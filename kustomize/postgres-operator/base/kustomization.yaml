@@ -1,0 +1,10 @@
+resources:
+  - namespace.yaml
+  - postgresql.crd.yaml
+  - operatorconfiguration.crd.yaml
+  - postgresteam.crd.yaml
+  - rbac.yaml
+  - config.yaml
+  - deployment.yaml
+  - service.yaml
+namespace: postgres-operator
