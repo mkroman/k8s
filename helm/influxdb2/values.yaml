@@ -1,0 +1,8 @@
+influxdb2:
+  persistence:
+    enabled: true
+    storageClass: ssd
+    accessMode: ReadWriteOnce
+    size: 50Gi
+
+
