@@ -1,0 +1,30 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: whoami
+  labels:
+    app: whoami
+spec:
+  selector:
+    matchLabels:
+      app: whoami
+  replicas: 3
+  template:
+    metadata:
+      labels:
+        app: whoami
+    spec:
+      containers:
+        - name: whoami
+          image: containous/whoami:latest
+          resources:
+            requests:
+              cpu: 0.1m
+              memory: 50Mi
+            limits:
+              cpu: 0.1m
+              memory: 50Mi
+          ports:
+            - name: http
+              containerPort: 80
