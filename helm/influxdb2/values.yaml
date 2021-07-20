@@ -13,5 +13,7 @@ influxdb2:
     secretName: rwx-im-tls
     hostname: influxdb.infra.rwx.im
     path: /
+    annotations:
+      traefik.ingress.kubernetes.io/redirect-entry-point: https
 
 
