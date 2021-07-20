@@ -5,4 +5,13 @@ influxdb2:
     accessMode: ReadWriteOnce
     size: 50Gi
 
+  ingress:
+    enabled: true
+
+    # Enable TLS termination
+    tls: true
+    secretName: rwx-im-tls
+    hostname: influxdb.infra.rwx.im
+    path: /
+
 
