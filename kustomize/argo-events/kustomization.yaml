@@ -1,0 +1,2 @@
+bases:
+  - github.com/argoproj/argo-events/manifests/cluster-install?ref=v1.4.0
