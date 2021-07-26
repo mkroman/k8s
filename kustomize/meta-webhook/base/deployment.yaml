@@ -1,0 +1,33 @@
+---
+apiVersion: v1
+kind: Deployment
+metadata:
+  name: meta-webhook
+  labels:
+    app: meta-webhook
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: meta-webhook
+  template:
+    metadata:
+      labels:
+        app: meta-webhook
+    spec:
+      containers:
+      - name: meta-webhook
+        image: rg.nl-ams.scw.cloud/uplink/meta-webhook:main
+        env:
+        - name: RACK_ENV
+          value: production
+        - name: META_RPC_URL
+          value: tcp://meta:31337
+        - name: META_RPC_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: meta-rpc
+              key: secret
+      imagePullSecrets:
+      - ams-docker-registry-credentials
+
