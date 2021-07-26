@@ -1,0 +1,25 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: meta-webhook
+  labels:
+    app: meta-webhook
+  annotations:
+    traefik.ingress.kubernetes.io/redirect-entry-point: https
+spec:
+  rules:
+  - host: meta-webhook.infra.rwx.im
+    http:
+      paths:
+      - backend:
+          service:
+            name: meta-webhook
+            port:
+              name: http
+        path: /
+        pathType: Prefix
+  tls:
+    - hosts:
+      - infra.rwx.im
+      secretName: infra-rwx-im-tls
