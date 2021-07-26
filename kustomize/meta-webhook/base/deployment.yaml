@@ -28,6 +28,11 @@ spec:
             secretKeyRef:
               name: meta-rpc
               key: secret
+        - name: META_WEBHOOK_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: meta-webhook
+              key: token
       imagePullSecrets:
       - name: ams-docker-registry-credentials
 

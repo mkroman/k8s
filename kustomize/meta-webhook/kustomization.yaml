@@ -1,3 +1,4 @@
 namespace: meta
 resources:
   - base/deployment.yaml
+  - base/sealedsecret.yaml
