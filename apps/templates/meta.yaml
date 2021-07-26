@@ -1,16 +1,16 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: meta-webhook
+  name: meta
   namespace: argocd
   finalizers:
   - resources-finalizer.argocd.argoproj.io
 spec:
   destination:
-    namespace: meta-webhook
+    namespace: meta
     server: {{ .Values.spec.destination.server }}
   project: production
   source:
-    path: kustomize/meta-webhook
+    path: kustomize/meta
     repoURL: {{ .Values.spec.source.repoURL }}
     targetRevision: {{ .Values.spec.source.targetRevision }}
