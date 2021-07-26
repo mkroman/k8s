@@ -1,5 +1,4 @@
 resources:
-  - namespace.yaml
   - postgresql.crd.yaml
   - operatorconfiguration.crd.yaml
   - postgresteam.crd.yaml
