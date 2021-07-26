@@ -1,0 +1,7 @@
+---
+bases:
+- ../meta-webhook
+namespace: meta
+resources:
+- base/persistentvolumeclaim.yaml
+- base/deployment.yaml

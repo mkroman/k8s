@@ -1,0 +1,94 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: meta
+  namespace: meta
+  labels:
+    app: meta
+    app.kubernetes.io/name: meta
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: meta
+  strategy:
+    type: Recreate
+  # Template for the created pods
+  template:
+    metadata:
+      namespace: meta
+      labels:
+        app.kubernetes.io/name: meta
+    spec:
+      initContainers:
+      - name: meta-migrate-db
+        image: rg.nl-ams.scw.cloud/uplink/meta:e5aa830
+        imagePullPolicy: IfNotPresent
+        env:
+          - name: BLUR_ENV
+            value: production
+        command: ["/bin/sh", "-c", "mkdir /meta/cache; bundle exec sequel -m /meta/migrations sqlite:///meta/cache/database.db"]
+        volumeMounts:
+          - name: meta-cache
+            mountPath: /meta/cache
+
+      containers:
+      # The bot container
+      - name: meta
+        image: rg.nl-ams.scw.cloud/uplink/meta:e5aa830
+        imagePullPolicy: Always
+        env:
+          - name: BLUR_ENV
+            value: production
+          - name: TZ
+            value: Europe/Copenhagen
+        args:
+          - "-v"
+        volumeMounts:
+          - name: meta-cache
+            mountPath: /meta/cache
+          - name: meta-webm
+            mountPath: /data/webm
+
+      # The mail reader container
+      - name: mail-reader
+        image: mkroman/meta-mail_reader:v0.1.6-2
+        env:
+        - name: S3_BUCKET_NAME
+          value: 7td20i4n5csfoq1w
+        - name: AWS_REGION
+          value: eu-north-1
+        - name: AWS_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: aws-s3-bucket-secret
+              key: aws-access-key
+        - name: AWS_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: aws-s3-bucket-secret
+              key: aws-secret-key
+        - name: IMAP_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: gmail-account-secret
+              key: username
+        - name: IMAP_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: gmail-account-secret
+              key: password
+        - name: RPC_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: meta-rpc
+              key: secret
+
+      imagePullSecrets:
+        - name: ams-docker-registry-credentials
+      volumes:
+        - name: meta-cache
+          persistentVolumeClaim:
+            claimName: meta-cache
+        - name: meta-webm
+          emptyDir: {}
+
