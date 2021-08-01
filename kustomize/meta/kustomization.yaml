@@ -5,3 +5,4 @@ namespace: meta
 resources:
 - base/persistentvolumeclaim.yaml
 - base/deployment.yaml
+- base/sealedsecret.yaml
