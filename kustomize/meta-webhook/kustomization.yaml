@@ -1,6 +1,7 @@
 namespace: meta
 resources:
-  - base/deployment.yaml
-  - base/sealedsecret.yaml
-  - base/service.yaml
-  - base/ingress.yaml
+- base/deployment.yaml
+- base/sealedsecret.yaml
+- base/service.yaml
+- base/middleware.yaml
+- base/ingressroute.yaml
