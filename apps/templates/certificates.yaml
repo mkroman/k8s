@@ -1,0 +1,15 @@
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: infra-rwx-im
+  namespace: rwx
+spec:
+  secretName: infra-rwx-im-tls
+  issuerRef:
+    name: letsencrypt-staging
+    kind: ClusterIssuer
+  commonName: '*.infra.rwx.im'
+  dnsNames:
+  - infra.rwx.im
+  - '*.infra.rwx.im'
