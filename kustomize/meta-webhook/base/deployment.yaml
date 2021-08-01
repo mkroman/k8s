@@ -36,5 +36,4 @@ spec:
               name: meta-webhook
               key: token
       imagePullSecrets:
-      - name: ams-docker-registry-credentials
-
+      - name: uplink-nl-ams-scw-registry
