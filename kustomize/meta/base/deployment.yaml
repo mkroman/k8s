@@ -60,22 +60,22 @@ spec:
         - name: AWS_ACCESS_KEY
           valueFrom:
             secretKeyRef:
-              name: aws-s3-bucket-secret
-              key: aws-access-key
+              name: meta-s3
+              key: AWS_ACCESS_KEY_ID
         - name: AWS_SECRET_KEY
           valueFrom:
             secretKeyRef:
-              name: aws-s3-bucket-secret
-              key: aws-secret-key
+              name: meta-s3
+              key: AWS_SECRET_ACCESS_KEY
         - name: IMAP_USERNAME
           valueFrom:
             secretKeyRef:
-              name: gmail-account-secret
+              name: meta-mail
               key: username
         - name: IMAP_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: gmail-account-secret
+              name: meta-mail
               key: password
         - name: RPC_SECRET
           valueFrom:
