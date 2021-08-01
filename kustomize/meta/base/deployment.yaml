@@ -84,7 +84,7 @@ spec:
               key: secret
 
       imagePullSecrets:
-        - name: ams-docker-registry-credentials
+        - name: uplink-nl-ams-scw-registry
       volumes:
         - name: meta-cache
           persistentVolumeClaim:
