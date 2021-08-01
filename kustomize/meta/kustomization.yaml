@@ -6,3 +6,4 @@ resources:
 - base/persistentvolumeclaim.yaml
 - base/deployment.yaml
 - base/sealedsecret.yaml
+- base/service.yaml

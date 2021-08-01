@@ -24,7 +24,7 @@ spec:
         - name: RACK_ENV
           value: production
         - name: META_RPC_URL
-          value: tcp://meta:31337
+          value: tcp://meta-rpc:31337
         - name: META_RPC_SECRET
           valueFrom:
             secretKeyRef:
