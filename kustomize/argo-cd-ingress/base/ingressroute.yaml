@@ -15,7 +15,7 @@ spec:
         - name: argocd-server
           port: 80
     - kind: Rule
-      match: (Host(`argocd.rwx.im`) || Host(`argo-cd.infra.rwx.im`) && Headers(`Content-Type`, `application/grpc`)
+      match: (Host(`argocd.infra.rwx.im`) || Host(`argo-cd.infra.rwx.im`)) && Headers(`Content-Type`, `application/grpc`)
       priority: 11
       services:
         - name: argocd-server
