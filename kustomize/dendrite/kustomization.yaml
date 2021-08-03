@@ -3,7 +3,6 @@ resources:
 - base/storageclass.yaml
 - base/persistentvolume.yaml
 - base/persistentvolumeclaim.yaml
-- base/secret.yaml
 - base/service.yaml
 - base/sealedsecret.yaml
 - base/postgresql.yaml
