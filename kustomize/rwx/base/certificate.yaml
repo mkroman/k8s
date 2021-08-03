@@ -4,7 +4,7 @@ kind: Certificate
 metadata:
   name: rwx-im
 spec:
-  secretName: irwx-im-tls
+  secretName: rwx-im-tls
   issuerRef:
     name: letsencrypt-production
     kind: ClusterIssuer
