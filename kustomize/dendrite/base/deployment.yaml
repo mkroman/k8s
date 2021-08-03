@@ -1,0 +1,45 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dendrite
+  labels:
+    app: dendrite
+spec:
+  selector:
+    matchLabels:
+      app: dendrite
+  template:
+    metadata:
+      labels:
+        app: dendrite
+    spec:
+      containers:
+      - name: dendrite
+        image: matrixdotorg/dendrite-monolith:v0.4.1
+        args: ["--tls-cert=tls/tls.crt", "--tls-key=tls/tls.key"]
+        volumeMounts:
+        - name: media
+          mountPath: /var/dendrite/media
+        - name: tls
+          mountPath: /etc/dendrite/tls
+          readOnly: true
+        - name: config
+          mountPath: /etc/dendrite
+          readOnly: true
+        - name: signing-key
+          mountPath: /etc/dendrite/signing
+          readOnly: true
+      volumes:
+      - name: media
+        persistentVolumeClaim:
+          claimName: dendrite-media
+      - name: tls
+        secret:
+          secretName: dendrite-tls
+      - name: config
+        secret:
+          secretName: dendrite-config
+      - name: signing-key
+        secret:
+          secretName: dendrite-signing-key
