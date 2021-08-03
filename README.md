@@ -6,8 +6,11 @@ This is the GitOps repository for the kubernetes cluster running in my home lab.
 
 * Kubernetes
 * Router capable of BGP load-balancing (I use [EdgeRouter 4])
+* CNI (I use [flannel])
+* Argo CD
 
 [edgerouter 4]: https://www.ui.com/edgemax/edgerouter-4/
+[flannel]: https://github.com/flannel-io/flannel
 
 ## Structure
 
