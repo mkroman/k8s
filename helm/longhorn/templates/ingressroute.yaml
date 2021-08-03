@@ -29,7 +29,7 @@ spec:
   - kind: Rule
     match: Host(`longhorn.infra.rwx.im`)
     middlewares:
-    - longhorn-basic-auth
+    - name: longhorn-basic-auth
     services:
     - name: longhorn-frontend
       port: 80
