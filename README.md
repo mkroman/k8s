@@ -63,6 +63,12 @@ and backup.
 This is an application that deploys [Traefik v2][traefik] as an ingress
 controller across my whole cluster.
 
+### [`kustomize/argo-cd-ingress`](kustomize/argo-cd-ingress/)
+
+This application creates an ingress route for [Argo CD].
+
+[argo cd]: https://argo-cd.readthedocs.io/en/stable/
+
 ### [`kustomize/argo-events`](kustomize/argo-events/)
 
 This application deploys [Argo Events][argo-events] which is a very extensible
