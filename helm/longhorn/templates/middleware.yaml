@@ -1,0 +1,9 @@
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: longhorn-basic-auth
+spec:
+  basicAuth:
+    secret: longhorn-http-auth
+

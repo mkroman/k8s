@@ -1,0 +1,37 @@
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: longhorn-ingress
+  namespace: {{ include "release_namespace" . }}
+spec:
+  entryPoints:
+  - web
+  routes:
+  - kind: Rule
+    match: Host(`longhorn.infra.rwx.im`)
+    middlewares:
+    - name: redirect-to-https
+      namespace: rwx
+    services:
+    - name: longhorn-frontend
+      port: 80
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: longhorn-ingress
+  namespace: {{ include "release_namespace" . }}
+spec:
+  entryPoints:
+  - websecure
+  routes:
+  - kind: Rule
+    match: Host(`longhorn.infra.rwx.im`)
+    middlewares:
+    - longhorn-basic-auth
+    services:
+    - name: longhorn-frontend
+      port: 80
+  tls:
+    secretName: infra-rwx-im-tls
