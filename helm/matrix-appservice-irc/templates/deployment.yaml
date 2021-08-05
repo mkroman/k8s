@@ -73,5 +73,5 @@ spec:
         secret:
           secretName: {{ .Values.appservice.secretName }}
       - name: config
-        configMap:
-          name: {{ .Values.appservice.config.secretName }}
+        secret:
+          secretName: {{ .Values.appservice.config.secretName }}
