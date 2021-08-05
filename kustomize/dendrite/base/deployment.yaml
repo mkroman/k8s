@@ -30,6 +30,9 @@ spec:
         - name: signing-key
           mountPath: /etc/dendrite/signing
           readOnly: true
+        - name: appservices
+          mountPath: /etc/dendrite/appservices
+          readOnly: true
       volumes:
       - name: media
         persistentVolumeClaim:
@@ -43,3 +46,6 @@ spec:
       - name: signing-key
         secret:
           secretName: dendrite-signing-key
+      - name: appservices
+        secret:
+          secretName: dendrite-appservices
