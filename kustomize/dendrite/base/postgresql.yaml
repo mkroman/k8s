@@ -19,8 +19,10 @@ spec:
     storageClass: local-storage-ssd
   users:
     dendrite: []
+    matrix_irc: []
   databases:
     dendrite: dendrite
+    matrix_irc: matrix_irc
   allowedSourceRanges:
     # IP ranges to access your cluster go here
   
