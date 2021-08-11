@@ -13,6 +13,9 @@ spec:
     middlewares:
     - name: redirect-to-https
       namespace: rwx
+    services:
+    - name: argocd-server
+      port: 80
 ---
 apiVersion: traefik.containo.us/v1alpha1
 kind: IngressRoute
