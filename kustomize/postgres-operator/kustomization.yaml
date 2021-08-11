@@ -1,4 +1,4 @@
 bases:
-  - ./operator
-  - ./ui
+- ./operator
+- ./ui
 namespace: postgres-operator

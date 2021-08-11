@@ -10,7 +10,6 @@ spec:
   selector:
     name: postgres-operator-ui
   ports:
-    - port: 80
-      protocol: TCP
-      targetPort: 8081
-
+  - port: 80
+    protocol: TCP
+    targetPort: 8081

@@ -24,18 +24,18 @@ spec:
       openAPIV3Schema:
         type: object
         required:
-          - kind
-          - apiVersion
-          - spec
+        - kind
+        - apiVersion
+        - spec
         properties:
           kind:
             type: string
             enum:
-              - PostgresTeam
+            - PostgresTeam
           apiVersion:
             type: string
             enum:
-              - acid.zalan.do/v1
+            - acid.zalan.do/v1
           spec:
             type: object
             properties:

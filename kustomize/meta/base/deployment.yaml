@@ -1,3 +1,4 @@
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -24,12 +25,12 @@ spec:
         image: rg.nl-ams.scw.cloud/uplink/meta:911e20d
         imagePullPolicy: IfNotPresent
         env:
-          - name: BLUR_ENV
-            value: production
+        - name: BLUR_ENV
+          value: production
         command: ["/bin/sh", "-c", "mkdir /meta/cache; bundle exec sequel -m /meta/migrations sqlite:///meta/cache/database.db"]
         volumeMounts:
-          - name: meta-cache
-            mountPath: /meta/cache
+        - name: meta-cache
+          mountPath: /meta/cache
 
       containers:
       # The bot container
@@ -37,17 +38,17 @@ spec:
         image: rg.nl-ams.scw.cloud/uplink/meta:911e20d
         imagePullPolicy: Always
         env:
-          - name: BLUR_ENV
-            value: production
-          - name: TZ
-            value: Europe/Copenhagen
+        - name: BLUR_ENV
+          value: production
+        - name: TZ
+          value: Europe/Copenhagen
         args:
-          - "-v"
+        - "-v"
         volumeMounts:
-          - name: meta-cache
-            mountPath: /meta/cache
-          - name: meta-webm
-            mountPath: /data/webm
+        - name: meta-cache
+          mountPath: /meta/cache
+        - name: meta-webm
+          mountPath: /data/webm
 
       # The mail reader container
       - name: mail-reader
@@ -84,11 +85,11 @@ spec:
               key: secret
 
       imagePullSecrets:
-        - name: uplink-nl-ams-scw-registry
+      - name: uplink-nl-ams-scw-registry
       volumes:
-        - name: meta-cache
-          persistentVolumeClaim:
-            claimName: meta-cache
-        - name: meta-webm
-          emptyDir: {}
+      - name: meta-cache
+        persistentVolumeClaim:
+          claimName: meta-cache
+      - name: meta-webm
+        emptyDir: {}
 

@@ -15,4 +15,4 @@ jobs:
       with:
         token: ${{ secrets.GITHUB_TOKEN }}
         ## The target path is processed recursively
-        target-path: .
+        target-path: kustomize .github

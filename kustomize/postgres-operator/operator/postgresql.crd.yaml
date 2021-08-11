@@ -56,34 +56,34 @@ spec:
       openAPIV3Schema:
         type: object
         required:
-          - kind
-          - apiVersion
-          - spec
+        - kind
+        - apiVersion
+        - spec
         properties:
           kind:
             type: string
             enum:
-              - postgresql
+            - postgresql
           apiVersion:
             type: string
             enum:
-              - acid.zalan.do/v1
+            - acid.zalan.do/v1
           spec:
             type: object
             required:
-              - numberOfInstances
-              - teamId
-              - postgresql
-              - volume
+            - numberOfInstances
+            - teamId
+            - postgresql
+            - volume
             properties:
               additionalVolumes:
                 type: array
                 items:
                   type: object
                   required:
-                    - name
-                    - mountPath
-                    - volumeSource
+                  - name
+                  - mountPath
+                  - volumeSource
                   properties:
                     name:
                       type: string
@@ -108,7 +108,7 @@ spec:
               clone:
                 type: object
                 required:
-                  - cluster
+                - cluster
                 properties:
                   cluster:
                     type: string
@@ -141,22 +141,22 @@ spec:
                   mode:
                     type: string
                     enum:
-                      - "session"
-                      - "transaction"
+                    - "session"
+                    - "transaction"
                   numberOfInstances:
                     type: integer
                     minimum: 2
                   resources:
                     type: object
                     required:
-                      - requests
-                      - limits
+                    - requests
+                    - limits
                     properties:
                       limits:
                         type: object
                         required:
-                          - cpu
-                          - memory
+                        - cpu
+                        - memory
                         properties:
                           cpu:
                             type: string
@@ -167,8 +167,8 @@ spec:
                       requests:
                         type: object
                         required:
-                          - cpu
-                          - memory
+                        - cpu
+                        - memory
                         properties:
                           cpu:
                             type: string
@@ -262,19 +262,19 @@ spec:
               postgresql:
                 type: object
                 required:
-                  - version
+                - version
                 properties:
                   version:
                     type: string
                     enum:
-                      - "9.3"
-                      - "9.4"
-                      - "9.5"
-                      - "9.6"
-                      - "10"
-                      - "11"
-                      - "12"
-                      - "13"
+                    - "9.3"
+                    - "9.4"
+                    - "9.5"
+                    - "9.6"
+                    - "10"
+                    - "11"
+                    - "12"
+                    - "13"
                   parameters:
                     type: object
                     additionalProperties:
@@ -304,14 +304,14 @@ spec:
               resources:
                 type: object
                 required:
-                  - requests
-                  - limits
+                - requests
+                - limits
                 properties:
                   limits:
                     type: object
                     required:
-                      - cpu
-                      - memory
+                    - cpu
+                    - memory
                     properties:
                       cpu:
                         type: string
@@ -341,8 +341,8 @@ spec:
                   requests:
                     type: object
                     required:
-                      - cpu
-                      - memory
+                    - cpu
+                    - memory
                     properties:
                       cpu:
                         type: string
@@ -371,7 +371,7 @@ spec:
               standby:
                 type: object
                 required:
-                  - s3_wal_path
+                - s3_wal_path
                 properties:
                   s3_wal_path:
                     type: string
@@ -380,7 +380,7 @@ spec:
               tls:
                 type: object
                 required:
-                  - secretName
+                - secretName
                 properties:
                   secretName:
                     type: string
@@ -488,25 +488,25 @@ spec:
                 items:
                   type: object
                   required:
-                    - key
-                    - operator
-                    - effect
+                  - key
+                  - operator
+                  - effect
                   properties:
                     key:
                       type: string
                     operator:
                       type: string
                       enum:
-                        - Equal
-                        - Exists
+                      - Equal
+                      - Exists
                     value:
                       type: string
                     effect:
                       type: string
                       enum:
-                        - NoExecute
-                        - NoSchedule
-                        - PreferNoSchedule
+                      - NoExecute
+                      - NoSchedule
+                      - PreferNoSchedule
                     tolerationSeconds:
                       type: integer
               useLoadBalancer:  # deprecated
@@ -551,7 +551,7 @@ spec:
               volume:
                 type: object
                 required:
-                  - size
+                - size
                 properties:
                   iops:
                     type: integer

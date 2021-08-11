@@ -44,9 +44,9 @@ spec:
       openAPIV3Schema:
         type: object
         required:
-          - kind
-          - apiVersion
-          - configuration
+        - kind
+        - apiVersion
+        - configuration
         properties:
           kind:
             type: string
@@ -118,11 +118,11 @@ spec:
                 type: object
                 properties:
                   replication_username:
-                     type: string
-                     default: standby
+                    type: string
+                    default: standby
                   super_username:
-                     type: string
-                     default: postgres
+                    type: string
+                    default: postgres
               major_version_upgrade:
                 type: object
                 properties:
@@ -186,9 +186,9 @@ spec:
                     items:
                       type: object
                       required:
-                        - secretname
-                        - userkey
-                        - passwordkey
+                      - secretname
+                      - userkey
+                      - passwordkey
                       properties:
                         secretname:
                           type: string
@@ -237,8 +237,8 @@ spec:
                   pod_management_policy:
                     type: string
                     enum:
-                      - "ordered_ready"
-                      - "parallel"
+                    - "ordered_ready"
+                    - "parallel"
                     default: "ordered_ready"
                   pod_priority_class_name:
                     type: string
@@ -275,9 +275,9 @@ spec:
                   storage_resize_mode:
                     type: string
                     enum:
-                      - "ebs"
-                      - "pvc"
-                      - "off"
+                    - "ebs"
+                    - "pvc"
+                    - "off"
                     default: "pvc"
                   toleration:
                     type: object
@@ -352,8 +352,8 @@ spec:
                   external_traffic_policy:
                     type: string
                     enum:
-                      - "Cluster"
-                      - "Local"
+                    - "Cluster"
+                    - "Local"
                     default: "Cluster"
                   master_dns_name_format:
                     type: string
@@ -535,8 +535,8 @@ spec:
                   connection_pooler_mode:
                     type: string
                     enum:
-                      - "session"
-                      - "transaction"
+                    - "session"
+                    - "transaction"
                     default: "transaction"
                   connection_pooler_number_of_instances:
                     type: integer
