@@ -21,7 +21,7 @@ spec:
     spec:
       initContainers:
       - name: meta-migrate-db
-        image: rg.nl-ams.scw.cloud/uplink/meta:e5aa830
+        image: rg.nl-ams.scw.cloud/uplink/meta:911e20d
         imagePullPolicy: IfNotPresent
         env:
           - name: BLUR_ENV
@@ -34,7 +34,7 @@ spec:
       containers:
       # The bot container
       - name: meta
-        image: rg.nl-ams.scw.cloud/uplink/meta:e5aa830
+        image: rg.nl-ams.scw.cloud/uplink/meta:911e20d
         imagePullPolicy: Always
         env:
           - name: BLUR_ENV
