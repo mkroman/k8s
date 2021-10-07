@@ -20,9 +20,11 @@ spec:
   users:
     dendrite: []
     matrix_irc: []
+    vaultwarden: []
   databases:
     dendrite: dendrite
     matrix_irc: matrix_irc
+    vaultwarden: vaultwarden
   allowedSourceRanges:
     # IP ranges to access your cluster go here
   
