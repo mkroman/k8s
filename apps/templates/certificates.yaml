@@ -25,3 +25,5 @@ spec:
     name: letsencrypt-production
     kind: ClusterIssuer
   commonName: bitwarden.rwx.im
+  dnsNames:
+  - bitwarden.rwx.im
