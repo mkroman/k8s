@@ -14,4 +14,4 @@ traefik:
     kubernetesCRD:
       enabled: true
       # Allow IngressRoutes to reference resources in other namespaces
-      allowCrossNamespace: false
+      allowCrossNamespace: true
