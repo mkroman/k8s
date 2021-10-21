@@ -1,0 +1,55 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: meta-webhook-sensor
+  namespace: argo-events
+spec:
+  template:
+    serviceAccountName: deployment-patch-sa
+  dependencies:
+  - name: webhook
+    eventSourceName: deployment
+    eventName: deploy
+    filters:
+      data:
+      - path: body.project
+        type: string
+        value:
+        - meta
+  triggers:
+  - template:
+      name: webhook-meta-deployment
+      k8s:
+        group: apps
+        operation: patch
+        patchStrategy: "application/strategic-merge-patch+json"
+        resource: deployments
+        version: v1
+        source:
+          resource:
+            apiVersion: apps/v1
+            kind: Deployment
+            metadata:
+              name: meta
+              namespace: meta
+            spec:
+              template:
+                spec:
+                  initContainers:
+                  - name: meta-migrate-db
+                    image: "rg.nl-ams.scw.cloud/uplink/meta:"
+                  containers:
+                  - name: meta
+                    image: "rg.nl-ams.scw.cloud/uplink/meta:"
+        parameters:
+        - src:
+            dependencyName: webhook
+            dataKey: body.imageTag
+          dest: spec.template.spec.initContainers.0.image
+          operation: append
+        - src:
+            dependencyName: webhook
+            dataKey: body.imageTag
+          dest: spec.template.spec.containers.0.image
+          operation: append
