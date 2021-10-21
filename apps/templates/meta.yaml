@@ -17,10 +17,10 @@ spec:
   # Ignore updates to the deployment image tags because this is controlled by
   # webhooks
   ignoreDifferences:
-  - group: apps/v1
+  - group: apps
     kind: Deployment
     name: meta
     namespace: meta
-    jsonPointers:
-    - /spec/template/spec/initContainers/0/image
-    - /spec/template/spec/containers/0/image
+    jqPathExpressions:
+    - .spec.template.spec.containers[] | select(.name == "name")
+    - .spec.template.spec.initContainers[] | select(.name == "meta-migrate-db")
