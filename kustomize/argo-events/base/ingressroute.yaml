@@ -1,3 +1,4 @@
+---
 apiVersion: traefik.containo.us/v1alpha1
 kind: IngressRoute
 metadata:
@@ -10,6 +11,22 @@ spec:
     match: Host(`github-events.infra.rwx.im`)
     services:
     - name: github-eventsource-svc
+      port: 12000
+  tls:
+    secretName: infra-rwx-im-tls
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: eventsource-webhook
+spec:
+  entryPoints:
+  - websecure
+  routes:
+  - kind: Rule
+    match: Host(`events.infra.rwx.im`)
+    services:
+    - name: deployment-eventsource-svc
       port: 12000
   tls:
     secretName: infra-rwx-im-tls
