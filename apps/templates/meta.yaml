@@ -14,3 +14,13 @@ spec:
     path: kustomize/meta
     repoURL: {{ .Values.spec.source.repoURL }}
     targetRevision: {{ .Values.spec.source.targetRevision }}
+  ignoreDifferences:
+  # Ignore updates to the deployment image tags because this is controlled by
+  # webhooks
+  - group: apps
+    kind: Deployment
+    name: meta
+    namespace: meta
+    jsonPointers:
+    - /spec/template/spec/initContainers/0/image
+    - /spec/template/spec/containers/0/image
