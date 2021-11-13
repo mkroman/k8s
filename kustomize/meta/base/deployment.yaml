@@ -7,8 +7,6 @@ metadata:
   labels:
     app: meta
     app.kubernetes.io/name: meta
-  annotations:
-    linkerd.io/inject: enabled
 spec:
   selector:
     matchLabels:
@@ -19,6 +17,8 @@ spec:
       namespace: meta
       labels:
         app.kubernetes.io/name: meta
+      annotations:
+        linkerd.io/inject: enabled
     spec:
       initContainers:
       - name: meta-migrate-db
