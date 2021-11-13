@@ -11,8 +11,6 @@ spec:
   selector:
     matchLabels:
       app.kubernetes.io/name: meta
-  strategy:
-    type: Recreate
   # Template for the created pods
   template:
     metadata:
