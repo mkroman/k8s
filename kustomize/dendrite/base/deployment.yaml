@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: dendrite
-        image: matrixdotorg/dendrite-monolith:v0.5.0
+        image: matrixdotorg/dendrite-monolith:v0.5.1
         args: ["--tls-cert=tls/tls.crt", "--tls-key=tls/tls.key"]
         volumeMounts:
         - name: media
