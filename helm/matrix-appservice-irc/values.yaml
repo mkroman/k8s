@@ -2,10 +2,10 @@
 # This is a YAML-formatted file.
 
 image:
-  repository: rg.nl-ams.scw.cloud/mkroman/matrix-appservice-irc
+  repository: matrixdotorg/matrix-appservice-irc
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  # tag: ""
+  tag: "release-0.32.1"
 
 imagePullSecrets:
 - name: uplink-nl-ams-scw-registry
