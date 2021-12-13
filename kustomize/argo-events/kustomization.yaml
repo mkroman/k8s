@@ -1,5 +1,5 @@
 bases:
-- github.com/argoproj/argo-events/manifests/cluster-install?ref=v1.5.0
-- github.com/argoproj/argo-events/manifests/extensions/validating-webhook?ref=v1.5.0
+- github.com/argoproj/argo-events/manifests/cluster-install?ref=v1.5.4
+- github.com/argoproj/argo-events/manifests/extensions/validating-webhook?ref=v1.5.4
 resources:
 - base/eventbus.yaml
