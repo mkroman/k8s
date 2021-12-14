@@ -1,9 +1,12 @@
 influxdb2:
+  adminUser:
+    existingSecret: influxdb-auth
+
   persistence:
     enabled: true
-    storageClass: ssd
+    storageClass: local-path
     accessMode: ReadWriteOnce
-    size: 50Gi
+    size: 100Gi
 
   ingress:
     enabled: true
