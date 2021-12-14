@@ -17,6 +17,6 @@ influxdb2:
     hostname: influxdb.infra.rwx.im
     path: /
     annotations:
-      traefik.ingress.kubernetes.io/redirect-entry-point: https
-
+      traefik.ingress.kubernetes.io/router.entrypoints: websecure
+      traefik.ingress.kubernetes.io/router.tls: "true"
 
