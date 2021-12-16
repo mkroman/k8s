@@ -1,3 +1,4 @@
 namespace: rwx
 resources:
 - base/certificate.yaml
+- base/kubegres.yaml

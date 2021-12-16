@@ -1,0 +1,24 @@
+---
+apiVersion: kubegres.reactive-tech.io/v1
+kind: Kubegres
+metadata:
+  name: postgres
+  namespace: rwx
+spec:
+  replicas: 2
+  image: postgres:14.1
+  database:
+    size: 100Gi
+    storageClassName: local-path
+  env:
+   - name: POSTGRES_PASSWORD
+     valueFrom:
+       secretKeyRef:
+         name: postgres-auth
+         key: superUserPassword
+   - name: POSTGRES_REPLICATION_PASSWORD
+     valueFrom:
+       secretKeyRef:
+         name: postgres-auth
+         key: replicationUserPassword
+
