@@ -9,7 +9,7 @@ kind: Namespace
 metadata:
   name: argo-events
   labels:
-    im.rwx.infra/tls: true
+    im.rwx.infra/tls: 'true'
 ---
 apiVersion: v1
 kind: Namespace
@@ -31,4 +31,4 @@ kind: Namespace
 metadata:
   name: influxdb
   labels:
-    im.rwx.infra/tls: true
+    im.rwx.infra/tls: 'true'
