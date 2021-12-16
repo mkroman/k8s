@@ -13,7 +13,7 @@ influxdb2:
 
     # Enable TLS termination
     tls: true
-    secretName: rwx-im-tls
+    secretName: infra-rwx-im-tls
     hostname: influxdb.infra.rwx.im
     path: /
     annotations:
