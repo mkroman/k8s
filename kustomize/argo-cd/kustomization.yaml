@@ -1,0 +1,4 @@
+bases:
+- github.com/argoproj/argo-cd/manifests/cluster-install?ref=v2.2.0
+resources:
+- ingressroute.yaml
