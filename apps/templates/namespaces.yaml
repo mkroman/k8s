@@ -14,11 +14,6 @@ metadata:
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: postgres-operator
----
-apiVersion: v1
-kind: Namespace
-metadata:
   name: rwx
 ---
 apiVersion: v1

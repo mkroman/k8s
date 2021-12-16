@@ -1,6 +1,0 @@
-resources:
-- deployment.yaml
-- ingress.yaml
-- service.yaml
-- rbac.yaml
-namespace: postgres-operator
