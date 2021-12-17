@@ -1,0 +1,82 @@
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "mumble.fullname" . }}
+  labels:
+    {{- include "mumble.labels" . | nindent 4 }}
+spec:
+  serviceName: {{ include "mumble.fullname" . }}
+  selector:
+    matchLabels:
+      {{- include "mumble.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "mumble.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+          - name: CONFIG_PATH
+            value: /etc/murmur/murmur.ini
+          ports:
+          - name: mumble
+            containerPort: 64738
+            protocol: TCP
+          - name: mumble-udp
+            containerPort: 64738
+            protocol: UDP
+          # livenessProbe:
+          #   tcpSocket:
+          #     port: mumble
+          # readinessProbe:
+          #   tcpSocket:
+          #     port: mumble
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+          - name: tls
+            mountPath: /etc/secrets/tls
+            readOnly: true
+          - name: config
+            mountPath: /etc/murmur
+            readOnly: true
+          - name: data
+            mountPath: /var/lib/murmurd
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+      - name: tls
+        secret:
+          secretName: {{ .Values.murmur.tls.secretName }}
+      - name: config
+        configMap:
+          name: {{ include "mumble.fullname" . }}-config
+      - name: data
+        persistentVolumeClaim:
+          claimName: {{ include "mumble.fullname" . }}-data
