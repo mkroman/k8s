@@ -6,6 +6,9 @@ metadata:
   namespace: rwx
 spec:
   secretName: infra-rwx-im-tls
+  secretTemplate:
+    annotations:
+      kubed.appscode.com/sync: 'im.rwx.infra/tls=true'
   issuerRef:
     name: letsencrypt-production
     kind: ClusterIssuer
