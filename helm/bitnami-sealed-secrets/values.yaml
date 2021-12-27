@@ -1,4 +1,3 @@
 sealed-secrets:
   namespace: "kube-system"
-  commandArgs:
-  - "--update-status"
+  nameOverride: "sealed-secrets"
