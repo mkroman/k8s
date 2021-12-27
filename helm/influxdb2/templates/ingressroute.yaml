@@ -1,0 +1,20 @@
+{{- if .Values.influxdb2.ingress.enabled -}}
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: {{ include "influxdb.fullname" . }}-http
+spec:
+  entryPoints:
+  - web
+  routes:
+  - kind: Rule
+    match: Host(`{{ .Values.influxdb2.ingress.hostname }}`)
+    middlewares:
+    - name: redirect-to-https
+      namespace: rwx
+    services:
+    - name: {{ include "influxdb.fullname" . }}
+      kind: Service
+      port: http
+{{- end }}

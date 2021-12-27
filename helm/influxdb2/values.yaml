@@ -4,7 +4,9 @@ influxdb2:
 
   persistence:
     enabled: true
-    storageClass: ssd
+    useExisting: true
+    name: influxdb-data
+    # storageClass: ssd
     accessMode: ReadWriteOnce
     size: 100Gi
 
