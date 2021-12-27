@@ -1,5 +1,5 @@
 ---
-manifestss:
+bases:
 - ../meta-webhook
 namespace: meta
 resources:
