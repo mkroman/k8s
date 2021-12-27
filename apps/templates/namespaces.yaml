@@ -14,13 +14,6 @@ metadata:
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: argocd
-  labels:
-    im.rwx.infra/tls: 'true'
----
-apiVersion: v1
-kind: Namespace
-metadata:
   name: rwx
 ---
 apiVersion: v1
