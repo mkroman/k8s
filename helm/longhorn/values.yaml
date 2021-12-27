@@ -1,0 +1,5 @@
+longhorn:
+  defaultSettings:
+    backupTarget: s3://mkroman-backup@eu-central-003/backupstore
+    backupTargetCredentialSecret: backblaze-b2
+    defaultReplicaCount: 2
