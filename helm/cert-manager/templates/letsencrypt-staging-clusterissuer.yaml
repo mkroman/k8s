@@ -19,5 +19,5 @@ spec:
         cloudflare:
           email: mk@maero.dk
           apiTokenSecretRef:
-            name: cloudflare-api-token-secret
+            name: cloudflare-api-access
             key: api-token
