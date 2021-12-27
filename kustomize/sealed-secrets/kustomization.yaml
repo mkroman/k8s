@@ -1,0 +1,5 @@
+resources:
+- manifests/crd.yaml
+- manifests/rbac.yaml
+- manifests/deployment.yaml
+- manifests/service.yaml
