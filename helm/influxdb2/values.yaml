@@ -22,3 +22,17 @@ influxdb2:
       traefik.ingress.kubernetes.io/router.entrypoints: websecure
       traefik.ingress.kubernetes.io/router.tls: "true"
 
+grafana:
+  ingress:
+    enabled: true
+    hosts:
+    - grafana.infra.rwx.im
+    tls:
+      - secretName: infra-rwx-im-tls
+        hosts:
+        - grafana.infra.rwx.im
+  persistence:
+    enabled: true
+    size: 10Gi
+  admin:
+    existingSecret: grafana-auth
