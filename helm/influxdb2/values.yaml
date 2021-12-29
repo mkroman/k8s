@@ -23,16 +23,25 @@ influxdb2:
       traefik.ingress.kubernetes.io/router.tls: "true"
 
 grafana:
+  grafana.ini:
+    server:
+      domain: grafana.infra.rwx.im
+      root_url: "%(protocol)s://%(domain)s"
+
   ingress:
     enabled: true
     hosts:
     - grafana.infra.rwx.im
     tls:
-      - secretName: infra-rwx-im-tls
-        hosts:
-        - grafana.infra.rwx.im
+    - secretName: infra-rwx-im-tls
+      hosts:
+      - grafana.infra.rwx.im
+
   persistence:
     enabled: true
     size: 10Gi
+
   admin:
     existingSecret: grafana-auth
+
+
