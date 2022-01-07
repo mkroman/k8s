@@ -39,7 +39,7 @@ spec:
           claimName: dendrite-media
       - name: tls
         secret:
-          secretName: dendrite-tls
+          secretName: rwx-im-tls
       - name: config
         secret:
           secretName: dendrite-config

@@ -1,9 +1,9 @@
 namespace: rwx
 resources:
-- base/storageclass.yaml
-- base/persistentvolume.yaml
 - base/persistentvolumeclaim.yaml
 - base/service.yaml
-- base/sealedsecret.yaml
+- base/sealedsecret.dendrite-config.yaml
+- base/sealedsecret.dendrite-appservices.yaml
+- base/sealedsecret.dendrite-signing-key.yaml
 - base/deployment.yaml
 - base/ingressroute.yaml
