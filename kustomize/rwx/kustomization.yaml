@@ -1,5 +1,9 @@
 namespace: rwx
 resources:
 - base/certificate.yaml
+- base/configmap.yaml
+- base/sealedsecret.rwx-im-scw-cr-auth.yaml
+- base/sealedsecret.postgres-backup.yaml
 - base/kubegres.yaml
+- base/persistentvolumeclaim.yaml
 - base/middleware.yaml
