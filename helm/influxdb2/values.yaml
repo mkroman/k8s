@@ -26,6 +26,7 @@ grafana:
   grafana.ini:
     server:
       domain: grafana.infra.rwx.im
+      protocol: https
       root_url: "%(protocol)s://%(domain)s"
 
   ingress:
