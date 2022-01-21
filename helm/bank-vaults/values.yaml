@@ -1,0 +1,26 @@
+vault-operator: {}
+
+vault:
+  # The name of the vault
+  name: vault
+
+  # Google Cloud configuration values
+  gcloud:
+    # The name of the google cloud project to use.
+    project: home-automation-194600
+
+    # The name of the storage bucket to use.
+    storageBucket: vault-rwx
+
+    # Key Management Service configuration
+    kms:
+      # The name of the KMS keyring to use.
+      keyRing: vault
+
+      # The name of the key used when unsealing.
+      cryptoKey: vault-unsealer
+
+      # The location of the KMS.
+      location: global
+
+      
