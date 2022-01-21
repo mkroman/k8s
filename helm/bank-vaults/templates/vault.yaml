@@ -57,6 +57,11 @@ spec:
         ttl: 1h
     # See: https://www.vaultproject.io/docs/secrets/gcp/index.html
     secrets:
+    - type: kv
+      path: secret
+      description: General secrets.
+      options:
+        version: 2
     - type: gcp
       path: gcp/
       description: Google cloud secret backend
