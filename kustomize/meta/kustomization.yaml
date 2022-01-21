@@ -4,10 +4,7 @@ bases:
 namespace: meta
 resources:
 - manifests/persistentvolumeclaim.yaml
-- manifests/sealedsecret.meta-s3.yaml
-- manifests/sealedsecret.meta-rpc.yaml
-- manifests/sealedsecret.meta-mail.yaml
-- manifests/sealedsecret.uplink-nl-ams-scw-registry.yaml
+- manifests/secret.uplink-nl-ams-scw-registry.yaml
 - manifests/deployment.yaml
 - manifests/service.yaml
 

@@ -57,30 +57,15 @@ spec:
         - name: AWS_REGION
           value: eu-north-1
         - name: AWS_ACCESS_KEY
-          valueFrom:
-            secretKeyRef:
-              name: meta-s3
-              key: AWS_ACCESS_KEY_ID
+          value: vault:secret/data/meta/aws#AWS_ACCESS_KEY_ID
         - name: AWS_SECRET_KEY
-          valueFrom:
-            secretKeyRef:
-              name: meta-s3
-              key: AWS_SECRET_ACCESS_KEY
+          value: vault:secret/data/meta/aws#AWS_SECRET_ACCESS_KEY
         - name: IMAP_USERNAME
-          valueFrom:
-            secretKeyRef:
-              name: meta-mail
-              key: username
+          value: vault:secret/data/meta/mail#IMAP_USERNAME
         - name: IMAP_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: meta-mail
-              key: password
+          value: vault:secret/data/meta/mail#IMAP_PASSWORD
         - name: RPC_SECRET
-          valueFrom:
-            secretKeyRef:
-              name: meta-rpc
-              key: secret
+          value: vault:secret/data/meta#RPC_SECRET
 
       imagePullSecrets:
       - name: uplink-nl-ams-scw-registry
