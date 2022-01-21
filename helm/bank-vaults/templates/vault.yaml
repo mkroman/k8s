@@ -55,6 +55,16 @@ spec:
         bound_service_account_namespaces: default
         policies: allow_secrets
         ttl: 1h
+    # Allow mutation of secrets using secrets-mutation annotation to use the secret kv store
+    - name: secretsmutation
+      bound_service_account_names:
+      - bank-vaults-secrets-webhook
+      bound_service_account_namespaces:
+      - default
+      policies:
+      - allow_secrets
+      ttl: 1h
+
     # See: https://www.vaultproject.io/docs/secrets/gcp/index.html
     secrets:
     - type: kv
