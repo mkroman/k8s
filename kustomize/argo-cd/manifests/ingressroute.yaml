@@ -33,6 +33,13 @@ spec:
     - name: argocd-server
       port: 80
   - kind: Rule
+    match: (Host(`argocd.infra.rwx.im`) || Host(`argo-cd.infra.rwx.im`)) && Path(`\.(svg|png|jpg|gif)$`)
+    middlewares:
+    - name: client-1hr-cache
+    services:
+    - name: argocd-server
+      port: 80
+  - kind: Rule
     match: (Host(`argocd.infra.rwx.im`) || Host(`argo-cd.infra.rwx.im`)) && Headers(`Content-Type`, `application/grpc`)
     priority: 11
     services:
