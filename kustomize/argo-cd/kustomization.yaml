@@ -1,7 +1,6 @@
 bases:
 - github.com/argoproj/argo-cd/manifests/cluster-install?ref=v2.2.3
 resources:
-- manifests/namespace.yaml
 - manifests/project.yaml
 - manifests/repository.yaml
 - manifests/application.yaml
