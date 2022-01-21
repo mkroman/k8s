@@ -1,4 +1,14 @@
-vault-operator: {}
+operator: {}
+
+secrets-webhook:
+  env:
+    # Use the same image as our primary vault
+    VAULT_IMAGE: vault:1.9.2
+
+  # Use cert-manager to mange the CA.
+  certificate:
+    generate: false
+    useCertManager: true
 
 vault:
   # The name of the vault
