@@ -19,6 +19,12 @@ spec:
       storageBucket: {{ .storageBucket }}
       {{- end }}
 
+  # Distribute the CA TLS cert to the following namespaces
+  caNamespaces:
+  - meta
+  - default
+  - rwx
+
   config:
     storage:
       gcs:
