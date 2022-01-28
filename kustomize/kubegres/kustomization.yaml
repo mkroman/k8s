@@ -1,4 +1,4 @@
 ---
 resources:
 - base/kubegres-v1.15.yaml
-- base/sealedsecret.postgres-auth.yaml
+- base/secret.postgres-auth.yaml
