@@ -10,6 +10,8 @@ secrets-webhook:
     generate: false
     useCertManager: true
 
+  configMapMutation: true
+
 vault:
   # The name of the vault
   name: vault
