@@ -5,58 +5,60 @@ metadata:
   name: postgres
   namespace: rwx
 spec:
-  replicas: 2
+  replicas: 1
+
   image: rg.nl-ams.scw.cloud/rwx-im/postgres-wal-g:14.1-1.1-3
+
   imagePullSecrets:
-    - name: rwx-im-scw-cr-auth
+  - name: rwx-im-scw-cr-auth
 
   backup:
     pvcName: postgres-backup-pvc
-    schedule: '0 */1 * * *'
+    schedule: '21 */1 * * *'
     volumeMount: /var/lib/backup
 
   customConfig: postgres-config
 
   database:
     size: 100Gi
-    storageClassName: local-path
+    storageClassName: local-storage
 
   failover:
     isDisabled: false
 
   env:
-   - name: POSTGRES_PASSWORD
-     valueFrom:
-       secretKeyRef:
-         name: postgres-auth
-         key: superUserPassword
-   - name: POSTGRES_REPLICATION_PASSWORD
-     valueFrom:
-       secretKeyRef:
-         name: postgres-auth
-         key: replicationUserPassword
-   - name: AWS_ACCESS_KEY_ID
-     valueFrom:
-       secretKeyRef:
-         name: postgres-backup
-         key: AWS_ACCESS_KEY_ID
-   - name: AWS_ENDPOINT
-     valueFrom:
-       secretKeyRef:
-         name: postgres-backup
-         key: AWS_ENDPOINT
-   - name: AWS_SECRET_ACCESS_KEY
-     valueFrom:
-       secretKeyRef:
-         name: postgres-backup
-         key: AWS_SECRET_ACCESS_KEY
-   - name: WALG_S3_PREFIX
-     valueFrom:
-       secretKeyRef:
-         name: postgres-backup
-         key: WALG_S3_PREFIX
-   - name: WALG_LIBSODIUM_KEY
-     valueFrom:
-       secretKeyRef:
-         name: postgres-backup
-         key: WALG_LIBSODIUM_KEY
+  - name: POSTGRES_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: postgres-auth
+        key: superUserPassword
+  - name: POSTGRES_REPLICATION_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: postgres-auth
+        key: replicationUserPassword
+  - name: AWS_ACCESS_KEY_ID
+    valueFrom:
+      secretKeyRef:
+        name: postgres-backup
+        key: AWS_ACCESS_KEY_ID
+  - name: AWS_ENDPOINT
+    valueFrom:
+      secretKeyRef:
+        name: postgres-backup
+        key: AWS_ENDPOINT
+  - name: AWS_SECRET_ACCESS_KEY
+    valueFrom:
+      secretKeyRef:
+        name: postgres-backup
+        key: AWS_SECRET_ACCESS_KEY
+  - name: WALG_S3_PREFIX
+    valueFrom:
+      secretKeyRef:
+        name: postgres-backup
+        key: WALG_S3_PREFIX
+  - name: WALG_LIBSODIUM_KEY
+    valueFrom:
+      secretKeyRef:
+        name: postgres-backup
+        key: WALG_LIBSODIUM_KEY

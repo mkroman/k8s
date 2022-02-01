@@ -17,8 +17,17 @@ data:
   backup_database.sh: |
     #!/usr/bin/env bash
     set -e
+    set -x
+
+    apt update && apt install -y curl
+
+    curl -q -L "https://github.com/wal-g/wal-g/releases/download/v1.1/wal-g-pg-ubuntu-20.04-amd64.tar.gz" -o wal-g-pg.tar.gz
+    echo "c922c46c770fa5edd38bd60bfacdb92d813272d5d6bd2fc83ef57084b9c6c68c  wal-g-pg.tar.gz" | sha256sum -c
+    tar xvf wal-g-pg.tar.gz
+    install wal-g-pg-ubuntu-20.04-amd64 /usr/local/bin/wal-g
 
     export PGUSER=postgres
     export PGPASSWORD="${POSTGRES_PASSWORD}"
+    export PGHOST=postgres
 
-    wal-g backup-push "${PGDATA}"
+    /usr/local/bin/wal-g backup-push "/var/lib/postgresql/data"
