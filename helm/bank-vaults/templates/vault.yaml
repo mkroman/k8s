@@ -53,7 +53,8 @@ spec:
           capabilities = ["read"]
         }
     auth:
-    - type: kubernetes
+    - name: kubernetes
+      type: kubernetes
       roles:
       # Allow every pod in the default namespace to use the secret kv store
       - name: default
