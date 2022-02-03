@@ -4,7 +4,7 @@ metadata:
   name: {{ .Values.vault.name }}
 spec:
   size: 1
-  image: vault:1.9.2
+  image: vault:1.9.3
 
   # Specify the ServiceAccount where the Vault Pod and the Bank-Vaults configurer/unsealer is running
   serviceAccount: vault
@@ -53,8 +53,7 @@ spec:
           capabilities = ["read"]
         }
     auth:
-    - name: kubernetes
-      type: kubernetes
+    - type: kubernetes
       roles:
       # Allow every pod in the default namespace to use the secret kv store
       - name: default
@@ -80,7 +79,7 @@ spec:
       options:
         version: 2
     - type: gcp
-      path: gcp/
+      path: gcp
       description: Google cloud secret backend
       configuration:
         config:

@@ -34,5 +34,3 @@ vault:
 
       # The location of the KMS.
       location: global
-
-      
