@@ -16,6 +16,9 @@ spec:
         app: meta-webhook
       annotations:
         linkerd.io/inject: enabled
+        vault.security.banzaicloud.io/vault-role: meta
+        vault.security.banzaicloud.io/vault-addr: "https://vault.default.svc.cluster.local:8200"
+        vault.security.banzaicloud.io/vault-tls-secret: vault-tls
     spec:
       containers:
       - name: meta-webhook
@@ -26,14 +29,8 @@ spec:
         - name: META_RPC_URL
           value: tcp://meta-rpc:31337
         - name: META_RPC_SECRET
-          valueFrom:
-            secretKeyRef:
-              name: meta-rpc
-              key: secret
+          value: vault:secret/data/meta#RPC_SECRET
         - name: META_WEBHOOK_TOKEN
-          valueFrom:
-            secretKeyRef:
-              name: meta-webhook
-              key: token
+          value: vault:secret/data/meta#WEBHOOK_TOKEN
       imagePullSecrets:
       - name: uplink-nl-ams-scw-registry
