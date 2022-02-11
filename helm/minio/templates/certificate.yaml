@@ -9,4 +9,5 @@ spec:
     name: letsencrypt-production
     kind: ClusterIssuer
   dnsNames:
-  - io.rwx.im
+  - 'io.rwx.im'
+  - '*.io.rwx.im'
