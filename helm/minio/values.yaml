@@ -16,12 +16,14 @@ minio:
       traefik.ingress.kubernetes.io/router.tls: "true"
 
     hosts:
-    - io.rwx.im
+    - 'io.rwx.im'
+    - '*.io.rwx.im'
 
     tls:
     - secretName: io-rwx-im-tls
       hosts:
-      - io.rwx.im
+      - 'io.rwx.im'
+      - '*.io.rwx.im'
 
   consoleIngress:
     enabled: true
