@@ -24,3 +24,9 @@ spec:
     jqPathExpressions:
     - .spec.template.spec.containers[] | select(.name == "name")
     - .spec.template.spec.initContainers[] | select(.name == "meta-migrate-db")
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - ApplyOutOfSyncOnly=true
