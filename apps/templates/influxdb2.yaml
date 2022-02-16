@@ -3,8 +3,6 @@ kind: Application
 metadata:
   name: influxdb2
   namespace: argocd
-  finalizers:
-  - resources-finalizer.argocd.argoproj.io
 spec:
   destination:
     namespace: influxdb
@@ -17,6 +15,6 @@ spec:
   syncPolicy:
     automated:
       prune: true
-      selfHeal: false
+      selfHeal: true
     syncOptions:
     - ApplyOutOfSyncOnly=true
