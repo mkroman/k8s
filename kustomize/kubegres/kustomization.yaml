@@ -1,4 +1,5 @@
 ---
 resources:
-- base/kubegres-v1.15.yaml
-- base/secret.postgres-auth.yaml
+# Kubegres v1.15
+- https://raw.githubusercontent.com/reactive-tech/kubegres/7d751febe0847389ce001dea203ee890556bca77/kubegres.yaml
+- base/sealedsecret.postgres-auth.yaml
