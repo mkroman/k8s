@@ -12,3 +12,9 @@ spec:
     path: kustomize/argo-cd
     repoURL: {{ .Values.spec.source.repoURL }}
     targetRevision: {{ .Values.spec.source.targetRevision }}
+  syncPolicy:
+    automated:
+      prune: false
+      selfHeal: true
+    syncOptions:
+    - ApplyOutOfSyncOnly=true
