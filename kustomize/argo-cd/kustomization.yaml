@@ -4,6 +4,7 @@ resources:
 - manifests/project.yaml
 - manifests/repository.yaml
 - manifests/application.yaml
+- manifests/secret.argocd-vault-plugin-credentials.yaml
 - manifests/middleware.yaml
 - manifests/ingressroute.yaml
 patchesJson6902:
