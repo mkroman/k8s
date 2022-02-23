@@ -15,4 +15,5 @@ patchesJson6902:
     version: v1
 patchesStrategicMerge:
 - overlays/production/argo-cd-cm.yaml
+- overlays/production/deployment.argocd-repo-server.yaml
 namespace: argocd
