@@ -12,6 +12,12 @@ This is the GitOps repository for the kubernetes cluster running in my home lab.
 [edgerouter 4]: https://www.ui.com/edgemax/edgerouter-4/
 [flannel]: https://github.com/flannel-io/flannel
 
+### Status
+
+| App      | Path                                          | Status |
+|----------|-----------------------------------------------|--------|
+| Dendrite | [`kustomize/dendrite`](kustomize/dendrite/)   | [![App Status](https://argo-cd.infra.rwx.im/api/badge?name=dendrite)](https://argo-cd.infra.rwx.im/applications/dendrite) |
+
 ## Structure
 
 ### [`apps/`](apps/)
@@ -139,3 +145,4 @@ This application deploys a basic web application that is useful for debugging
 ingress issues.
 
 For an example, you can access it [here](https://whoami.infra.rwx.im/)
+
