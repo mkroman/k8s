@@ -1,6 +1,6 @@
 namespace: rwx
 resources:
-# - base/persistentvolumeclaim.yaml
+- base/persistentvolumeclaim.yaml
 - base/service.yaml
 - base/sealedsecret.dendrite-config.yaml
 - base/sealedsecret.dendrite-appservices.yaml

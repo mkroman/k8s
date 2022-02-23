@@ -32,10 +32,15 @@ spec:
         - name: appservices
           mountPath: /etc/dendrite/appservices
           readOnly: true
+        - name: jetstream-data
+          mountPath: /var/lib/jetstream
       volumes:
       - name: media
         persistentVolumeClaim:
           claimName: dendrite-media
+      - name: jetstream-data
+        persistentVolumeClaim:
+          claimName: dendrite-jetstream
       - name: tls
         secret:
           secretName: rwx-im-tls
