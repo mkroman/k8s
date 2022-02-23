@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: dendrite
-        image: matrixdotorg/dendrite-monolith:v0.5.1
+        image: matrixdotorg/dendrite-monolith:v0.6.0
         volumeMounts:
         - name: media
           mountPath: /var/dendrite/media
