@@ -17,7 +17,6 @@ spec:
       containers:
       - name: dendrite
         image: matrixdotorg/dendrite-monolith:v0.5.1
-        args: ["--tls-cert=tls/tls.crt", "--tls-key=tls/tls.key"]
         volumeMounts:
         - name: media
           mountPath: /var/dendrite/media
@@ -45,7 +44,10 @@ spec:
           secretName: dendrite-config
       - name: signing-key
         secret:
-          secretName: dendrite-signing-key
+          secretName: dendrite-config
+          items:
+          - key: matrix_key.pem
+            path: matrix_key.pem
       - name: appservices
         secret:
           secretName: dendrite-appservices
