@@ -24,6 +24,7 @@ spec:
   - meta
   - default
   - rwx
+  - velero
 
   config:
     storage:
