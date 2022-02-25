@@ -16,7 +16,7 @@ spec:
 {{- else }}
 {{- range $key, $value := .Values.applications }}
   - namespace: {{ $key }}
-    server: {{ .Values.destination.server }}
+    server: {{ $.Values.destination.server }}
 {{- end }}
 {{- end }}
 {{- end }}

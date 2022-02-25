@@ -1,7 +1,0 @@
-namespace: meta
-resources:
-- manifests/deployment.yaml
-- manifests/sealedsecret.meta-webhook.yaml
-- manifests/service.yaml
-- manifests/middleware.yaml
-- manifests/ingressroute.yaml

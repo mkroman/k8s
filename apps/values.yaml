@@ -9,3 +9,4 @@ spec:
 
 applications:
 - name: k8s-infra-apps
+- name: k8s-meta-apps
