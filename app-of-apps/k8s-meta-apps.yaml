@@ -13,6 +13,5 @@ clusterResourceWhitelist:
   kind: '*'
 
 applications:
-  meta:
-    disableAutoSync: true
+  meta: {}
   meta-webhook: {}
