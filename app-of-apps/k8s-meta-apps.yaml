@@ -14,4 +14,5 @@ clusterResourceWhitelist:
 
 applications:
   meta: {}
+  meta-oss: {}
   meta-webhook: {}
