@@ -1,0 +1,17 @@
+repository: https://github.com/mkroman/k8s-infra-apps.git
+
+  
+destination:
+  server: https://kubernetes.default.svc
+  namespace: argocd
+
+# -- Allow apps to deploy to all namespaces.
+allowAllNamespaces: true
+
+# -- Allow access to all cluster resources.
+clusterResourceWhitelist:
+- group: '*'
+  kind: '*'
+
+applications:
+  velero: {}

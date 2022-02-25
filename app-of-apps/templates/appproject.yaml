@@ -1,0 +1,30 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: {{ .Release.Name }}
+  namespace: {{ default "argocd" .Values.argocdNamespace}}
+spec:
+  sourceRepos:
+  - {{ .Values.repository | quote }}
+{{- if eq (len .Values.applications) 0 }}
+  destinations: []
+{{- else }}
+  destinations:
+{{- if .Values.allowAllNamespaces }}
+  - namespace: '*'
+    server: {{ .Values.destination.server }}
+{{- else }}
+{{- range $key, $value := .Values.applications }}
+  - namespace: {{ $key }}
+    server: {{ .Values.destination.server }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- if .Values.clusterResourceWhitelist }}
+  clusterResourceWhitelist:
+  {{- toYaml .Values.clusterResourceWhitelist | nindent 2 }}
+{{- end }}
+{{- if .Values.namespaceResourceBlacklist }}
+  namespaceResourceBlacklist:
+{{- toYaml .Values.namespaceResourceBlacklist | nindent 2 -}}
+{{- end }}

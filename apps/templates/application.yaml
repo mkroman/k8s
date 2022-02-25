@@ -1,0 +1,26 @@
+{{- range $key, $value := .Values.applications }}
+{{- $name := .name }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ .name }}
+  namespace: argocd
+spec:
+  destination:
+    namespace: {{ $.Values.spec.destination.namespace }}
+    server: {{ $.Values.spec.destination.server }}
+  project: default
+  source:
+    path: app-of-apps
+    repoURL: {{ $.Values.repository }}
+    helm:
+      valueFiles:
+      - {{ printf "%s.yaml" $name | quote }}
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - ApplyOutOfSyncOnly=true
+{{- end }}

@@ -1,6 +1,11 @@
+repository: https://github.com/mkroman/k8s.git
+
 spec:
   destination:
     server: https://kubernetes.default.svc
   source:
     repoURL: https://github.com/mkroman/k8s
     targetRevision: HEAD
+
+applications:
+- name: k8s-infra-apps
