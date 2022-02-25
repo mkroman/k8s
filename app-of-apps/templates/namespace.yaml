@@ -1,0 +1,23 @@
+{{- range $key, $value := .Values.applications -}}
+{{- $disableNamespaceCreation := false -}}
+{{- if . -}}
+{{- $disableNamespaceCreation = .disableNamespaceCreation -}}
+{{- end }}
+{{- if not $disableNamespaceCreation }}
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ $key }}
+{{- with $.Values.namespace }}
+{{- with .annotations }}
+  annotations:
+    {{ toYaml . | nindent 4 }}
+{{- end }}
+{{ with .labels }}
+  labels:
+    {{ toYaml . | nindent 4 }}
+{{- end }}
+{{- end }}
+{{ end }}
+{{ end }}

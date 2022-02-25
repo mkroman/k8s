@@ -1,4 +1,5 @@
 {{- range $key, $value := .Values.applications -}}
+{{- $path := default $key .path }}
 {{- $automatedPrune := default true .automatedPrune -}}
 {{- $disableAutoSync := default false .disableAutoSync -}}
 {{- $selfHeal := default true .selfHeal }}
@@ -10,7 +11,7 @@ metadata:
   namespace: {{ include "app-of-apps.argocdNamespace" $ }}
 spec:
   destination:
-    namespace: {{ $.Values.destination.namespace }}
+    namespace: {{ $path }}
     server: {{ $.Values.destination.server }}
   project: {{ $.Release.Name }}
   source:
