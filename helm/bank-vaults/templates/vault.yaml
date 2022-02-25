@@ -22,6 +22,7 @@ spec:
   # Distribute the CA TLS cert to the following namespaces
   caNamespaces:
   - meta
+  - meta-webhook
   - default
   - rwx
   - velero
