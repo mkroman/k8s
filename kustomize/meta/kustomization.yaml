@@ -1,6 +1,4 @@
 ---
-bases:
-- ../meta-webhook
 namespace: meta
 resources:
 - manifests/persistentvolumeclaim.yaml
