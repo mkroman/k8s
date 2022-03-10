@@ -1,0 +1,19 @@
+repository: https://github.com/rwx-im/k8s-rwx-apps.git
+
+destination:
+  server: https://kubernetes.default.svc
+  namespace: argocd
+
+# -- Allow apps to deploy to all namespaces.
+# allowAllNamespaces: true
+#
+disableNamespaceCreation: true
+
+# -- Allow access to all cluster resources.
+clusterResourceWhitelist:
+- group: '*'
+  kind: '*'
+
+applications:
+  element-web:
+    namespace: rwx
