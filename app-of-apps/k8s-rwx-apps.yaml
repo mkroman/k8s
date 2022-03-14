@@ -17,3 +17,4 @@ clusterResourceWhitelist:
 applications:
   element-web:
     namespace: rwx
+  wayback:
