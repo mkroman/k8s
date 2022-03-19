@@ -12,7 +12,7 @@ spec:
     server: {{ $.Values.spec.destination.server }}
   project: default
   source:
-    path: app-of-apps
+    path: apps-of-apps
     repoURL: {{ $.Values.repository }}
     helm:
       valueFiles:
