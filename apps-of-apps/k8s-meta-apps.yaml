@@ -16,3 +16,7 @@ applications:
   meta: {}
   meta-oss: {}
   meta-webhook: {}
+  meta-webdriver:
+    disableNamespaceCreation: true
+    namespace: meta
+

@@ -1,4 +1,4 @@
 apiVersion: v2
-name: app-of-apps
+name: apps-of-apps
 description: A Helm chart for Kubernetes
 version: 0.1.0

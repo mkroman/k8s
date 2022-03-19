@@ -15,8 +15,16 @@ spec:
     server: {{ .Values.destination.server }}
 {{- else }}
 {{- range $key, $value := .Values.applications }}
+{{- $disableNamespaceCreation := false -}}
+{{- if $.Values.disableNamespaceCreation }}
+{{- $disableNamespaceCreation = $.Values.disableNamespaceCreation -}}
+{{- else if . -}}
+{{- $disableNamespaceCreation = .disableNamespaceCreation -}}
+{{- end }}
+{{- if not $disableNamespaceCreation }}
   - namespace: {{ default $key .namespace }}
     server: {{ $.Values.destination.server }}
+{{- end }}
 {{- end }}
 {{- end }}
 {{- end }}
