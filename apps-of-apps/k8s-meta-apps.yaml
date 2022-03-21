@@ -12,6 +12,10 @@ clusterResourceWhitelist:
 - group: '*'
   kind: '*'
 
+namespace:
+  labels:
+    im.rwx.infra/tls: 'true'
+
 applications:
   meta: {}
   meta-oss: {}
