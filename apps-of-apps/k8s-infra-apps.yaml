@@ -7,6 +7,10 @@ destination:
 # -- Allow apps to deploy to all namespaces.
 allowAllNamespaces: true
 
+namespace:
+  labels:
+    im.rwx.infra/tls: 'true'
+
 # -- Allow access to all cluster resources.
 clusterResourceWhitelist:
 - group: '*'
