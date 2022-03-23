@@ -10,6 +10,12 @@ spec:
   destinations: []
 {{- else }}
   destinations:
+{{- with .Values.allowedNamespaces }}
+  {{- range $ns := . }}
+  - namespace: {{ $ns }}
+    server: {{ $.Values.destination.server }}
+  {{- end }}
+{{- end }}
 {{- if .Values.allowAllNamespaces }}
   - namespace: '*'
     server: {{ .Values.destination.server }}

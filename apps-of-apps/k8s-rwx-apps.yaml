@@ -9,6 +9,9 @@ destination:
 #
 disableNamespaceCreation: true
 
+allowedNamespaces:
+- rwx
+
 # -- Allow access to all cluster resources.
 clusterResourceWhitelist:
 - group: '*'
