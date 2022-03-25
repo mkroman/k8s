@@ -16,7 +16,15 @@ spec:
     spec:
       containers:
       - name: dendrite
-        image: matrixdotorg/dendrite-monolith:v0.6.5
+        image: matrixdotorg/dendrite-monolith:v0.7.0
+        readinessProbe:
+          httpGet:
+            path: /_dendrite/monitor/up
+            port: http
+          initialDelaySeconds: 5
+        ports:
+        - name: http
+          containerPort: 8008
         volumeMounts:
         - name: media
           mountPath: /var/dendrite/media
