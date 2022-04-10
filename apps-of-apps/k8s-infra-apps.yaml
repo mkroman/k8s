@@ -20,3 +20,4 @@ applications:
   velero: {}
   argo-workflows: {}
   argo-events: {}
+  mkroman-github-events: {}

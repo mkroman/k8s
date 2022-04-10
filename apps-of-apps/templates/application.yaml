@@ -2,7 +2,7 @@
 {{- $path := default $key .path }}
 {{- $automatedPrune := default true .automatedPrune }}
 {{- $disableAutoSync := default false .disableAutoSync }}
-{{- $namespace := default $key .namespace }}
+{{- $namespace := default $key .namespace | quote }}
 {{- $selfHeal := default true .selfHeal }}
 ---
 apiVersion: argoproj.io/v1alpha1
