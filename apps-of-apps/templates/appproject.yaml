@@ -31,6 +31,12 @@ spec:
   - namespace: {{ default $key .namespace }}
     server: {{ $.Values.destination.server }}
 {{- end }}
+{{- if .allowedNamespaces }}
+{{- range $ns := .allowedNamespaces }}
+  - namespace: {{ $ns }}
+    server: {{ $.Values.destination.server }}
+{{- end }}
+{{- end }}
 {{- end }}
 {{- end }}
 {{- end }}
