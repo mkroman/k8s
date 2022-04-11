@@ -23,4 +23,5 @@ applications:
   meta-webdriver:
     disableNamespaceCreation: true
     namespace: meta
+  meta-deployments: {}
 
