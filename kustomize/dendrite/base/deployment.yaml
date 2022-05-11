@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: dendrite
-        image: matrixdotorg/dendrite-monolith:v0.8.3
+        image: matrixdotorg/dendrite-monolith:v0.8.4
         readinessProbe:
           httpGet:
             path: /_dendrite/monitor/up
