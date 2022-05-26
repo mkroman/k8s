@@ -6,3 +6,6 @@ resources:
 - base/sealedsecret.dendrite-appservices.yaml
 - base/deployment.yaml
 - base/ingressroute.yaml
+images:
+- name: matrixdotorg/dendrite-monolith
+  newTag: v0.8.6
