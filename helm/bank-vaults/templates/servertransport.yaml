@@ -5,5 +5,3 @@ metadata:
 spec:
   rootCAsSecrets:
   - vault-tls
-  certificatesSecrets:
-  - vault-tls
