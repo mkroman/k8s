@@ -17,7 +17,8 @@ clusterResourceWhitelist:
   kind: '*'
 
 applications:
-  velero: {}
-  argo-workflows: {}
   argo-events: {}
+  argo-workflows: {}
+  external-secrets: {}
   mkroman-github-events: {}
+  velero: {}
