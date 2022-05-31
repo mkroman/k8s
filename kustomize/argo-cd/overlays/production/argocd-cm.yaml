@@ -50,7 +50,7 @@ data:
         args: ["helm dependency build"]
       generate:
         command: ["sh", "-c"]
-        args: ["helm template $ARGOCD_APP_NAME . | argocd-vault-plugin generate -"]
+        args: ["helm template $ARGOCD_APP_NAME . --install-crds | argocd-vault-plugin generate -"]
     - name: argocd-vault-plugin-kustomize
       generate:
         command: ["sh", "-c"]
