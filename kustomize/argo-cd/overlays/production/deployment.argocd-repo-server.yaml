@@ -24,7 +24,7 @@ spec:
         command: [sh, -c]
         env:
         - name: AVP_VERSION
-          value: '1.9.0'
+          value: '1.11.0'
         args:
         - >-
             wget -O argocd-vault-plugin
