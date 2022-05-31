@@ -35,7 +35,8 @@ spec:
     listener:
       tcp:
         address: "0.0.0.0:8200"
-        tls_disable: true
+        tls_cert_file: /vault/tls/server.crt
+        tls_key_file: /vault/tls/server.key
     api_addr: https://vault.default:8200
     ui: true
 
