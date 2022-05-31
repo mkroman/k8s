@@ -30,5 +30,6 @@ spec:
     - name: vault
       port: 8200
       serversTransport: vault-transport
+      scheme: https
   tls:
     secretName: infra-rwx-im-tls
