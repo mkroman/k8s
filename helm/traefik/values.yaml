@@ -15,3 +15,9 @@ traefik:
       enabled: true
       # Allow IngressRoutes to reference resources in other namespaces
       allowCrossNamespace: true
+
+    kubernetesIngress:
+      enabled: true
+      publishedService:
+        # -- This is used to determine resource health
+        enabled: true
