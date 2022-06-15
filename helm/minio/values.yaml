@@ -48,7 +48,7 @@ minio:
      MINIO_SERVER_URL: https://io.rwx.im
      MINIO_BROWSER_REDIRECT_URL: https://minio.infra.rwx.im
 
-  additionalAnnotations:
+  podAnnotations:
     vault.security.banzaicloud.io/vault-addr: https://vault.default:8200
     vault.security.banzaicloud.io/vault-role: meta
     vault.security.banzaicloud.io/vault-serviceaccount: default
