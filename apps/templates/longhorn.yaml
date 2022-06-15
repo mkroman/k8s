@@ -12,7 +12,5 @@ spec:
   project: production
   source:
     path: helm/longhorn
-    plugin:
-      name: argocd-vault-plugin-helm
     repoURL: {{ .Values.spec.source.repoURL }}
     targetRevision: {{ .Values.spec.source.targetRevision }}
