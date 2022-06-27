@@ -27,5 +27,5 @@ dependencies:
   version: 2.1.0
   repository: https://helm.influxdata.com/
 - name: grafana
-  version: 6.29.6
+  version: 6.31.1
   repository: https://grafana.github.io/helm-charts
