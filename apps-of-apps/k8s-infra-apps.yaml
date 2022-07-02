@@ -20,5 +20,6 @@ applications:
   argo-events: {}
   argo-workflows: {}
   external-secrets: {}
+  influxdb2: {}
   mkroman-github-events: {}
   velero: {}
