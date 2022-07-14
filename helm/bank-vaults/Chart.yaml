@@ -11,10 +11,10 @@ version: 0.1.0
 
 dependencies:
 - name: vault-operator
-  version: 1.15.2
+  version: 1.15.8
   repository: https://kubernetes-charts.banzaicloud.com
   alias: operator
 - name: vault-secrets-webhook
-  version: 1.15.5
+  version: 1.15.11
   repository: https://kubernetes-charts.banzaicloud.com
   alias: secrets-webhook

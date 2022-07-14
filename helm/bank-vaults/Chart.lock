@@ -1,9 +1,9 @@
 dependencies:
 - name: vault-operator
   repository: https://kubernetes-charts.banzaicloud.com
-  version: 1.15.2
+  version: 1.15.8
 - name: vault-secrets-webhook
   repository: https://kubernetes-charts.banzaicloud.com
-  version: 1.15.5
-digest: sha256:8ffe5e5978e4573f66a17088668ff5241fccdf9a89c2d2bfcc88fad1e6e41699
-generated: "2022-02-02T00:05:12.1213035+01:00"
+  version: 1.15.11
+digest: sha256:22c3e1effd1ecee8879a89b4bf41c671238831774d71545f49f70afca141f0dd
+generated: "2022-07-15T01:35:15.72987736+02:00"
