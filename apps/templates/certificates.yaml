@@ -16,17 +16,3 @@ spec:
   dnsNames:
   - infra.rwx.im
   - '*.infra.rwx.im'
----
-apiVersion: cert-manager.io/v1
-kind: Certificate
-metadata:
-  name: bitwarden-rwx-im
-  namespace: rwx
-spec:
-  secretName: bitwarden-rwx-im-tls
-  issuerRef:
-    name: letsencrypt-production
-    kind: ClusterIssuer
-  commonName: bitwarden.rwx.im
-  dnsNames:
-  - bitwarden.rwx.im
