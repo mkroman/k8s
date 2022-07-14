@@ -3,7 +3,7 @@ operator: {}
 secrets-webhook:
   env:
     # Use the same image as our primary vault
-    VAULT_IMAGE: vault:1.9.2
+    VAULT_IMAGE: vault:1.11.0
 
   # Use cert-manager to mange the CA.
   certificate:
