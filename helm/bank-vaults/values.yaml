@@ -1,5 +1,3 @@
-operator: {}
-
 secrets-webhook:
   env:
     # Use the same image as our primary vault
@@ -12,25 +10,26 @@ secrets-webhook:
 
   configMapMutation: true
 
+# -- Configuration the primary Vault
 vault:
-  # The name of the vault
+  # -- The name of the vault
   name: vault
 
-  # Google Cloud configuration values
+  # -- Google Cloud configuration values
   gcloud:
-    # The name of the google cloud project to use.
+    # -- The name of the google cloud project
     project: home-automation-194600
 
-    # The name of the storage bucket to use.
+    # -- The name of the storage bucket
     storageBucket: vault-rwx
 
-    # Key Management Service configuration
+    # -- Key Management Service configuration
     kms:
-      # The name of the KMS keyring to use.
+      # -- The name of the KMS keyring
       keyRing: vault
 
-      # The name of the key used when unsealing.
+      # -- The name of the key used when unsealing
       cryptoKey: vault-unsealer
 
-      # The location of the KMS.
+      # -- The location of the KMS
       location: global

@@ -3,23 +3,25 @@ kind: Vault
 metadata:
   name: {{ .Values.vault.name }}
 spec:
-  size: 1
+  # -- Deploy 2 replicas
+  size: 2
   image: vault:1.11.0
 
-  # Specify the ServiceAccount where the Vault Pod and the Bank-Vaults configurer/unsealer is running
+  # Specify the ServiceAccount where the Vault Pod and the Bank-Vaults
+  # configurer/unsealer is running
   serviceAccount: vault
 
   unsealConfig:
     google:
-      {{- with .Values.vault.gcloud }}
+    {{- with .Values.vault.gcloud }}
+      kmsProject: {{ .project }}
       kmsKeyRing: {{ .kms.keyRing }}
       kmsCryptoKey: {{ .kms.cryptoKey }}
       kmsLocation: {{ .kms.location }}
-      kmsProject: {{ .project }}
       storageBucket: {{ .storageBucket }}
-      {{- end }}
+    {{- end }}
 
-  # Distribute the CA TLS cert to the following namespaces
+  # -- Distribute the CA TLS cert to the following namespaces
   caNamespaces:
   - meta
   - meta-webhook
@@ -28,25 +30,34 @@ spec:
   - velero
 
   config:
+    # -- Enable the Web UI
+    ui: true
+    api_addr: https://vault.default:8200
     storage:
       gcs:
         bucket: {{ .Values.vault.gcloud.storageBucket }}
-        ha_enabled: "true"
+        ha_enabled: 'true'
     listener:
       tcp:
-        address: "0.0.0.0:8200"
+        address: '0.0.0.0:8200'
         tls_cert_file: /vault/tls/server.crt
         tls_key_file: /vault/tls/server.key
-    api_addr: https://vault.default:8200
-    ui: true
 
   # See: https://banzaicloud.com/docs/bank-vaults/cli-tool/#example-external-vault-configuration
-  # The repository also contains a lot examples in the deploy/ and operator/deploy directories.
+  # The repository also contains a lot examples in the deploy/ and
+  # operator/deploy directories.
   externalConfig:
     policies:
+    # Grant access to all secrets
     - name: allow_secrets
       rules: |
         path "secret/*" {
+          capabilities = ["create", "read", "update", "delete", "list"]
+        }
+    # Grant access to secrets under secrets/rwx/*
+    - name: allow_rwx_secrets
+      rules: |
+        path "secret/rwx/*" {
           capabilities = ["create", "read", "update", "delete", "list"]
         }
     - name: gcp_editor_access
@@ -54,6 +65,8 @@ spec:
         path "gcp/key/editor" {
           capabilities = ["read"]
         }
+
+    # -- Configure authentication methods
     auth:
     - type: kubernetes
       roles:
@@ -63,7 +76,15 @@ spec:
         bound_service_account_namespaces: default
         policies: allow_secrets
         ttl: 1h
-    # Allow mutation of secrets using secrets-mutation annotation to use the secret kv store
+
+      - name: rwx
+        bound_service_account_names: vault
+        bound_service_account_namespaces: rwx
+        policies: allow_rwx_secrets
+        ttl: 1h
+
+    # Allow mutation of secrets using secrets-mutation annotation to use the
+    # secret kv store
     - name: secretsmutation
       bound_service_account_names:
       - bank-vaults-secrets-webhook
@@ -80,29 +101,32 @@ spec:
       description: General secrets.
       options:
         version: 2
+
     - type: gcp
       path: gcp
-      description: Google cloud secret backend
+      description: Google Cloud secret backend
       configuration:
         config:
-        - ttl: "60m"
-          max_ttl: "0"
+        - ttl: '60m'
+          max_ttl: '0'
         roleset:
         - name: editor
-          # To avoid vault deleting and recreating the Google Service Account everytime this config is applied
-          # set create_only=true. Disable when you need to actually apply a change
-          create_only: "true"
-          secret_type: "service_account_key"
+          # To avoid vault deleting and recreating the Google Service Account
+          # everytime this config is applied set create_only=true. Disable when
+          # you need to actually apply a change
+          create_only: 'true'
+          secret_type: 'service_account_key'
           project: {{ .Values.vault.gcloud.project }}
           bindings: |
             resource "//cloudresourcemanager.googleapis.com/projects/{{ .Values.vault.gcloud.project }}" {
               roles = ["roles/editor", "roles/iam.securityAdmin", "roles/iam.roleAdmin", "roles/container.admin"]
             }
 
-  # If you are not using a Service Account to authenticate against GCP you can pass in an
-  # GCP credentials refering to a Secret with the following configuration block. You have to
-  # create the "gcp-sa" secret manually, it has to have a key called "service-account.json"
-  # holding the configuration in the following format:
+  # If you are not using a Service Account to authenticate against GCP you can
+  # pass in an GCP credentials refering to a Secret with the following
+  # configuration block. You have to create the "gcp-sa" secret manually, it has
+  # to have a key called "service-account.json" holding the configuration in the
+  # following format:
   # https://cloud.google.com/docs/authentication/getting-started
   credentialsConfig:
     env: GOOGLE_APPLICATION_CREDENTIALS
