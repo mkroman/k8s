@@ -1,35 +1,41 @@
-secrets-webhook:
-  env:
-    # Use the same image as our primary vault
-    VAULT_IMAGE: vault:1.11.0
-
-  # Use cert-manager to mange the CA.
-  certificate:
-    generate: false
-    useCertManager: true
-
-  configMapMutation: true
-
-# -- Configuration the primary Vault
+# -- Configuration for the primary Vault
 vault:
   # -- The name of the vault
   name: vault
 
   # -- Google Cloud configuration values
   gcloud:
-    # -- The name of the google cloud project
+    # -- The name of the Google Cloud project
     project: home-automation-194600
-
-    # -- The name of the storage bucket
+    # -- The name of the Cloud Storage bucket
     storageBucket: vault-rwx
 
     # -- Key Management Service configuration
     kms:
       # -- The name of the KMS keyring
       keyRing: vault
-
       # -- The name of the key used when unsealing
       cryptoKey: vault-unsealer
-
       # -- The location of the KMS
       location: global
+
+  # -- List of namespaces to distribute the Vault CA cert to
+  caNamespaces:
+  - meta
+  - meta-webhook
+  - rwx
+  - velero
+
+# -- Configuration for the mutating webhook
+secrets-webhook:
+  env:
+    # Use the same image as our primary vault
+    VAULT_IMAGE: vault:1.11.0
+
+  # -- Use cert-manager to manage the Vault CA
+  certificate:
+    generate: false
+    useCertManager: true
+
+  # -- Enable mutation of ConfigMaps
+  configMapMutation: true
