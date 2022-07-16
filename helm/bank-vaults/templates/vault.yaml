@@ -10,6 +10,28 @@ spec:
   # configurer/unsealer is running
   serviceAccount: vault
 
+  # Use local disk to store Vault raft data, see config section.
+  volumeClaimTemplates:
+  - metadata:
+      name: vault-raft
+    spec:
+      # https://kubernetes.io/docs/concepts/storage/persistent-volumes/#class-1
+      # storageClassName: ""
+      accessModes:
+      - ReadWriteOnce
+      volumeMode: Filesystem
+      resources:
+        requests:
+          storage: 1Gi
+
+  volumeMounts:
+    - name: vault-raft
+      mountPath: /vault/file
+
+  # Add Velero fsfreeze sidecar container and supporting hook annotations to Vault Pods:
+  # https://velero.io/docs/v1.2.0/hooks/
+  veleroEnabled: true
+
   unsealConfig:
     google:
     {{- with .Values.vault.gcloud }}
@@ -28,10 +50,13 @@ spec:
     # -- Enable the Web UI
     ui: true
     api_addr: https://vault.default:8200
+    cluster_addr: "https://${.Env.POD_NAME}:8201"
     storage:
       gcs:
         bucket: {{ .Values.vault.gcloud.storageBucket }}
         ha_enabled: 'true'
+      raft:
+        path: "/vault/file"
     listener:
       tcp:
         address: '0.0.0.0:8200'
