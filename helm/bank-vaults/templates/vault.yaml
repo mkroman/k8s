@@ -3,7 +3,6 @@ kind: Vault
 metadata:
   name: {{ .Values.vault.name }}
 spec:
-  # -- Deploy 2 replicas
   size: 2
   image: vault:1.11.0
 
@@ -23,11 +22,7 @@ spec:
 
   # -- Distribute the CA TLS cert to the following namespaces
   caNamespaces:
-  - meta
-  - meta-webhook
-  - default
-  - rwx
-  - velero
+  {{- .Values.vault.caNamespaces | toYaml | nindent 2 }}
 
   config:
     # -- Enable the Web UI
@@ -54,12 +49,13 @@ spec:
         path "secret/*" {
           capabilities = ["create", "read", "update", "delete", "list"]
         }
-    # Grant access to secrets under secrets/rwx/*
-    - name: allow_rwx_secrets
+    # Grant access to read secrets under secrets/rwx/*
+    - name: read_rwx_secrets
       rules: |
         path "secret/rwx/*" {
-          capabilities = ["create", "read", "update", "delete", "list"]
+          capabilities = ["read", "list"]
         }
+
     - name: gcp_editor_access
       rules: |
         path "gcp/key/editor" {
@@ -76,23 +72,23 @@ spec:
         bound_service_account_namespaces: default
         policies: allow_secrets
         ttl: 1h
-
       - name: rwx
-        bound_service_account_names: vault
-        bound_service_account_namespaces: rwx
-        policies: allow_rwx_secrets
+        bound_service_account_names:
+        - vault
+        bound_service_account_namespaces:
+        - rwx
+        policies: read_rwx_secrets
         ttl: 1h
-
-    # Allow mutation of secrets using secrets-mutation annotation to use the
-    # secret kv store
-    - name: secretsmutation
-      bound_service_account_names:
-      - bank-vaults-secrets-webhook
-      bound_service_account_namespaces:
-      - default
-      policies:
-      - allow_secrets
-      ttl: 1h
+      # Allow mutation of secrets using secrets-mutation annotation to use the
+      # secret kv store
+      - name: secretsmutation
+        bound_service_account_names:
+        - bank-vaults-secrets-webhook
+        bound_service_account_namespaces:
+        - default
+        policies:
+        - allow_secrets
+        ttl: 1h
 
     # See: https://www.vaultproject.io/docs/secrets/gcp/index.html
     secrets:
