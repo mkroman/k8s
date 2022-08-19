@@ -18,8 +18,11 @@ clusterResourceWhitelist:
 
 applications:
   argo-events: {}
-  argo-workflows: {}
+  argo-workflows:
+    namespace: argo
   external-secrets: {}
   influxdb2: {}
   mkroman-github-events: {}
   velero: {}
+  prometheus-operator:
+    namespace: monitoring
