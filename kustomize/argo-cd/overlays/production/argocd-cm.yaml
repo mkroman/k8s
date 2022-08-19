@@ -35,6 +35,10 @@ data:
     jqPathExpressions:
     - '.webhooks[]?.clientConfig.caBundle'
 
+  resource.customizations.ignoreDifferences.apiextensions.k8s.io_CustomResourceDefinition: |
+    jqPathExpressions:
+    - '.spec.conversion.webhook.clientConfig.caBundle'
+
   resource.customizations.ignoreDifferences.cert-manager.io_Certificate: |
     jqPathExpressions:
     - '.spec.duration'
