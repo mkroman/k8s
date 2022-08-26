@@ -3,6 +3,10 @@ traefik:
     # Use a DaemonSet deployment so every node can take http traffic
     kind: DaemonSet
 
+  ingressClass:
+    enabled: true
+    isDefaultClass: true
+
   service:
     spec:
       # Use a static ip address so we can port forward it
