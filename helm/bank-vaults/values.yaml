@@ -1,7 +1,7 @@
 # -- Configuration for the primary Vault
 vault:
   # -- Enable the default vault
-  enabled: false
+  enabled: true
 
   # -- The name of the vault
   name: vault
@@ -11,7 +11,7 @@ vault:
     # -- The name of the Google Cloud project
     project: home-automation-194600
     # -- The name of the Cloud Storage bucket
-    storageBucket: vault-rwx
+    storageBucket: rwx-vault
 
     # -- Key Management Service configuration
     kms:
