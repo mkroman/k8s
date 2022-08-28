@@ -1,5 +1,8 @@
 # -- Configuration for the primary Vault
 vault:
+  # -- Enable the default vault
+  enabled: false
+
   # -- The name of the vault
   name: vault
 
