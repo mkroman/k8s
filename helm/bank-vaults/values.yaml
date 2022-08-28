@@ -6,6 +6,9 @@ vault:
   # -- The name of the vault
   name: vault
 
+  # -- The vault image
+  image: vault:1.11.2
+
   # -- Google Cloud configuration values
   gcloud:
     # -- The name of the Google Cloud project
@@ -33,7 +36,7 @@ vault:
 secrets-webhook:
   env:
     # Use the same image as our primary vault
-    VAULT_IMAGE: vault:1.11.0
+    VAULT_IMAGE: vault:1.11.2
 
   # -- Use cert-manager to manage the Vault CA
   certificate:
