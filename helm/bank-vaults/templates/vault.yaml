@@ -4,7 +4,7 @@ kind: Vault
 metadata:
   name: {{ .Values.vault.name }}
 spec:
-  size: 2
+  size: 3
   image: {{ .Values.vault.image }}
 
   # Specify the ServiceAccount where the Vault Pod and the Bank-Vaults
