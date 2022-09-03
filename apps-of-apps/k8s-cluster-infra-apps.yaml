@@ -1,4 +1,4 @@
-repository: https://github.com/mkroman/k8s-infra-apps.git
+repository: https://github.com/mkroman/k8s-cluster-infra-apps.git
 
 destination:
   server: https://kubernetes.default.svc
