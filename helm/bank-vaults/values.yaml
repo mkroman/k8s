@@ -31,6 +31,7 @@ vault:
   - meta-webhook
   - rwx
   - velero
+  - mk-labs
 
 # -- Configuration for the mutating webhook
 secrets-webhook:
