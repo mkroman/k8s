@@ -1,0 +1,19 @@
+repository: https://github.com/mkroman/k8s-mk-labs.git
+
+destination:
+  server: https://kubernetes.default.svc
+  namespace: argocd
+
+allowedNamespaces:
+- k8s-mk-labs
+disableNamespaceCreation: true
+
+# -- Allow apps to deploy to all namespaces.
+allowAllNamespaces: false
+
+# -- Allow access to all cluster resources.
+clusterResourceWhitelist: []
+
+applications:
+  resources:
+    namespace: k8s-mk-labs

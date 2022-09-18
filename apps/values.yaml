@@ -11,3 +11,4 @@ applications:
 - name: k8s-cluster-infra-apps
 - name: k8s-meta-apps
 - name: k8s-rwx-apps
+- name: k8s-mk-labs
