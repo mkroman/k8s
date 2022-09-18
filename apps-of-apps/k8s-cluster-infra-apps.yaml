@@ -26,3 +26,6 @@ applications:
   velero: {}
   prometheus-operator:
     namespace: monitoring
+  cluster-resources:
+    namespace: default
+    disableNamespaceCreation: true
