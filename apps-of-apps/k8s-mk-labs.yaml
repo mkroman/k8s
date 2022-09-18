@@ -6,7 +6,12 @@ destination:
 
 allowedNamespaces:
 - k8s-mk-labs
+
+# Disable namespace creation for each application.
 disableNamespaceCreation: true
+
+# Create a namespace for k8s-mk-labs.
+createProjectNamespace: true
 
 # -- Allow apps to deploy to all namespaces.
 allowAllNamespaces: false

@@ -1,3 +1,5 @@
+{{- $clusterResourceWhitelist := default list .Values.clusterResourceWhitelist }}
+---
 apiVersion: argoproj.io/v1alpha1
 kind: AppProject
 metadata:
@@ -40,10 +42,8 @@ spec:
 {{- end }}
 {{- end }}
 {{- end }}
-{{- if .Values.clusterResourceWhitelist }}
   clusterResourceWhitelist:
-  {{- toYaml .Values.clusterResourceWhitelist | nindent 2 }}
-{{- end }}
+  {{- toYaml $clusterResourceWhitelist | nindent 4 }}
 {{- if .Values.namespaceResourceBlacklist }}
   namespaceResourceBlacklist:
 {{- toYaml .Values.namespaceResourceBlacklist | nindent 2 -}}

@@ -1,3 +1,10 @@
+{{- if .Values.createProjectNamespace }}
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ $.Release.Name }}
+{{- end }}
 {{- range $key, $value := .Values.applications -}}
 {{- $disableNamespaceCreation := false -}}
 {{- if $.Values.disableNamespaceCreation }}
