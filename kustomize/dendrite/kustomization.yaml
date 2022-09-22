@@ -8,4 +8,4 @@ resources:
 - base/ingressroute.yaml
 images:
 - name: matrixdotorg/dendrite-monolith
-  newTag: v0.9.7
+  newTag: v0.9.9
