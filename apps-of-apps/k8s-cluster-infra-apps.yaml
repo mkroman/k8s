@@ -24,7 +24,8 @@ applications:
   influxdb2: {}
   mkroman-github-events: {}
   velero: {}
-  cloudnative-pg: {}
+  cloudnative-pg:
+    disableNamespaceCreation: true
   prometheus-operator:
     namespace: monitoring
   cluster-resources:
