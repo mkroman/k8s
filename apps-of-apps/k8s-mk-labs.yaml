@@ -22,5 +22,3 @@ clusterResourceWhitelist: []
 applications:
   resources:
     namespace: k8s-mk-labs
-  timescaledb:
-    namespace: k8s-mk-labs
