@@ -11,6 +11,7 @@ disableNamespaceCreation: true
 
 allowedNamespaces:
 - rwx
+- chadgpt
 
 # -- Allow access to all cluster resources.
 clusterResourceWhitelist:
@@ -22,3 +23,4 @@ applications:
     namespace: rwx
   wayback:
     namespace: rwx
+  chadgpt: {}
