@@ -1,5 +1,5 @@
 resources:
-- manifests/install-ha-v2.5.3.yaml
+- manifests/install-ha-v2.5.7.yaml
 - manifests/project.yaml
 - manifests/repository.yaml
 - manifests/application.yaml
