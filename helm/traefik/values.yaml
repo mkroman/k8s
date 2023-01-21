@@ -1,4 +1,6 @@
 traefik:
+  instanceLabelOverride: traefik
+
   deployment:
     # Use a DaemonSet deployment so every node can take http traffic
     kind: DaemonSet
