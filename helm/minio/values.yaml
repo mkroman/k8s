@@ -1,5 +1,5 @@
 minio:
-  replicas: 1
+  replicas: 0
   mode: standalone
   existingSecret: minio-root-auth
 
