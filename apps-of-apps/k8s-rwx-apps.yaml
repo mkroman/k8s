@@ -31,3 +31,10 @@ applications:
       helm:
         valueFiles:
         - values-magistr.yaml
+  chadgpt-coding:
+    path: chadgpt
+    namespace: chadgpt
+    source:
+      helm:
+        valueFiles:
+        - values-coding.yaml
