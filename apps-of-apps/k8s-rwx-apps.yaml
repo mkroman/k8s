@@ -25,6 +25,7 @@ applications:
     namespace: rwx
   chadgpt: {}
   chadgpt-magistr:
+    path: chadgpt
     namespace: chadgpt
     source:
       helm:
