@@ -24,3 +24,9 @@ applications:
   wayback:
     namespace: rwx
   chadgpt: {}
+  chadgpt-magistr:
+    namespace: chadgpt
+    source:
+      helm:
+        valueFiles:
+        - values-magistr.yaml
