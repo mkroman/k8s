@@ -20,6 +20,7 @@ applications:
   argo-events: {}
   argo-workflows:
     namespace: argo
+    path: argo-workflows/overlays/production
   external-secrets: {}
   influxdb2: {}
   mkroman-github-events: {}
