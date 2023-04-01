@@ -17,10 +17,10 @@ clusterResourceWhitelist:
   kind: '*'
 
 applications:
-  argo-events: {}
+  argo-events:
+    path: argo-events/overlays/production
   argo-workflows:
     namespace: argo
-    path: argo-workflows/overlays/production
   external-secrets: {}
   influxdb2: {}
   mkroman-github-events: {}
