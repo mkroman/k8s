@@ -1,5 +1,5 @@
 resources:
-- manifests/install-v2.5.7.yaml
+- manifests/install-v2.6.7.yaml
 - manifests/project.yaml
 - manifests/repository.yaml
 - manifests/application.yaml
