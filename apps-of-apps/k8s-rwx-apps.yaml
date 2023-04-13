@@ -23,6 +23,8 @@ applications:
     namespace: rwx
   wayback:
     namespace: rwx
+  magistr-prod:
+    path: magistr.dk/overlays/production
   chadgpt: {}
   chadgpt-magistr:
     path: chadgpt
