@@ -12,6 +12,7 @@ disableNamespaceCreation: true
 allowedNamespaces:
 - rwx
 - chadgpt
+- magist-prod
 
 # -- Allow access to all cluster resources.
 clusterResourceWhitelist:
