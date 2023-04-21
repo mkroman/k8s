@@ -3,3 +3,15 @@ longhorn:
     backupTarget: s3://mkroman-backup@eu-central-003/
     backupTargetCredentialSecret: backblaze-b2
     defaultReplicaCount: 2
+
+  longhornManager:
+    nodeSelector:
+      manager.longhorn.io/enabled: "true"
+
+  longhornDriver:
+    nodeSelector:
+      driver.longhorn.io/enabled: "true"
+
+  longhornUI:
+    nodeSelector:
+      ui.longhorn.io/enabled: "true"
