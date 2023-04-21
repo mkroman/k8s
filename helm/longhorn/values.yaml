@@ -4,14 +4,7 @@ longhorn:
     backupTargetCredentialSecret: backblaze-b2
     defaultReplicaCount: 2
 
-  longhornManager:
-    nodeSelector:
-      manager.longhorn.io/enabled: "true"
-
-  longhornDriver:
-    nodeSelector:
-      driver.longhorn.io/enabled: "true"
-
-  longhornUI:
-    nodeSelector:
-      ui.longhorn.io/enabled: "true"
+  persistence:
+    defaultNodeSelector:
+      enable: true
+      selector: "storage"
