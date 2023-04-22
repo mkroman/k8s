@@ -7,7 +7,7 @@ metadata:
   namespace: metallb-system
 spec:
   holdTime: 1m30s
-  keepaliveTime: 15s
+  keepaliveTime: 60s
   myASN: 64512
   passwordSecret: {}
   peerASN: 64512
