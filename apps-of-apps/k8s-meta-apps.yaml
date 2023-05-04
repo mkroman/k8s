@@ -18,7 +18,8 @@ namespace:
 
 applications:
   meta: {}
-  meta-oss: {}
+  meta-oss:
+    path: meta/overlays/oss
   meta-webhook: {}
   meta-webdriver:
     disableNamespaceCreation: true
