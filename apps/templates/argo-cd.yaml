@@ -9,7 +9,7 @@ spec:
     server: {{ .Values.spec.destination.server }}
   project: production
   source:
-    path: kustomize/argo-cd
+    path: argo-cd/overlays/production
     repoURL: {{ .Values.spec.source.repoURL }}
     targetRevision: {{ .Values.spec.source.targetRevision }}
   syncPolicy:

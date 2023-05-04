@@ -1,0 +1,14 @@
+namespace: argocd
+
+patches:
+- path: ./patches/configmap.argocd-cm.yaml
+- path: ./patches/configmap.argocd-cmd-params-cm.yaml
+
+resources:
+- ./manifests/namespace.yaml
+- ../../base
+- ./manifests/project.production.yaml
+- ./manifests/repository.mkroman-k8s.yaml
+- ./manifests/application.apps.yaml
+- ./manifests/middleware.yaml
+- ./manifests/ingressroute.yaml
