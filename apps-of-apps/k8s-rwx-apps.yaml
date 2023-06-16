@@ -22,8 +22,6 @@ clusterResourceWhitelist:
 applications:
   element-web:
     namespace: rwx
-  wayback:
-    namespace: rwx
   magistr-prod:
     path: magistr.dk/overlays/production
   chadgpt: {}
