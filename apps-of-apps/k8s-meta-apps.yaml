@@ -22,10 +22,3 @@ applications:
   meta-oss:
     path: meta/overlays/oss
   meta-webhook: {}
-  meta-webdriver:
-    disableNamespaceCreation: true
-    namespace: meta
-  meta-deployments:
-    allowedNamespaces:
-    - mkroman-github-events
-
