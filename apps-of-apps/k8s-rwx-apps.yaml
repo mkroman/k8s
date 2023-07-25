@@ -1,4 +1,4 @@
-repository: https://github.com/rwx-im/k8s-rwx-apps.git
+repository: https://github.com/rwx-labs/k8s-rwx-apps.git
 
 destination:
   server: https://kubernetes.default.svc
