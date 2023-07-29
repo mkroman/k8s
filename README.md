@@ -139,10 +139,3 @@ to deploy clusters, databases, add replication, load-balancing, pooling, etc.
 This application deploys resources such as [cert-manager] certificates for
 [rwx.im](https://rwx.im).
 
-### [`kustomize/whoami`](kustomize/whoami/)
-
-This application deploys a basic web application that is useful for debugging
-ingress issues.
-
-For an example, you can access it [here](https://whoami.infra.rwx.im/)
-

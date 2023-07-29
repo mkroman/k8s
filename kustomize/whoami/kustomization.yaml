@@ -1,5 +1,0 @@
-resources:
-- base/deployment.yaml
-- base/service.yaml
-- base/ingressroute.yaml
-namespace: rwx
