@@ -4,7 +4,7 @@ longhorn:
     backupTargetCredentialSecret: backblaze-b2
     defaultReplicaCount: 2
 
-  persistence:
-    defaultNodeSelector:
-      enable: true
-      selector: "storage"
+  # persistence:
+  #   defaultNodeSelector:
+  #     enable: true
+  #     selector: "storage"
