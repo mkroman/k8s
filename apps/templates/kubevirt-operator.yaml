@@ -11,6 +11,6 @@ spec:
     server: {{ .Values.spec.destination.server }}
   project: production
   source:
-    path: kubevirt-operator
+    path: kubevirt-operator/overlays/production
     repoURL: {{ .Values.spec.source.repoURL }}
     targetRevision: {{ .Values.spec.source.targetRevision }}
