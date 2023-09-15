@@ -1,2 +1,2 @@
 resources:
-- ./manifests/install-v2.8.0-rc6.yaml
+- ./manifests/install-v2.8.4.yaml
