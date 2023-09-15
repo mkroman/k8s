@@ -1,0 +1,56 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "renovate.fullname" . }}
+  labels:
+    {{- include "renovate.labels" . | nindent 4 }}
+spec:
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          {{- with .Values.podAnnotations }}
+          annotations:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          labels:
+            {{- include "renovate.selectorLabels" . | nindent 12 }}
+        spec:
+          {{- with .Values.imagePullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          automountServiceAccountToken: false
+          containers:
+          - name: renovate
+            securityContext:
+              {{- toYaml .Values.securityContext | nindent 14 }}
+            image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+            imagePullPolicy: {{ .Values.image.pullPolicy }}
+            {{- with .Values.resources }}
+            resources: 
+              {{- . | toYaml | nindent 14 }}
+            {{- end }}
+            env:
+            - name: LOG_LEVEL
+              value: debug
+            - name: RENOVATE_CONFIG_FILE
+              value: /opt/renovate/config.js
+            envFrom:
+            - secretRef:
+                name: renovate-env
+            volumeMounts:
+            - name: config
+              mountPath: /opt/renovate
+            - name: cache
+              mountPath: /tmp/renovate
+          restartPolicy: Never
+          volumes:
+          - name: config
+            configMap:
+              name: renovate-config
+          - name: cache
+            persistentVolumeClaim:
+              claimName: {{ include "renovate.fullname" . }}-cache
+  schedule: {{ .Values.cronjob.schedule | quote }}

@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "renovate.fullname" . }}
+  labels:
+    {{- include "renovate.labels" . | nindent 4 }}
+data:
+  config.json: |-
+    {{- .Values.renovate | toPrettyJson | nindent 4 }}
