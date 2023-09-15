@@ -1,0 +1,74 @@
+image:
+  repository: renovate/renovate
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+imagePullSecrets: []
+
+nameOverride: ""
+fullnameOverride: ""
+
+cronjob:
+  # -- The schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.
+  schedule: '@hourly'
+
+persistence:
+  # -- Enable provisioning of a persistent volume.
+  enabled: true
+
+  # -- The desired access modes the volume should have.
+  #
+  # Reference: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#access-modes
+  accessModes:
+  - ReadWriteOnce
+
+  # -- The minimum storage size to request.
+  size: 1Gi
+
+  # -- The name of the StorageClass to use to provivision the dynamic block
+  # volume.
+  storageClassName: ""
+
+# -- Renovate configuration - this is converted directly to JSON.
+renovate:
+  # -- Enable autodiscovery of repositories.
+  autodiscovery: true
+
+  # -- Limit autodiscovery to these topics.
+  autodiscoveryTopics: [managed-by-renovate]
+
+  platform: github
+
+  gitAuthor: "Renovate Bot <renovate.bot@maero.dk>"
+
+  onboardingConfig:
+    extends:
+    - config:recommended
+
+podAnnotations: {}
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+securityContext:
+  capabilities:
+    drop:
+    - ALL
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 1000
+
+resources:
+  limits:
+    cpu: 1
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
