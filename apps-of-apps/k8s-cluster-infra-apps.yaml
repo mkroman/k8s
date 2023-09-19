@@ -33,7 +33,3 @@ applications:
   cluster-resources:
     namespace: default
     disableNamespaceCreation: true
-  flannel:
-    path: flannel/overlays/production
-    namespace: kube-flannel
-    disableNamespaceCreation: true
