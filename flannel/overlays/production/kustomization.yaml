@@ -1,0 +1,4 @@
+resources:
+- ../../base
+patchesStrategicMerge:
+- ./patches/configmap.kube-flannel-cfg.yaml
