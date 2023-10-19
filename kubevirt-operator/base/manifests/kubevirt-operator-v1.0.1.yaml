@@ -469,6 +469,7 @@ spec:
                         type: integer
                     type: object
                   machineType:
+                    description: Deprecated. Use architectureConfiguration instead.
                     type: string
                   mediatedDevicesConfiguration:
                     description: MediatedDevicesConfiguration holds information about
@@ -3467,6 +3468,7 @@ spec:
                         type: integer
                     type: object
                   machineType:
+                    description: Deprecated. Use architectureConfiguration instead.
                     type: string
                   mediatedDevicesConfiguration:
                     description: MediatedDevicesConfiguration holds information about
@@ -6115,6 +6117,18 @@ rules:
   - routes/custom-host
   verbs:
   - create
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - get
+  - list
+  - watch
+  - delete
+  - update
+  - create
+  - patch
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -6164,18 +6178,6 @@ rules:
   - create
   - update
   - delete
-  - patch
-- apiGroups:
-  - coordination.k8s.io
-  resources:
-  - leases
-  verbs:
-  - get
-  - list
-  - watch
-  - delete
-  - update
-  - create
   - patch
 - apiGroups:
   - ""
@@ -6438,6 +6440,14 @@ rules:
   - list
   - watch
 - apiGroups:
+  - ""
+  resources:
+  - namespaces
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
   - instancetype.kubevirt.io
   resources:
   - virtualmachineinstancetypes
@@ -6499,18 +6509,6 @@ rules:
   - configmaps
   - endpoints
   - services
-  verbs:
-  - get
-  - list
-  - watch
-  - delete
-  - update
-  - create
-  - patch
-- apiGroups:
-  - coordination.k8s.io
-  resources:
-  - leases
   verbs:
   - get
   - list
@@ -6757,6 +6755,18 @@ rules:
   - list
   - get
   - watch
+- apiGroups:
+  - coordination.k8s.io
+  resources:
+  - leases
+  verbs:
+  - get
+  - list
+  - watch
+  - delete
+  - update
+  - create
+  - patch
 - apiGroups:
   - kubevirt.io
   resources:
@@ -7226,6 +7236,15 @@ rules:
   - list
   - watch
 - apiGroups:
+  - instancetype.kubevirt.io
+  resources:
+  - virtualmachineclusterinstancetypes
+  - virtualmachineclusterpreferences
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
   - authentication.k8s.io
   resources:
   - tokenreviews
@@ -7298,14 +7317,14 @@ spec:
         - virt-operator
         env:
         - name: VIRT_OPERATOR_IMAGE
-          value: quay.io/kubevirt/virt-operator:v1.0.0
+          value: quay.io/kubevirt/virt-operator:v1.0.1
         - name: WATCH_NAMESPACE
           valueFrom:
             fieldRef:
               fieldPath: metadata.annotations['olm.targetNamespaces']
         - name: KUBEVIRT_VERSION
-          value: v1.0.0
-        image: quay.io/kubevirt/virt-operator:v1.0.0
+          value: v1.0.1
+        image: quay.io/kubevirt/virt-operator:v1.0.1
         imagePullPolicy: IfNotPresent
         name: virt-operator
         ports:
