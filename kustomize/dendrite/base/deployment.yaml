@@ -17,6 +17,13 @@ spec:
       containers:
       - name: dendrite
         image: matrixdotorg/dendrite-monolith:v0.8.8
+        resources:
+          requests:
+            cpu: "2"
+            memory: 8Gi
+          limits:
+            cpu: "2"
+            memory: 8Gi
         readinessProbe:
           httpGet:
             path: /_dendrite/monitor/up
