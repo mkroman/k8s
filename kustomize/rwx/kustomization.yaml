@@ -4,8 +4,6 @@ resources:
 - base/configmap.yaml
 - base/sealedsecret.rwx-im-scw-cr-auth.yaml
 - base/sealedsecret.postgres-backup.yaml
-- base/kubegres.yaml
 - base/storageclass.yaml
 - base/persistentvolume.yaml
-- base/persistentvolumeclaim.yaml
 - base/middleware.yaml
