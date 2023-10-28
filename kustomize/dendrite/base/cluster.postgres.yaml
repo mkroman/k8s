@@ -24,7 +24,7 @@ spec:
       #   backupRetentionPolicy: "expire"
       # historyTags:
       #   backupRetentionPolicy: "keep"
-    retentionPolicy: "30d"
+    retentionPolicy: "7d"
 
   superuserSecret:
     name: postgres-superuser-auth
