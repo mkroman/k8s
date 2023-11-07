@@ -1,0 +1,12 @@
+redis:
+  auth:
+    # -- Enable authentication.
+    enabled: true
+    # -- Use our existing sealed secret.
+    existingSecret: redis-auth
+    # -- The key that contains our password.
+    existingSecretPasswordKey: password
+
+  sentinel:
+    # Enable Redis Sentinal for HA.
+    enabled: true
