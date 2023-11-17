@@ -27,7 +27,7 @@ spec:
             memory: 128Mi
         readinessProbe:
           httpGet:
-            path: /
+            path: /.well-known/matrix/client
             port: http
           initialDelaySeconds: 5
         ports:
