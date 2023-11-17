@@ -9,8 +9,12 @@ resources:
 - base/sealedsecret.postgres-backup.yaml
 - base/sealedsecret.dendrite-config.yaml
 - base/sealedsecret.dendrite-appservices.yaml
+- base/deployment.nginx.yaml
+- base/configmap.nginx.yaml
 - base/deployment.yaml
 - base/ingressroute.yaml
 images:
 - name: matrixdotorg/dendrite-monolith
   newTag: v0.13.4
+- name: nginx
+  newTag: 1.24.0

@@ -1,0 +1,31 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+  labels:
+    app: nginx
+data:
+  nginx.conf: |
+    user             nginx;
+    worker_processes auto;
+
+    events {
+      worker_connections  1024;
+    }
+
+    http {
+      // Don't disclose the nginx version
+      server_tokens off;
+
+      server {
+          listen       8080;
+          server_name  _;
+
+          location /.well-known/matrix/client {
+              add_header Content-Type application/json;
+              add_header Access-Control-Allow-Origin *;
+              return 200 '{"m.homeserver": {"base_url": "https://rwx.im"}}';
+          }
+      }
+    }
