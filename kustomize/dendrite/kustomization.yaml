@@ -11,6 +11,7 @@ resources:
 - base/sealedsecret.dendrite-appservices.yaml
 - base/deployment.nginx.yaml
 - base/configmap.nginx-config.yaml
+- base/service.nginx.yaml
 - base/deployment.yaml
 - base/ingressroute.yaml
 images:
