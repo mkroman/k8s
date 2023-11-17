@@ -15,7 +15,7 @@ data:
     }
 
     http {
-      // Don't disclose the nginx version
+      # Don't disclose the nginx version
       server_tokens off;
 
       server {
