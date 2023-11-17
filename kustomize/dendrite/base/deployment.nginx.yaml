@@ -40,7 +40,7 @@ spec:
         - mountPath: /var/log/nginx
           name: log
       volumes:
-      - name: nginx-conf
+      - name: nginx-config
         configMap:
           name: nginx-config
           items:
