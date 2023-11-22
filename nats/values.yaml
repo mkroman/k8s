@@ -1,9 +1,11 @@
 nats:
   config:
-    # cluster:
-    #   enabled: true
-    #   replicas: 3
-    max_payload: 16Mi
+    cluster:
+      enabled: true
+      replicas: 3
+
+    merge:
+      max_payload: 16000000
 
     jetstream:
       enabled: true
