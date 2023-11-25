@@ -13,6 +13,7 @@ resources:
 - base/configmap.nginx-config.yaml
 - base/service.nginx.yaml
 - base/deployment.yaml
+- base/certificate.yaml
 - base/ingressroute.yaml
 images:
 - name: matrixdotorg/dendrite-monolith
