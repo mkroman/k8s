@@ -24,18 +24,3 @@ applications:
     namespace: rwx
   magistr-prod:
     path: magistr.dk/overlays/production
-  chadgpt: {}
-  chadgpt-magistr:
-    path: chadgpt
-    namespace: chadgpt
-    source:
-      helm:
-        valueFiles:
-        - values-magistr.yaml
-  chadgpt-coding:
-    path: chadgpt
-    namespace: chadgpt
-    source:
-      helm:
-        valueFiles:
-        - values-coding.yaml
