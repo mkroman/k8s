@@ -201,7 +201,7 @@ data:
     ; RPC mechanism, watch the console of a debug client, or root around through
     ; the Murmur Database to get it).
     ;
-    ;defaultchannel=0
+    defaultchannel=2
 
     ; When a user connects to a server they've already been on, by default the
     ; server will remember the last channel they were in and move them to it
