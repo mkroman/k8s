@@ -34,8 +34,6 @@ spec:
           env:
           - name: MUMBLE_CUSTOM_CONFIG_FILE
             value: /etc/murmur/murmur.ini
-          - name: MUMBLE_SUPERUSER_PASSWORD
-            value: verySecretPassword
           ports:
           - name: mumble
             containerPort: 64738
