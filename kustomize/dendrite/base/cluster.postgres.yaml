@@ -61,7 +61,7 @@ spec:
   #       maxParallel: 8
 
   storage:
-    size: 100Gi
+    size: 150Gi
     storageClass: ssd
 
   monitoring:
