@@ -34,8 +34,6 @@ spec:
         env:
         - name: SERVER_NAME
           value: {{ .Values.env.serverName | squote }}
-        - name: SERVER_PASSWORD
-          value: {{ .Values.env.serverPassword | squote }}
         - name: GAME_PORT
           value: {{ .Values.env.gamePort | squote }}
         - name: QUERY_PORT
