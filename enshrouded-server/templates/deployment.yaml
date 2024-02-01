@@ -15,8 +15,6 @@ spec:
     matchLabels:
       app: "{{ .Chart.Name }}"
       release: "{{ .Release.Name }}"
-  securityContext:
-    runAsNonRoot: true
   template:
     metadata:
       labels:
@@ -27,10 +25,10 @@ spec:
         runAsUser: 10000
         runAsGroup: 10000
         fsGroup: 10000
+        runAsNonRoot: true
       containers:
       - name: "{{ .Chart.Name }}"
         image: "{{ .Values.image }}:{{ .Values.imageTag }}"
-        imagePullPolicy: Always
         resources:
 {{ toYaml .Values.resources | indent 10 }}
         env:
@@ -56,7 +54,6 @@ spec:
           mountPath: /home/steam/enshrouded/savegame
         securityContext:
           allowPrivilegeEscalation: false
-          
       volumes:
       - name: data
         persistentVolumeClaim:
