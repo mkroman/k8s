@@ -1,5 +1,5 @@
 image: sknnr/enshrouded-dedicated-server
-imageTag: v2.0.5
+imageTag: proton-latest
 # serviceType should be LoadBalancer or NodePort
 service:
   type: LoadBalancer
