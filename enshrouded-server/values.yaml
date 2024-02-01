@@ -13,7 +13,7 @@ volumes:
     size: 20Gi
   storageClassName: "ssd"
 env:
-  serverName: 'Enshrouded Server'
+  serverName: 'foobar'
   serverPassword: 'picksomethingawesome'
   gamePort: 15636
   queryPort: 15637
