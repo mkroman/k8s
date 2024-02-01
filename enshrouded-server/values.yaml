@@ -13,8 +13,7 @@ volumes:
     size: 20Gi
   storageClassName: "ssd"
 env:
-  serverName: 'foobar'
-  serverPassword: 'picksomethingawesome'
+  serverName: 'rwx'
   gamePort: 15636
   queryPort: 15637
   serverSlots: 16

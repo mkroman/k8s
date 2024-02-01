@@ -42,6 +42,10 @@ spec:
           value: {{ .Values.env.queryPort | squote }}
         - name: SERVER_SLOTS
           value: {{ .Values.env.serverSlots | squote }}
+        envFrom:
+          secretRef:
+            name: enshrouded-env
+            optional: false
         ports:
         - name: game-port
           containerPort: {{ .Values.env.gamePort | int }}
