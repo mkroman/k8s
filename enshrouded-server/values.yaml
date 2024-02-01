@@ -1,0 +1,20 @@
+image: sknnr/enshrouded-dedicated-server
+imageTag: v2.0.5
+# serviceType should be LoadBalancer or NodePort
+service:
+  type: LoadBalancer
+  loadBalancerIP: 10.0.1.129
+resources:
+  requests:
+    memory: 12G
+    cpu: 4.0
+volumes:
+  dataPVC:
+    size: 20Gi
+  storageClassName: "ssd"
+env:
+  serverName: 'Enshrouded Server'
+  serverPassword: 'picksomethingawesome'
+  gamePort: 15636
+  queryPort: 15637
+  serverSlots: 16
