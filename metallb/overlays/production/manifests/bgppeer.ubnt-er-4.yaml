@@ -8,6 +8,3 @@ spec:
   myASN: 64512
   peerASN: 64512
   peerAddress: 10.0.0.1
-  nodeSelectors:
-  - matchLabels:
-      loadbalancer: "true"
