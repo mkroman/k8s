@@ -6,6 +6,9 @@ metadata:
   labels:
     {{- include "mumble.labels" . | nindent 4 }}
 spec:
+  strategy:
+    type: Recreate
+  replicas: 1
   selector:
     matchLabels:
       {{- include "mumble.selectorLabels" . | nindent 6 }}
