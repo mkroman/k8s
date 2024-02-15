@@ -1,12 +1,11 @@
 ---
 apiVersion: apps/v1
-kind: StatefulSet
+kind: Deployment
 metadata:
   name: {{ include "mumble.fullname" . }}
   labels:
     {{- include "mumble.labels" . | nindent 4 }}
 spec:
-  serviceName: {{ include "mumble.fullname" . }}
   selector:
     matchLabels:
       {{- include "mumble.selectorLabels" . | nindent 6 }}
