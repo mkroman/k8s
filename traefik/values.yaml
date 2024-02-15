@@ -1,4 +1,7 @@
 traefik:
+  image:
+    tag: v2.11.0
+
   instanceLabelOverride: traefik
 
   deployment:
@@ -24,6 +27,7 @@ traefik:
 
     kubernetesIngress:
       enabled: true
+
       publishedService:
         # -- This is used to determine resource health
         enabled: true
