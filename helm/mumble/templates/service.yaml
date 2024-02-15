@@ -7,16 +7,15 @@ metadata:
     {{- include "mumble.labels" . | nindent 4 }}
 spec:
   type: {{ .Values.service.type }}
+  loadBalancerIP: {{ .Values.service.loadBalancerIP | quote }}
   ports:
   - port: {{ .Values.service.port }}
     targetPort: mumble
     protocol: TCP
     name: mumble
-    nodePort: {{ .Values.service.port }}
   - port: {{ .Values.service.port }}
     targetPort: mumble-udp
     protocol: UDP
     name: mumble-udp
-    nodePort: {{ .Values.service.port }}
   selector:
     {{- include "mumble.selectorLabels" . | nindent 4 }}
