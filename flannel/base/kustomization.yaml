@@ -1,2 +1,2 @@
 resources:
-- ./manifests/kube-flannel-v0.22.3.yaml
+- ./manifests/kube-flannel-v0.24.2.yaml
