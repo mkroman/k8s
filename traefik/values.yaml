@@ -13,9 +13,10 @@ traefik:
     isDefaultClass: true
 
   service:
+    annotations:
+      metallb.universe.tf/loadBalancerIPs: 10.0.1.128
+
     spec:
-      # Use a static ip address so we can port forward it
-      loadBalancerIP: 10.0.1.128
       # Use a local traffic policy so we can get the users origin ip
       externalTrafficPolicy: Local
 
