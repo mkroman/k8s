@@ -1,0 +1,2 @@
+resources:
+- ./manifests/metallb-frr-v0.14.3.yaml
