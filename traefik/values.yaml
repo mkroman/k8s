@@ -14,7 +14,7 @@ traefik:
 
   service:
     annotations:
-      metallb.universe.tf/loadBalancerIPs: 10.0.1.128
+      metallb.universe.tf/loadBalancerIPs: 10.0.3.1
 
     spec:
       # Use a local traffic policy so we can get the users origin ip
