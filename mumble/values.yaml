@@ -27,7 +27,7 @@ securityContext: {}
 
 service:
   type: LoadBalancer
-  loadBalancerIP: "10.0.1.130"
+  loadBalancerIP: "10.0.3.2"
   port: 31738
 
 resources: {}
