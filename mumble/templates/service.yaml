@@ -8,6 +8,7 @@ metadata:
 spec:
   type: {{ .Values.service.type }}
   loadBalancerIP: {{ .Values.service.loadBalancerIP | quote }}
+  externalTrafficPolicy: Local
   ports:
   - port: {{ .Values.service.port }}
     targetPort: mumble
