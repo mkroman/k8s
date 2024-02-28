@@ -4,11 +4,11 @@ resources:
 - base/service.yaml
 - base/cluster.postgres.yaml
 - base/scheduledbackup.postgres.yaml
-- base/sealedsecret.postgres-superuser-auth.yaml
-- base/sealedsecret.postgres-dendrite-auth.yaml
+# - base/sealedsecret.postgres-superuser-auth.yaml
+# - base/sealedsecret.postgres-dendrite-auth.yaml
 - base/sealedsecret.postgres-backup.yaml
 - base/sealedsecret.dendrite-config.yaml
-- base/sealedsecret.dendrite-appservices.yaml
+# - base/sealedsecret.dendrite-appservices.yaml
 - base/deployment.nginx.yaml
 - base/configmap.nginx-config.yaml
 - base/service.nginx.yaml

@@ -68,6 +68,3 @@ spec:
           items:
           - key: matrix_key.pem
             path: matrix_key.pem
-      - name: appservices
-        secret:
-          secretName: dendrite-appservices
