@@ -12,6 +12,11 @@ metadata:
 apiVersion: v1
 kind: Namespace
 metadata:
+  name: traefik
+---
+apiVersion: v1
+kind: Namespace
+metadata:
   name: longhorn-system
   labels:
     im.rwx.infra/tls: 'true'
