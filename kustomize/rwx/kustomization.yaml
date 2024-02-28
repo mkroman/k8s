@@ -1,8 +1,5 @@
 namespace: rwx
 resources:
 - base/certificate.yaml
-- base/configmap.yaml
 - base/sealedsecret.rwx-im-scw-cr-auth.yaml
-- base/storageclass.yaml
-- base/persistentvolume.yaml
 - base/middleware.yaml
