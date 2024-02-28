@@ -1,0 +1,15 @@
+{{- $fullName := "grafana" }} #include "influxdb.fullname" . }}
+{{ range $path, $_ :=  .Files.Glob  "dashboards/*.json" }}
+{{- $filename := $path | base -}}
+{{- $filenameNoExt := $filename | trimSuffix ".json" }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $fullName }}-dashboard-{{ $filenameNoExt }}
+  labels:
+    {{ $.Values.grafana.sidecar.dashboards.label }}: {{ $.Values.grafana.sidecar.dashboards.labelValue | toYaml }}
+data:
+  {{ $filename }}: |-
+    {{- $.Files.Get $path | nindent 4 }}
+{{ end }}

@@ -1,0 +1,39 @@
+{{- $fullName := .Release.Name -}}
+{{- if .Values.ingress.enabled }}
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: {{ $fullName }}-http
+spec:
+  entryPoints:
+  - web
+  routes:
+  - kind: Rule
+    match: Host(`{{ .Values.ingress.hostname }}`)
+    middlewares:
+    - name: {{ $fullName }}-https-redirect
+    services:
+    - name: {{ $fullName }}
+      kind: Service
+      port: 80
+---
+{{- with .Values.ingress.tls }}
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: {{ $fullName }}-https
+spec:
+  entryPoints:
+  - websecure
+  routes:
+  - kind: Rule
+    match: Host(`{{ $.Values.ingress.hostname }}`)
+    services:
+    - name: {{ $fullName }}
+      kind: Service
+      port: 80
+  tls:
+  {{- . | toYaml | nindent 4 -}}
+{{- end }}
+{{- end }}

@@ -1,0 +1,80 @@
+influxdb2:
+  enabled: true
+
+  adminUser:
+    existingSecret: influxdb-auth
+
+  persistence:
+    enabled: true
+    useExisting: true
+    name: influxdb-data
+    # storageClass: ssd
+    accessMode: ReadWriteOnce
+    size: 100Gi
+
+  ingress:
+    enabled: true
+
+    # Enable TLS termination
+    tls: true
+    secretName: infra-rwx-im-tls
+    hostname: influxdb.infra.rwx.im
+    path: /
+    annotations:
+      traefik.ingress.kubernetes.io/router.entrypoints: websecure
+      traefik.ingress.kubernetes.io/router.tls: "true"
+
+grafana:
+  # image:
+  #   tag: 10.2.2
+
+  # -- Set the number of replicas to deploy.
+  replicas: 2
+
+  # -- Configure the Grafana instance.
+  grafana.ini:
+    server:
+      domain: grafana.infra.rwx.im
+      root_url: https://%(domain)s
+
+  ingress:
+    enabled: false
+    annotations:
+      traefik.ingress.kubernetes.io/router.entrypoints: websecure
+      traefik.ingress.kubernetes.io/router.tls: "true"
+    hosts:
+    - grafana.infra.rwx.im
+    tls:
+    - secretName: infra-rwx-im-tls
+      hosts:
+      - grafana.infra.rwx.im
+
+  persistence:
+    enabled: false
+
+  envFromSecret: grafana-env
+
+  sidecar:
+    # -- Enable sidecar that monitors for dashboards from ConfigMaps
+    dashboards:
+      enabled: true
+      # -- The label to watch for
+      label: 'grafana.com/dashboard'
+      # -- The value to match
+      labelValue: 'true'
+      # -- Only monitor ConfigMaps
+      resource: configmap
+
+  admin:
+    existingSecret: grafana-auth
+
+  imageRenderer:
+    enabled: true
+    # image:
+    #   tag: '3.8.4'
+
+ingress:
+  enabled: true
+  hostname: grafana.infra.rwx.im
+  tls:
+    secretName: infra-rwx-im-tls
