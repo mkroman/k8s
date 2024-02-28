@@ -1,0 +1,85 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mosquitto
+spec:
+  replicas: 1
+  template:
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1883
+        runAsGroup: 1883
+        fsGroup: 1883
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: mosquitto
+        image: eclipse-mosquitto:latest
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - NET_RAW
+            - ALL
+          readOnlyRootFilesystem: true
+        resources:
+          requests:
+            cpu: 100m
+            memory: 32Mi
+          limits:
+            cpu: 500m
+            memory: 64Mi
+        ports:
+        - name: mqtt
+          containerPort: 1883
+        livenessProbe:
+          failureThreshold: 3
+          tcpSocket:
+            port: 1883
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+        readinessProbe:
+          failureThreshold: 3
+          tcpSocket:
+            port: 1883
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+        startupProbe:
+          failureThreshold: 90
+          tcpSocket:
+            port: 1883
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 5
+        volumeMounts:
+        - name: mosquitto-data
+          mountPath: /mosquitto/data
+        - name: mosquitto-config
+          mountPath: /mosquitto/config
+        - name: mosquitto-passwd
+          mountPath: /mosquitto/config
+      volumes:
+      - name: mosquitto-config
+        projected:
+          defaultMode: 0660
+          sources:
+          - configMap:
+              name: mosquitto-config
+          - secret:
+              name: mosquitto-passwd
+              items:
+              - key: passwords.db
+                mode: 0660
+                path: passwords.db
+      - name: mosquitto-data
+        persistentVolumeClaim:
+          claimName: mosquitto-data
+  strategy:
+    type: Recreate

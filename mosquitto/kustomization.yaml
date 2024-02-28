@@ -1,0 +1,11 @@
+resources:
+- ./manifests/networkpolicy.yaml
+- ./manifests/configmap.yaml
+- ./manifests/sealedsecret.mosquitto-passwd.yaml
+- ./manifests/persistentvolumeclaim.yaml
+- ./manifests/deployment.yaml
+- ./manifests/service.yaml
+
+commonLabels:
+  app.kubernetes.io/name: mosquitto
+  app.kubernetes.io/part-of: mosquitto
