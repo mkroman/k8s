@@ -22,7 +22,6 @@ applications:
   argo-workflows:
     namespace: argo
   external-secrets: {}
-  influxdb2: {}
   mkroman-github-events: {}
   velero: {}
   prometheus-operator:
