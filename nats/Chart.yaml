@@ -1,0 +1,10 @@
+apiVersion: v2
+appVersion: 0.1.0
+description: A Helm chart for Kubernetes
+name: nats
+type: application
+version: 0.1.0
+dependencies:
+- name: nats
+  version: 1.1.2
+  repository: https://nats-io.github.io/k8s/helm/charts/
