@@ -1,0 +1,22 @@
+# -- The namespace where Argo CD is installed.
+argocdNamespace: argocd
+
+# -- List of namespaces to create.
+namespaces:
+- name: local-path-storage
+
+# List of Argo CD projects to create.
+# Reference:
+# https://argo-cd.readthedocs.io/en/stable/operator-manual/project-specification/
+projects:
+  - name: local-path-provisioner
+    sourceRepos:
+    - 'https://github.com/mkroman/k8s'
+    destinations:
+    - namespace: local-path-storage
+    clusterResourceWhitelist:
+    - group: ''
+      kind: Namespace
+
+
+# -- List of Argo CD applications to create.
