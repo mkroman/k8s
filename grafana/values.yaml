@@ -37,18 +37,6 @@ grafana:
       domain: grafana.infra.rwx.im
       root_url: https://%(domain)s
 
-  ingress:
-    enabled: false
-    annotations:
-      traefik.ingress.kubernetes.io/router.entrypoints: websecure
-      traefik.ingress.kubernetes.io/router.tls: "true"
-    hosts:
-    - grafana.infra.rwx.im
-    tls:
-    - secretName: infra-rwx-im-tls
-      hosts:
-      - grafana.infra.rwx.im
-
   persistence:
     enabled: false
 
