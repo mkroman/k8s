@@ -1,10 +1,9 @@
 namespace: rwx
 resources:
-- base/persistentvolumeclaim.yaml
 - base/service.yaml
 - base/cluster.postgres.yaml
 - base/scheduledbackup.postgres.yaml
-# - base/sealedsecret.postgres-superuser-auth.yaml
+- base/sealedsecret.postgres-superuser-auth.yaml
 # - base/sealedsecret.postgres-dendrite-auth.yaml
 - base/sealedsecret.postgres-backup.yaml
 - base/sealedsecret.dendrite-config.yaml
