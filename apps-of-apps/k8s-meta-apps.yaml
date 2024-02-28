@@ -17,9 +17,9 @@ namespace:
     im.rwx.infra/tls: 'true'
 
 applications:
-  # meta:
-  #   path: meta/overlays/production
-  #   automatedPrune: false
+  meta:
+    path: meta/overlays/production
+    automatedPrune: false
   meta-oss:
     path: meta/overlays/oss
   meta-webhook: {}
