@@ -26,6 +26,11 @@ metadata:
 apiVersion: v1
 kind: Namespace
 metadata:
+  name: magistr-prod
+---
+apiVersion: v1
+kind: Namespace
+metadata:
   name: kubeops
 ---
 apiVersion: v1
