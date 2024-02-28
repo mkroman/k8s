@@ -7,8 +7,7 @@ metadata:
 spec:
   certificateRotateStrategy: {}
   configuration:
-    developerConfiguration:
-      featureGates: []
+    developerConfiguration: {}
   customizeComponents: {}
   imagePullPolicy: IfNotPresent
   workloadUpdateStrategy: {}
