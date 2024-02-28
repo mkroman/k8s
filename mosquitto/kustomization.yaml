@@ -1,5 +1,5 @@
 resources:
-- ./manifests/networkpolicy.yaml
+# - ./manifests/networkpolicy.yaml
 - ./manifests/configmap.yaml
 - ./manifests/sealedsecret.mosquitto-passwd.yaml
 - ./manifests/persistentvolumeclaim.yaml
