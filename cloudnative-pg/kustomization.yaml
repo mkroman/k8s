@@ -1,0 +1,3 @@
+resources:
+- ./manifests/cnpg-1.22.0.yaml
+namespace: cnpg-system
