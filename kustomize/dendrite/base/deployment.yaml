@@ -6,6 +6,7 @@ metadata:
   labels:
     app: dendrite
 spec:
+  replicas: 2
   selector:
     matchLabels:
       app: dendrite
