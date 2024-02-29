@@ -1,0 +1,2 @@
+resources:
+- ./manifests/prometheus-operator-v0.71.2.yaml

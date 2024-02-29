@@ -29,6 +29,11 @@ metadata:
 apiVersion: v1
 kind: Namespace
 metadata:
+  name: prometheus-operator
+---
+apiVersion: v1
+kind: Namespace
+metadata:
   name: grafana
   labels:
     im.rwx.infra/tls: 'true'
