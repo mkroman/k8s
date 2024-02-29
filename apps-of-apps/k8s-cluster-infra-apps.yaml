@@ -24,8 +24,6 @@ applications:
   external-secrets: {}
   mkroman-github-events: {}
   velero: {}
-  prometheus-operator:
-    namespace: monitoring
   cluster-resources:
     namespace: default
     disableNamespaceCreation: true
