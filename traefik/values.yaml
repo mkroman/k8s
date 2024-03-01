@@ -39,5 +39,8 @@ traefik:
         enabled: true
         labels:
           team: frontend
+
       serviceMonitor:
         enabled: true
+        additionalLabels:
+          team: frontend
