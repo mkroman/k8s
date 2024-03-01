@@ -44,3 +44,4 @@ traefik:
         enabled: true
         additionalLabels:
           team: frontend
+        jobLabel: traefik
