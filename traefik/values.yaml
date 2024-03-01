@@ -1,12 +1,8 @@
 traefik:
-  image:
-    tag: v2.11.0
-
   instanceLabelOverride: traefik
 
   deployment:
-    # Use a DaemonSet deployment so every node can take http traffic
-    kind: DaemonSet
+    replicas: 3
 
   ingressClass:
     enabled: true
@@ -14,7 +10,7 @@ traefik:
 
   service:
     annotations:
-      metallb.universe.tf/loadBalancerIPs: 10.0.3.1
+      io.cilium/lb-ipam-ips: 10.0.3.1
 
     spec:
       # Use a local traffic policy so we can get the users origin ip
@@ -32,3 +28,7 @@ traefik:
       publishedService:
         # -- This is used to determine resource health
         enabled: true
+
+  metrics:
+    # Enable prometheus metrics
+    prometheus: {}
