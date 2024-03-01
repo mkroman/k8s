@@ -4,6 +4,9 @@ traefik:
   deployment:
     replicas: 3
 
+  # Don't send anonymous usage statistics
+  globalArguments: []
+
   ingressClass:
     enabled: true
     isDefaultClass: true
@@ -31,4 +34,8 @@ traefik:
 
   metrics:
     # Enable prometheus metrics
-    prometheus: {}
+    prometheus:
+      service:
+        enabled: true
+        labels:
+          team: frontend
