@@ -2,7 +2,8 @@ traefik:
   instanceLabelOverride: traefik
 
   deployment:
-    replicas: 3
+    kind: DaemonSet
+    # replicas: 3
 
   # Don't send anonymous usage statistics
   globalArguments: []
