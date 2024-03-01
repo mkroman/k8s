@@ -1,0 +1,19 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "mqtt2prometheus.fullname" . }}
+  {{- with .Values.serviceMonitor.annotations }}
+  annotations:
+  {{- . | toYaml | nindent 4 }}
+  {{- end }}
+  labels:
+    {{- include "mqtt2prometheus.labels" . | nindent 4 }}
+    {{- with .Values.serviceMonitor.labels }}
+    {{- . | toYaml | nindent 4 }}
+    {{- end }}
+spec:
+  endpoints:
+  - port: http
+  selector:
+    matchLabels:
+      {{- include "mqtt2prometheus.selectorLabels" . | nindent 6 }}
