@@ -45,4 +45,4 @@ traefik:
         enabled: true
         additionalLabels:
           team: frontend
-        jobLabel: traefik
+        jobLabel: app.kubernetes.io/instance
