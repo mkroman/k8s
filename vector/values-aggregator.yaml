@@ -26,6 +26,11 @@ vector:
         endpoint: "http://loki-gateway.loki.svc:80"
         encoding:
           codec: json
+        labels:
+          "\"*\"": "{{`{{ metadata }}`}}"
+          "\"pod_labels_*\"": "{{`{{ kubernetes.pod_labels }}`}}"
+          source: vector
+
       stdout:
         type: console
         inputs: [vector]
