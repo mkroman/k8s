@@ -19,7 +19,8 @@ vector:
       vector_logs:
         type: filter
         inputs: [vector]
-        condition: "is_log"
+        condition:
+          type: is_log
     sinks:
       prom_exporter:
         type: prometheus_exporter
