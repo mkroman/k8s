@@ -24,6 +24,8 @@ vector:
         type: loki
         inputs: [vector]
         endpoint: "http://loki-gateway.loki.svc:80"
+        encoding:
+          codec: json
       stdout:
         type: console
         inputs: [vector]
