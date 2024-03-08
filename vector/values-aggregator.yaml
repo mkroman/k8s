@@ -1,0 +1,3 @@
+vector:
+  replicas: 1
+  role: "Aggregator"
