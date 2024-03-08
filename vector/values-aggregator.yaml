@@ -27,10 +27,9 @@ vector:
         encoding:
           codec: json
         labels:
-          "\"*\"": "{{`{{ metadata }}`}}"
-          "\"pod_labels_*\"": "{{`{{ kubernetes.pod_labels }}`}}"
+          "*": "{{`{{ metadata }}`}}"
+          "pod_labels_*": "{{`{{ kubernetes.pod_labels }}`}}"
           source: vector
-
       stdout:
         type: console
         inputs: [vector]
