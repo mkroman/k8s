@@ -3,10 +3,11 @@ kind: Cluster
 metadata:
   name: postgres
 spec:
-  instances: 2
+  instances: 3
   imageName: ghcr.io/cloudnative-pg/postgresql:14
 
   backup:
+    retentionPolicy: '7d'
     barmanObjectStore:
       serverName: postgres-recovered-2024-02
       endpointURL: https://s3.eu-central-003.backblazeb2.com
@@ -21,14 +22,6 @@ spec:
         secretAccessKey:
           key: AWS_SECRET_ACCESS_KEY
           name: postgres-backup
-      # tags:
-      #   backupRetentionPolicy: "expire"
-      # historyTags:
-      #   backupRetentionPolicy: "keep"
-    retentionPolicy: "7d"
-
-  superuserSecret:
-    name: postgres-superuser-auth
 
   bootstrap:
     recovery:
@@ -52,11 +45,20 @@ spec:
           name: postgres-backup
       wal:
         maxParallel: 8
-  storage:
-    size: 150Gi
-    storageClass: ssd
-  walStorage:
-    size: 15Gi
 
   monitoring:
     enablePodMonitor: true
+
+  # Do a switchover instead of restarting during a rolling upgrade, to prevent
+  # downtime.
+  primaryUpdateMethod: switchover
+
+  storage:
+    size: 150Gi
+    storageClass: ssd
+
+  superuserSecret:
+    name: postgres-superuser-auth
+
+  walStorage:
+    size: 15Gi
