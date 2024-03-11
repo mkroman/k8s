@@ -55,6 +55,8 @@ spec:
   storage:
     size: 150Gi
     storageClass: ssd
+  walStorage:
+    size: 15Gi
 
   monitoring:
     enablePodMonitor: true
