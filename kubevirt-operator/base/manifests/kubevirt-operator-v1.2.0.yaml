@@ -639,6 +639,15 @@ spec:
                                 be used instead or in addition to the sidecarImage.
                                 version: 1alphav1'
                               type: string
+                            migration:
+                              description: 'Migration means the VM using the plugin
+                                can be safely migrated version: 1alphav1'
+                              properties:
+                                method:
+                                  description: 'Method defines a pre-defined migration
+                                    methodology version: 1alphav1'
+                                  type: string
+                              type: object
                             networkAttachmentDefinition:
                               description: 'NetworkAttachmentDefinition references
                                 to a NetworkAttachmentDefinition CR object. Format:
@@ -898,6 +907,14 @@ spec:
                           AutoattachSerialConsole is disabled.
                         type: object
                     type: object
+                  vmRolloutStrategy:
+                    description: VMRolloutStrategy defines how changes to a VM object
+                      propagate to its VMI
+                    enum:
+                    - Stage
+                    - LiveUpdate
+                    nullable: true
+                    type: string
                   vmStateStorageClass:
                     description: VMStateStorageClass is the name of the storage class
                       to use for the PVCs created to preserve VM state, like TPM.
@@ -3714,6 +3731,15 @@ spec:
                                 be used instead or in addition to the sidecarImage.
                                 version: 1alphav1'
                               type: string
+                            migration:
+                              description: 'Migration means the VM using the plugin
+                                can be safely migrated version: 1alphav1'
+                              properties:
+                                method:
+                                  description: 'Method defines a pre-defined migration
+                                    methodology version: 1alphav1'
+                                  type: string
+                              type: object
                             networkAttachmentDefinition:
                               description: 'NetworkAttachmentDefinition references
                                 to a NetworkAttachmentDefinition CR object. Format:
@@ -3973,6 +3999,14 @@ spec:
                           AutoattachSerialConsole is disabled.
                         type: object
                     type: object
+                  vmRolloutStrategy:
+                    description: VMRolloutStrategy defines how changes to a VM object
+                      propagate to its VMI
+                    enum:
+                    - Stage
+                    - LiveUpdate
+                    nullable: true
+                    type: string
                   vmStateStorageClass:
                     description: VMStateStorageClass is the name of the storage class
                       to use for the PVCs created to preserve VM state, like TPM.
@@ -6993,6 +7027,13 @@ rules:
   - list
   - watch
 - apiGroups:
+  - kubevirt.io
+  resources:
+  - kubevirts
+  verbs:
+  - get
+  - list
+- apiGroups:
   - subresources.kubevirt.io
   resources:
   - version
@@ -7468,14 +7509,14 @@ spec:
         - virt-operator
         env:
         - name: VIRT_OPERATOR_IMAGE
-          value: quay.io/kubevirt/virt-operator:v1.1.1
+          value: quay.io/kubevirt/virt-operator:v1.2.0
         - name: WATCH_NAMESPACE
           valueFrom:
             fieldRef:
               fieldPath: metadata.annotations['olm.targetNamespaces']
         - name: KUBEVIRT_VERSION
-          value: v1.1.1
-        image: quay.io/kubevirt/virt-operator:v1.1.1
+          value: v1.2.0
+        image: quay.io/kubevirt/virt-operator:v1.2.0
         imagePullPolicy: IfNotPresent
         name: virt-operator
         ports:
