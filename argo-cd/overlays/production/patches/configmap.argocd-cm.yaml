@@ -8,6 +8,14 @@ data:
   # Enable application status badge feature.
   statusbadge.enabled: "true"
 
+  resource.exclusions: |
+    - apiGroups:
+      - cilium.io
+      kinds:
+       - CiliumIdentity
+      clusters:
+       - "*"
+
   # Health status for cert-manager certificates.
   resource.customizations.health.cert-manager.io_Certificate: |
     hs = {}
@@ -46,6 +54,8 @@ data:
   resource.customizations.ignoreDifferences.metallb.io_BGPAdvertisement: |
     jqPathExpressions:
     - '.status'
+
+
 
   resource.customizations.ignoreDifferences.metallb.io_BGPPeer: |
     jqPathExpressions:
