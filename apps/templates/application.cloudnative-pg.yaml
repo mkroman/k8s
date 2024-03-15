@@ -20,3 +20,5 @@ spec:
       selfHeal: true
     syncOptions:
     - ApplyOutOfSyncOnly=true
+    # We need to use server-side apply because the CRD metadata is too large.
+    - ServerSideApply=true
