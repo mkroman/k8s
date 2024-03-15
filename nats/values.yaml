@@ -27,7 +27,7 @@ nats:
       resources:
         requests:
           cpu: "2"
-          memory: 8Gi
+          memory: 2Gi
         limits:
           cpu: "2"
           memory: 8Gi
