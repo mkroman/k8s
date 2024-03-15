@@ -1,6 +1,6 @@
 dependencies:
 - name: vector
   repository: https://helm.vector.dev
-  version: 0.31.0
-digest: sha256:1dbf4fc75f883f5bbbeafdaa1119b4fa8a24abad3a86a17c054fc5985e5790e3
-generated: "2024-03-08T17:28:38.047532404+01:00"
+  version: 0.31.1
+digest: sha256:d56be6e4e1dc4b08b553314addd85b5a130ed4751e6d8703e59468ab4f47328d
+generated: "2024-03-15T19:26:52.967642731+01:00"
