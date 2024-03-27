@@ -1,6 +1,14 @@
 vector:
   role: "Agent"
 
+  resources:
+    requests:
+      memory: "64Mi"
+      cpu: "500m"
+    limits:
+      memory: "1024Mi"
+      cpu: "6000m"
+
   customConfig:
     data_dir: /vector-data-dir
     api:
