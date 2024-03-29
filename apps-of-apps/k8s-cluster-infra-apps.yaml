@@ -17,10 +17,10 @@ clusterResourceWhitelist:
   kind: '*'
 
 applications:
-  argo-events:
-    path: argo-events/overlays/production
-  argo-workflows:
-    namespace: argo
+  # argo-events:
+  #   path: argo-events/overlays/production
+  # argo-workflows:
+  #   namespace: argo
   external-secrets: {}
   mkroman-github-events: {}
   velero: {}
