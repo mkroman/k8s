@@ -13,6 +13,7 @@ allowedNamespaces:
 - rwx
 - chadgpt
 - magistr-prod
+- meta
 
 # -- Allow access to all cluster resources.
 clusterResourceWhitelist:
@@ -22,3 +23,5 @@ clusterResourceWhitelist:
 applications:
   magistr-prod:
     path: magistr.dk/overlays/production
+  stromligning:
+    namespace: meta
