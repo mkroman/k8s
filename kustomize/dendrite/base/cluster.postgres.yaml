@@ -7,12 +7,12 @@ spec:
   imageName: ghcr.io/cloudnative-pg/postgresql:14
 
   resources:
-    requests:
-      memory: "2048Mi"
-      cpu: "100m"
     limits:
-      memory: "4096Mi"
       cpu: 2
+      memory: "4Gi"
+    requests:
+      cpu: "100m"
+      memory: "2Gi"
 
   backup:
     retentionPolicy: '7d'
