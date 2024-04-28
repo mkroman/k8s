@@ -5,4 +5,4 @@ metadata:
 data:
   policy.csv: |
     g, argocd-admins, role:admin
-  scopes: '[http://rwx.im/claims/groups, email]' 
+  scopes: '[https://rwx.im/claims/groups, email]' 
