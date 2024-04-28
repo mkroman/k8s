@@ -8,6 +8,18 @@ data:
   # Enable application status badge feature.
   statusbadge.enabled: "true"
 
+  # Configure Auth0 OIDC authentication
+  oidc.config: |
+    name: Auth0
+    issuer: https://rwx-prod.au.auth0.com/
+    clientID: wicwEMz2ohytCLBZVGSLMaSgVc1nzzIM
+    clientSecret: $oidc.auth0.clientSecret
+    requestedScopes:
+    - openid
+    - profile
+    - email
+    - 'https://rwx.im/claims/groups'
+
   resource.exclusions: |
     - apiGroups:
       - cilium.io
@@ -54,8 +66,6 @@ data:
   resource.customizations.ignoreDifferences.metallb.io_BGPAdvertisement: |
     jqPathExpressions:
     - '.status'
-
-
 
   resource.customizations.ignoreDifferences.metallb.io_BGPPeer: |
     jqPathExpressions:
