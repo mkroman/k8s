@@ -69,4 +69,4 @@ spec:
     name: postgres-superuser-auth
 
   walStorage:
-    size: 80Gi
+    size: 150Gi
