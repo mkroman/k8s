@@ -18,4 +18,4 @@ images:
 - name: matrixdotorg/dendrite-monolith
   newTag: v0.13.7
 - name: nginx
-  newTag: 1.24.0
+  newTag: 1.26.0
