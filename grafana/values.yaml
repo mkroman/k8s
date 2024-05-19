@@ -1,35 +1,9 @@
-influxdb2:
-  enabled: true
-
-  adminUser:
-    existingSecret: influxdb-auth
-
-  persistence:
-    enabled: true
-    useExisting: true
-    name: influxdb-data
-    # storageClass: ssd
-    accessMode: ReadWriteOnce
-    size: 100Gi
-
-  ingress:
-    enabled: true
-
-    # Enable TLS termination
-    tls: true
-    secretName: infra-rwx-im-tls
-    hostname: influxdb.infra.rwx.im
-    path: /
-    annotations:
-      traefik.ingress.kubernetes.io/router.entrypoints: websecure
-      traefik.ingress.kubernetes.io/router.tls: "true"
-
 grafana:
-  # image:
-  #   tag: 10.2.2
-
   # -- Set the number of replicas to deploy.
   replicas: 2
+
+  image:
+    tag: 11.0.0
 
   # -- Configure the Grafana instance.
   grafana.ini:
