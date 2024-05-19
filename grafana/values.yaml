@@ -11,6 +11,9 @@ grafana:
       domain: grafana.infra.rwx.im
       root_url: https://%(domain)s
 
+    users:
+      auto_assign_org_id: 2
+
   persistence:
     enabled: false
 
