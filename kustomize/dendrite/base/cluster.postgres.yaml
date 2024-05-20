@@ -51,10 +51,7 @@ spec:
         secretAccessKey:
           key: AWS_SECRET_ACCESS_KEY
           name: postgres-backup
-      data:
-        compression: gzip
       wal:
-        compression: gzip
         maxParallel: 8
 
   monitoring:
