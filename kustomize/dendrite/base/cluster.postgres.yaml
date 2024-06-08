@@ -46,6 +46,7 @@ spec:
     barmanObjectStore:
       endpointURL: https://s3.eu-central-003.backblazeb2.com
       destinationPath: s3://dendrite-postgres-backup
+      serverName: postgres-recovered-2024-02
       s3Credentials:
         accessKeyId:
           key: AWS_ACCESS_KEY_ID
@@ -64,7 +65,7 @@ spec:
 
   # Do a switchover instead of restarting during a rolling upgrade, to prevent
   # downtime.
-  primaryUpdateMethod: switchover
+  # primaryUpdateMethod: switchover
 
   storage:
     size: 150Gi
