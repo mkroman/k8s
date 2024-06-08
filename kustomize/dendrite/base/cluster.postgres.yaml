@@ -39,7 +39,7 @@ spec:
     recovery:
       source: clusterBackup
       recoveryTarget:
-        targetName: '20240526T033747'
+        backupID: '20240526T033747'
 
   externalClusters:
   - name: clusterBackup
