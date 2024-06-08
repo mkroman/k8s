@@ -2,7 +2,7 @@ namespace: rwx
 resources:
 - base/service.yaml
 # - base/cluster.postgres.yaml
-- base/scheduledbackup.postgres.yaml
+# - base/scheduledbackup.postgres.yaml
 - base/sealedsecret.postgres-superuser-auth.yaml
 # - base/sealedsecret.postgres-dendrite-auth.yaml
 - base/sealedsecret.postgres-backup.yaml
