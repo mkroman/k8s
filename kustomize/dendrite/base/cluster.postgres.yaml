@@ -37,16 +37,15 @@ spec:
 
   bootstrap:
     recovery:
-      source: clusterBackup
-      recoveryTarget:
-        backupID: '20240526T033747'
+      source: postgres-recovered-2024-02
+      # recoveryTarget:
+      #   backupID: '20240526T033747'
 
   externalClusters:
-  - name: clusterBackup
+  - name: postgres-recovered-2024-02
     barmanObjectStore:
       endpointURL: https://s3.eu-central-003.backblazeb2.com
       destinationPath: s3://dendrite-postgres-backup
-      serverName: postgres-recovered-2024-02
       s3Credentials:
         accessKeyId:
           key: AWS_ACCESS_KEY_ID
