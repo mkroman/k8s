@@ -17,7 +17,7 @@ spec:
   backup:
     retentionPolicy: '7d'
     barmanObjectStore:
-      serverName: postgres-recovered-2024-06
+      serverName: postgres-recovered-2024-06-08
       endpointURL: https://s3.eu-central-003.backblazeb2.com
       destinationPath: s3://dendrite-postgres-backup
       s3Credentials:
