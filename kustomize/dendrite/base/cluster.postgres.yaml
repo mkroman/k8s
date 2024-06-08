@@ -59,7 +59,7 @@ spec:
         maxParallel: 8
 
   monitoring:
-    enablePodMonitor: true
+    enablePodMonitor: false
 
   # Do a switchover instead of restarting during a rolling upgrade, to prevent
   # downtime.
