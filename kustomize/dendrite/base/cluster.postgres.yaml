@@ -38,8 +38,8 @@ spec:
   bootstrap:
     recovery:
       source: postgres-recovered-2024-02
-      # recoveryTarget:
-      #   backupID: '20240526T033747'
+      recoveryTarget:
+        backupID: '20240526T033747'
 
   externalClusters:
   - name: postgres-recovered-2024-02
