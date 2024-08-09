@@ -7,7 +7,7 @@ destination:
 # -- Allow apps to deploy to all namespaces.
 # allowAllNamespaces: true
 #
-disableNamespaceCreation: true
+disableNamespaceCreation: false
 
 allowedNamespaces:
 - rwx
@@ -23,6 +23,9 @@ clusterResourceWhitelist:
 applications:
   magistr-prod:
     path: magistr.dk/overlays/production
+    disableNamespaceCreation: true
   stromligning:
     namespace: meta
-  chadgpt: {}
+    disableNamespaceCreation: true
+  chadgpt:
+    disableNamespaceCreation: false
