@@ -21,9 +21,7 @@ applications:
   #   path: argo-events/overlays/production
   # argo-workflows:
   #   namespace: argo
-  external-secrets: {}
   mkroman-github-events: {}
-  velero: {}
   cluster-resources:
     namespace: default
     disableNamespaceCreation: true
