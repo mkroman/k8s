@@ -2,8 +2,8 @@ grafana:
   # -- Set the number of replicas to deploy.
   replicas: 2
 
-  # image:
-  #   tag: 11.0.0
+  image:
+    tag: 11.2.1
 
   # -- Configure the Grafana instance.
   grafana.ini:
