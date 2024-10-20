@@ -21,7 +21,6 @@ applications:
   #   path: argo-events/overlays/production
   # argo-workflows:
   #   namespace: argo
-  mkroman-github-events: {}
   cluster-resources:
     namespace: default
     disableNamespaceCreation: true
