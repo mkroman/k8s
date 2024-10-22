@@ -14,6 +14,10 @@ spec:
       cpu: "100m"
       memory: "2Gi"
 
+  postgresql:
+    parameters:
+      max_connections: "500"
+
   backup:
    retentionPolicy: '7d'
    barmanObjectStore:
