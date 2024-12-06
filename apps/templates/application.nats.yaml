@@ -1,4 +1,20 @@
 apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: nats
+  namespace: argocd
+  # Finalizer that ensures that project is not deleted until it is not referenced by any application
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  description: nats
+  sourceRepos:
+  - {{ .Values.spec.source.repoURL }}
+  destinations:
+  - namespace: nats
+    server: https://kubernetes.default.svc
+---
+apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: nats
@@ -9,7 +25,7 @@ spec:
   destination:
     namespace: nats
     server: {{ .Values.spec.destination.server }}
-  project: production
+  project: nats
   source:
     path: nats
     repoURL: {{ .Values.spec.source.repoURL }}
