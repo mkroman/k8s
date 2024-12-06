@@ -32,6 +32,11 @@ nats:
           cpu: "1"
           memory: 1Gi
 
+
+  natsBox:
+    # -- Disable deployment of the nats-box pod.
+    enabled: false
+
   podTemplate:
     topologySpreadConstraints:
       kubernetes.io/hostname:
