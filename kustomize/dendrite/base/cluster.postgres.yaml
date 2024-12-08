@@ -78,11 +78,11 @@ spec:
 
   storage:
     size: 150Gi
-    storageClass: ssd-gp1x2
+    storageClass: ssd-gp1x1
 
   superuserSecret:
     name: postgres-superuser-auth
 
   walStorage:
     size: 250Gi
-    storageClass: ssd-gp1x2
+    storageClass: ssd-gp1x1
