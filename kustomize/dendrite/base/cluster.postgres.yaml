@@ -16,10 +16,10 @@ spec:
 
   postgresql:
     parameters:
-      max_connections: "500"
+      max_connections: "1000"
 
   backup:
-   retentionPolicy: '7d'
+   retentionPolicy: "7d"
    barmanObjectStore:
      serverName: postgres-recovered-2024-08
      endpointURL: https://s3.eu-central-003.backblazeb2.com
@@ -78,11 +78,11 @@ spec:
 
   storage:
     size: 150Gi
-    storageClass: ssd-gp1x1
+    storageClass: x-cnpg-data
 
   superuserSecret:
     name: postgres-superuser-auth
 
   walStorage:
     size: 250Gi
-    storageClass: ssd-gp1x1
+    storageClass: x-cnpg-wal
