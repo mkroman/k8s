@@ -23,6 +23,37 @@ parameters:
   fromBackup: ""
   diskSelector: hdd
 ---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: x-cnpg-data
+provisioner: driver.longhorn.io
+allowVolumeExpansion: true
+parameters:
+  # Attempt to keep the data on the same node as the workload for better
+  # performance.
+  dataLocality: "strict-local"
+  # We want to target at least SSDs or better.
+  diskSelector: "ssd"
+  # We only need a single replica since cnpg takes care of backups.
+  # performance.
+  numberOfReplicas: "1"
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: x-cnpg-wal
+provisioner: driver.longhorn.io
+allowVolumeExpansion: true
+parameters:
+  # Attempt to keep the WAL data local to the node it runs on.
+  dataLocality: "best-effort"
+  # We want to target at least SSDs or better.
+  diskSelector: "ssd"
+  # We only need a single replica since cnpg takes care of backups.
+  # performance.
+  numberOfReplicas: "1"
+---
 {{- range $class := (tuple "hdd" "ssd") }}
 {{- range $replicas := untilStep 1 4 1 }}
 apiVersion: storage.k8s.io/v1
