@@ -16,6 +16,6 @@ resources:
 - base/ingressroute.yaml
 images:
 - name: matrixdotorg/dendrite-monolith
-  newTag: v0.13.8
+  newTag: v0.14.0
 - name: nginx
   newTag: 1.27.1
