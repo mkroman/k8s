@@ -1,0 +1,7 @@
+resources:
+- ./manifests/serviceaccount.prometheus.yaml
+- ./manifests/clusterrole.prometheus.yaml
+- ./manifests/clusterrolebinding.prometheus.yaml
+- ./manifests/prometheus.yaml
+- ./manifests/service.prometheus.yaml
+- ./manifests/servicemonitor.prometheus.yaml

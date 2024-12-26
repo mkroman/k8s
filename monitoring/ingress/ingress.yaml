@@ -1,0 +1,26 @@
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: prometheus-https
+spec:
+  entryPoints:
+  - websecure
+  routes:
+  - match: Host(`prometheus.infra.rwx.im`)
+    kind: Rule
+    middlewares:
+    - name: prometheus-auth
+    services:
+    - name: prometheus-operated
+      kind: Service
+      port: 9090
+  tls:
+    secretName: infra-rwx-im-tls
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: prometheus-auth
+spec:
+  basicAuth:
+    secret: prometheus-basic-auth

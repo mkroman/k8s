@@ -1,0 +1,3 @@
+resources:
+- ./sealedsecret.prometheus-basic-auth.yaml
+- ./ingress.yaml

@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus
+  labels:
+    app.kubernetes.io/name: prometheus
+    metrics.uplink.io/monitor-instance: default
+spec:
+  ports:
+  - name: web
+    port: 9090
+    targetPort: web
+  selector:
+    metrics.uplink.io/monitor-instance: default

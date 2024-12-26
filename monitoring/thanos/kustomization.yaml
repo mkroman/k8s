@@ -1,0 +1,4 @@
+resources:
+- ./deployment.thanos-query.yaml
+- ./service.thanos-query.yaml
+- ./service.thanos-sidecar.yaml

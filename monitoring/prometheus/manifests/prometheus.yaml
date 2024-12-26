@@ -1,0 +1,50 @@
+apiVersion: monitoring.coreos.com/v1
+kind: Prometheus
+metadata:
+  name: prometheus
+  labels:
+    prometheus.prometheus-operator.dev/instance: prometheus
+spec:
+  replicas: 2
+
+  serviceAccountName: prometheus
+
+  ruleSelector:
+    matchLabels:
+      prometheus: k8s
+      role: prometheus-rulefiles
+
+  prometheusExternalLabelName: prometheus.prometheus-operator.dev/instance
+
+  podMonitorNamespaceSelector:
+    # Monitor pods in all namespaces
+    matchLabels: {}
+
+  serviceMonitorNamespaceSelector:
+    # Monitor services in all namespaces
+    matchLabels: {}
+
+  podMonitorSelector:
+    matchLabels:
+      metrics.uplink.io/monitor: prometheus
+
+  serviceMonitorSelector:
+    matchLabels:
+      metrics.uplink.io/monitor: prometheus
+
+  thanos:
+    version: v0.37.2
+
+    # securityContext:
+    #   # Prometheus will fail to start because it can't write to the query log in
+    #   # the attached volume without this.
+    #   fsGroup: 65534
+
+  # Configure persistent storage.
+  storage:
+    volumeClaimTemplate:
+      spec:
+        storageClassName: ssd-gp1x1
+        resources:
+          requests:
+            storage: 15Gi
