@@ -11,6 +11,16 @@ spec:
   - {{ .Values.spec.source.repoURL }}
   destinations:
   - namespace: prometheus-operator
+    server: https://kubernetes.default.svc
+    name: in-cluster
+  clusterResourceWhitelist:
+  - group: apiextensions.k8s.io
+    kind: CustomResourceDefinition
+  - group: rbac.authorization.k8s.io
+    kind: ClusterRole
+  - group: rbac.authorization.k8s.io
+    kind: ClusterRoleBinding
+
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: Application
