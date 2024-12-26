@@ -35,10 +35,10 @@ spec:
   thanos:
     version: v0.37.2
 
-    # securityContext:
-    #   # Prometheus will fail to start because it can't write to the query log in
-    #   # the attached volume without this.
-    #   fsGroup: 65534
+  securityContext:
+    # Prometheus will fail to start because it can't write to the query log in
+    # the attached volume without this.
+    fsGroup: 65534
 
   # Configure persistent storage.
   storage:
