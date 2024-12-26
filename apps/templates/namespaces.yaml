@@ -68,6 +68,13 @@ metadata:
 apiVersion: v1
 kind: Namespace
 metadata:
+  name: monitoring
+  labels:
+    im.rwx.infra/tls: 'true'
+---
+apiVersion: v1
+kind: Namespace
+metadata:
   name: magistr-prod
 ---
 apiVersion: v1

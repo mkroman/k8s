@@ -40,4 +40,3 @@ spec:
       selfHeal: true
     syncOptions:
     - ApplyOutOfSyncOnly=true
-    - CreateNamespace=true
