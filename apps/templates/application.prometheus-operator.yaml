@@ -1,4 +1,18 @@
 apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: prometheus-operator
+  namespace: argocd
+  # Finalizer that ensures that project is not deleted until it is not referenced by any application
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  sourceRepos:
+  - {{ .Values.spec.source.repoURL }}
+  destinations:
+  - namespace: prometheus-operator
+---
+apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: prometheus-operator
@@ -9,7 +23,7 @@ spec:
   destination:
     namespace: prometheus-operator
     server: {{ .Values.spec.destination.server }}
-  project: production
+  project: prometheus-operator
   source:
     path: prometheus-operator/base
     repoURL: {{ .Values.spec.source.repoURL }}
