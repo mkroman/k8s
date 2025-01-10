@@ -1,0 +1,137 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "open-webui.fullname" . }}
+  labels:
+    {{- include "open-webui.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "open-webui.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "open-webui.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- with .Values.envFrom }}
+          envFrom:
+          {{- . | toYaml | nindent 10 }}
+          {{- end }}
+          env:
+          # WebUI values
+          {{- with .Values.open_webui.webui }}
+          - name: WEBUI_AUTH
+            value: {{ .authentication | ternary "True" "False" | quote }}
+          {{- with .name }}
+          - name: WEBUI_NAME
+            value: {{ . | quote }}
+          {{- end }}
+          - name: ENABLE_SIGNUP
+            value: {{ .registration | ternary "True" "False" | quote }}
+          {{- with .userRole }}
+          - name: DEFAULT_USER_ROLE
+            value: {{ . | quote }}
+          {{- end }}
+          {{- with .port }}
+          - name: PORT
+            value: {{ . | quote }}
+          {{- end }}
+          {{- with .url }}
+          - name: WEBUI_URL
+            value: {{ . | quote }}
+          {{- end }}
+          {{- with .websocket }}
+          - name: ENABLE_WEBSOCKET_SUPPORT
+            value: {{ .enabled | ternary "True" "False" | quote }}
+          {{- end }}
+
+          {{- with .secretKey }}
+          - name: WEBUI_SECRET_KEY
+            value: {{ . | quote }}
+          {{- end }}
+          {{- end }}
+          {{- with .Values.open_webui.tika }}
+          # Tika
+          - name: TIKA_URL
+            value: {{ .url | quote }}
+          {{- end }}
+
+          # Ollama values
+          {{- with .Values.open_webui.ollama }}
+          - name: ENABLE_OLLAMA_API
+            value: {{ .enabled | ternary "True" "False" | quote }}
+          {{- end }}
+
+          # Database values
+          {{- with .Values.open_webui.database }}
+          {{- with .pool_timeout }}
+          - name: DATABASE_POOL_TIMEOUT
+            value: {{ . | quote }}
+          {{- end }}
+          {{- with .url }}
+          - name: DATABASE_URL
+            value: {{ . | quote }}
+          {{- end }}
+          {{- end }}
+          ports:
+          - name: http
+            containerPort: {{ .Values.open_webui.webui.port }}
+            protocol: TCP
+          livenessProbe:
+            {{- toYaml .Values.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.readinessProbe | nindent 12 }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+          {{- with .Values.persistence }}
+          {{- if .enabled }}
+          - name: data
+            mountPath: /app/backend/data
+          {{- end }}
+          {{- end }}
+          {{- with .Values.volumeMounts }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      volumes:
+      {{- with .Values.persistence }}
+      {{- if .enabled }}
+      - name: data
+        persistentVolumeClaim:
+          claimName: {{ include "open-webui.fullname" $ | quote }}
+      {{- end }}
+      {{- end }}
+      {{- with .Values.volumes }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

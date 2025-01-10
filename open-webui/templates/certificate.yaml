@@ -1,0 +1,16 @@
+{{- if .Values.certificate.enabled }}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ .Values.certificate.commonName | quote }}
+  labels:
+    {{- include "open-webui.labels" . | nindent 4 }}
+spec:
+  dnsNames:
+  - {{ .Values.certificate.commonName | quote }}
+  {{- with .Values.certificate.issuer }}
+  issuerRef:
+    {{- . | toYaml | nindent 4 }}
+  {{- end }}
+  secretName: {{ printf "%s-tls" .Values.certificate.commonName | quote }}
+{{- end }}
