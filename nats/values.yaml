@@ -7,6 +7,11 @@ nats:
     merge:
       max_payload: 16000000
 
+    # Enable metrics monitoring.
+    monitor:
+      enabled: true
+
+    # Enable JetStream.
     jetstream:
       enabled: true
 
@@ -32,11 +37,30 @@ nats:
           cpu: "1"
           memory: 1Gi
 
-
   natsBox:
     # -- Disable deployment of the nats-box pod.
     enabled: false
 
+  # Enable prometheus metrics monitoring.
+  #
+  # Note: requires `config.monitor` to be enabled.
+  promExporter:
+    enabled: true
+
+    # Create the PodMonitor resource since we already use prometheus operator in
+    # the cluster.
+    podMonitor:
+      enabled: true
+
+      # Add the pod monitor selector label so our prometheus instance discovers
+      # the podmonitor.
+      merge:
+        metadata:
+          labels:
+            metrics.uplink.io/monitor: prometheus
+
+
+  # Limit deployments to 1 instance per node.
   podTemplate:
     topologySpreadConstraints:
       kubernetes.io/hostname:
