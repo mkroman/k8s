@@ -1,2 +1,2 @@
 resources:
-- ./manifests/install-v2.13.2.yaml
+- ./manifests/install-v2.13.3.yaml
