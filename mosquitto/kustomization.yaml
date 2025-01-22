@@ -1,11 +1,16 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
 resources:
-# - ./manifests/networkpolicy.yaml
-- ./manifests/configmap.yaml
 - ./manifests/sealedsecret.mosquitto-passwd.yaml
 - ./manifests/persistentvolumeclaim.yaml
 - ./manifests/deployment.yaml
 - ./manifests/service.yaml
-
-commonLabels:
-  app.kubernetes.io/name: mosquitto
-  app.kubernetes.io/part-of: mosquitto
+configMapGenerator:
+- files:
+  - ./mosquitto.conf
+  name: mosquitto-config
+labels:
+- includeSelectors: true
+  pairs:
+    app.kubernetes.io/name: mosquitto
+    app.kubernetes.io/part-of: mosquitto
