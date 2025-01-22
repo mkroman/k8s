@@ -48,7 +48,7 @@ secretName: mqtt2prometheus-auth
 config:
   mqtt:
     # The MQTT broker to connect to
-    server: tcp://10.0.1.4:1883
+    server: tcp://mosquitto.mosquitto.svc.cluster.local:1883
     # Optional: for TLS client certificates
     # ca_cert: certs/AmazonRootCA1.pem
     # client_cert: certs/xxxxx-certificate.pem.crt
