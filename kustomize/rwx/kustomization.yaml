@@ -1,5 +1,4 @@
 namespace: rwx
 resources:
 - base/certificate.yaml
-- base/sealedsecret.rwx-im-scw-cr-auth.yaml
 - base/middleware.yaml
