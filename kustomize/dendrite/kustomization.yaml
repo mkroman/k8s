@@ -7,6 +7,7 @@ resources:
 # - base/sealedsecret.postgres-dendrite-auth.yaml
 - base/sealedsecret.postgres-backup.yaml
 - base/sealedsecret.dendrite-config.yaml
+- base/sealedsecret.dendrite-monitoring-auth.yaml
 # - base/sealedsecret.dendrite-appservices.yaml
 - base/deployment.nginx.yaml
 - base/configmap.nginx-config.yaml
@@ -14,6 +15,7 @@ resources:
 - base/deployment.yaml
 - base/certificate.yaml
 - base/ingressroute.yaml
+- base/servicemonitor.dendrite.yaml
 images:
 - name: matrixdotorg/dendrite-monolith
   newTag: v0.14.1

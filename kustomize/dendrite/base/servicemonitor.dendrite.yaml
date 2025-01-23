@@ -1,0 +1,19 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: dendrite-monitoring
+  labels:
+    metrics.uplink.io/monitor: prometheus
+spec:
+  endpoints:
+  - basicAuth:
+      username:
+        name: dendrite-monitoring-auth
+        key: username
+      password:
+        name: dendrite-monitoring-auth
+        key: password
+    port: http
+  selector:
+    matchLabels:
+      app: dendrite
