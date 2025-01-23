@@ -4,11 +4,11 @@ vector:
 
   resources:
     requests:
-      memory: "64Mi"
-      cpu: "500m"
+      cpu: "200m"
+      memory: "256Mi"
     limits:
-      memory: "1024Mi"
-      cpu: "6000m"
+      cpu: "200m"
+      memory: "256Mi"
 
   customConfig:
     data_dir: /vector-data-dir
@@ -34,18 +34,12 @@ vector:
         type: prometheus_exporter
         inputs: [internal_metrics]
         address: 0.0.0.0:9090
-      loki:
-        type: loki
+      quickwit:
+        type: http
+        method: post
         inputs: [vector_logs]
-        endpoint: "http://loki-gateway.loki.svc:80"
         encoding:
           codec: json
-        labels:
-          "*": "{{`{{ metadata }}`}}"
-          "pod_labels_*": "{{`{{ kubernetes.pod_labels }}`}}"
-          source: vector_logs
-      stdout:
-        type: console
-        inputs: [vector]
-        encoding:
-          codec: json
+        framing:
+          method: newline_delimited
+        uri: "http://quickwit-control-plane.quickwit-prod.svc.cluster.local:7280/api/v1/otel-logs-v0_7/ingest"
