@@ -16,4 +16,4 @@ spec:
     port: http
   selector:
     matchLabels:
-      app: dendrite
+      app.kubernetes.io/instance: dendrite
