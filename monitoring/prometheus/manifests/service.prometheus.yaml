@@ -5,6 +5,9 @@ metadata:
   labels:
     app.kubernetes.io/name: prometheus
     metrics.uplink.io/monitor-instance: default
+    prometheus.prometheus-operator.dev/instance: prometheus
+  annotations:
+     io.cilium/lb-ipam-ips: 10.0.3.4
 spec:
   type: LoadBalancer
   ports:
