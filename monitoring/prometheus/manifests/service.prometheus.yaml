@@ -6,9 +6,10 @@ metadata:
     app.kubernetes.io/name: prometheus
     metrics.uplink.io/monitor-instance: default
 spec:
+  type: LoadBalancer
   ports:
   - name: web
     port: 9090
     targetPort: web
   selector:
-    metrics.uplink.io/monitor-instance: default
+    prometheus.prometheus-operator.dev/instance: prometheus
