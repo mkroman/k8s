@@ -11,6 +11,10 @@ nats:
     monitor:
       enabled: true
 
+    mqtt:
+      # Enable MQTT service.
+      enabled: true
+
     # Enable JetStream.
     jetstream:
       enabled: true
