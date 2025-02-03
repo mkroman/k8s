@@ -20,6 +20,7 @@ spec:
         args:
         - compact
         - --log.level=debug
+        - --wait
         - --data-dir
         - /data
         - --objstore.config=$(OBJSTORE_CONFIG)
