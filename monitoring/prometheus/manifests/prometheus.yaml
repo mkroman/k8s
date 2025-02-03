@@ -34,6 +34,9 @@ spec:
 
   thanos:
     version: v0.37.2
+    objectStorageConfig:
+      key: thanos.yaml
+      name: thanos-storage
 
   securityContext:
     # Prometheus will fail to start because it can't write to the query log in

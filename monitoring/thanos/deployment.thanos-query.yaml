@@ -22,7 +22,7 @@ spec:
         # - --query.replica-label=thanos_ruler_replica
         - --store=dnssrv+_grpc._tcp.thanos-sidecar.default.svc.cluster.local
         # - --store=dnssrv+_grpc._tcp.thanos-ruler.default.svc.cluster.local
-        image: quay.io/thanos/thanos:v0.34.1
+        image: quay.io/thanos/thanos:v0.37.2
         name: thanos-query
         ports:
         - containerPort: 10902
