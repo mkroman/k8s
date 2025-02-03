@@ -16,6 +16,9 @@ redis:
       # Create a master service that points to the current master.
       enabled: true
 
+  replica:
+    automountServiceAccountToken: true
+
   rbac:
     # Create RBAC resources.
     create: true
