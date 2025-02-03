@@ -1,3 +1,19 @@
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: mqtt2prometheus
+  namespace: argocd
+  # Finalizer that ensures that project is not deleted until it is not referenced by any application
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  sourceRepos:
+  - {{ .Values.spec.source.repoURL }}
+  destinations:
+  - namespace: mqtt2prometheus
+    server: https://kubernetes.default.svc
+---
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -9,11 +25,36 @@ spec:
   destination:
     namespace: mqtt2prometheus
     server: {{ .Values.spec.destination.server }}
-  project: production
+  project: mqtt2prometheus
   source:
     path: mqtt2prometheus
     repoURL: {{ .Values.spec.source.repoURL }}
     targetRevision: {{ .Values.spec.source.targetRevision }}
+  syncPolicy:
+    automated:
+      selfHeal: true
+    syncOptions:
+    - ApplyOutOfSyncOnly=true
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mqtt2prometheus-mqtt-topic
+  namespace: argocd
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  destination:
+    namespace: mqtt2prometheus
+    server: {{ .Values.spec.destination.server }}
+  project: mqtt2prometheus
+  source:
+    path: mqtt2prometheus
+    repoURL: {{ .Values.spec.source.repoURL }}
+    targetRevision: {{ .Values.spec.source.targetRevision }}
+    helm:
+      valueFiles:
+      - values-topic-metrics.yaml
   syncPolicy:
     automated:
       selfHeal: true
