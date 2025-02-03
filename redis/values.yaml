@@ -30,3 +30,6 @@ redis:
     serviceMonitor:
       # Create the ServiceMonitor for the metrics.
       enabled: true
+      # Make the ServiceMonitor discoverable by prometheus.
+      additionalLabels:
+        metrics.uplink.io/monitor: prometheus
