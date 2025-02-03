@@ -10,3 +10,20 @@ redis:
   sentinel:
     # Enable Redis Sentinal for HA.
     enabled: true
+
+    # Configure the master service resource.
+    masterService:
+      # Create a master service that points to the current master.
+      enabled: true
+
+  rbac:
+    # Create RBAC resources.
+    create: true
+
+  metrics:
+    # Enable metrics.
+    enabled: true
+
+    serviceMonitor:
+      # Create the ServiceMonitor for the metrics.
+      enabled: true
