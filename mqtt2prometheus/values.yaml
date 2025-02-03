@@ -185,4 +185,4 @@ config:
 
 serviceMonitor:
   labels:
-    team: frontend
+    metrics.uplink.io/monitor: prometheus
