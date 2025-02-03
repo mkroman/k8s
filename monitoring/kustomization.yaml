@@ -1,4 +1,4 @@
 resources:
 - ./prometheus
 - ./thanos
-# - ./ingress
+- ./ingress

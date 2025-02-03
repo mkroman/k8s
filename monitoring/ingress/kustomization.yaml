@@ -1,3 +1,4 @@
 resources:
 - ./sealedsecret.prometheus-basic-auth.yaml
-- ./ingress.yaml
+- ./middleware.yaml
+- ./ingressroute.yaml
