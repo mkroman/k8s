@@ -6,3 +6,4 @@ resources:
 - ./manifests/service.thanos-query.yaml
 - ./manifests/service.thanos-sidecar.yaml
 - ./manifests/service.thanos-store.yaml
+- ./manifests/servicemonitor.thanos-store.yaml
