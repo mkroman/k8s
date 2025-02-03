@@ -4,15 +4,21 @@ kind: Deployment
 metadata:
   name: dendrite
   labels:
+    app.kubernetes.io/name: dendrite
+    app.kubernetes.io/part-of: dendrite
     app: dendrite
 spec:
   # replicas: 2
   selector:
     matchLabels:
+      app.kubernetes.io/name: dendrite
+      app.kubernetes.io/part-of: dendrite
       app: dendrite
   template:
     metadata:
       labels:
+        app.kubernetes.io/name: dendrite
+        app.kubernetes.io/part-of: dendrite
         app: dendrite
     spec:
       containers:

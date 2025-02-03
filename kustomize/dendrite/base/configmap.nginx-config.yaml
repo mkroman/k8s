@@ -4,7 +4,8 @@ kind: ConfigMap
 metadata:
   name: nginx-config
   labels:
-    app: nginx
+    app.kubernetes.io/name: nginx
+    app.kubernetes.io/part-of: dendrite
 data:
   nginx.conf: |
     user             nginx;
