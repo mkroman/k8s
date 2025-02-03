@@ -24,6 +24,7 @@ spec:
         - --data-dir=/var/thanos/store
         - --objstore.config=$(OBJSTORE_CONFIG)
         - --index-cache.config=$(INDEX_CACHE_CONFIG)
+        - --store.caching-bucket.config=$(CACHING_BUCKET_CONFIG)
         - --ignore-deletion-marks-delay=24h
         env:
         - name: OBJSTORE_CONFIG
@@ -35,6 +36,11 @@ spec:
           valueFrom:
             secretKeyRef:
               key: index-cache.yaml
+              name: thanos-storage
+        - name: CACHING_BUCKET_CONFIG
+          valueFrom:
+            secretKeyRef:
+              key: caching-bucket.yaml
               name: thanos-storage
         livenessProbe:
           failureThreshold: 4
