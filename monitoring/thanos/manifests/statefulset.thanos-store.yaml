@@ -74,7 +74,6 @@ spec:
           runAsUser: 65534
           seccompProfile:
             type: RuntimeDefault
-        terminationGracePeriodSeconds: 120
         terminationMessagePolicy: FallbackToLogsOnError
         volumeMounts:
         - name: thanos-data-dir
