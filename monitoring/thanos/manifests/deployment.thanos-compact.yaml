@@ -19,7 +19,7 @@ spec:
         image: quay.io/thanos/thanos:v0.37.2
         args:
         - compact
-        - --log.level=debug
+        - --log.level=info
         - --wait
         - --data-dir
         - /data

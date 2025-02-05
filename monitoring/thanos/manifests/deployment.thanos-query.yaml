@@ -17,7 +17,7 @@ spec:
       containers:
       - args:
         - query
-        - --log.level=debug
+        - --log.level=info
         - --query.replica-label=prometheus_replica
         # - --query.replica-label=thanos_ruler_replica
         - --store=dnssrv+_grpc._tcp.thanos-sidecar.monitoring.svc.cluster.local
