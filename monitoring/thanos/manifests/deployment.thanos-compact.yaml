@@ -24,6 +24,9 @@ spec:
         - --data-dir
         - /data
         - --objstore.config=$(OBJSTORE_CONFIG)
+        - --retention.resolution-raw=0d 
+        - --retention.resolution-5m=0d
+        - --retention.resolution-1h=0d
         env:
         - name: OBJSTORE_CONFIG
           valueFrom:
