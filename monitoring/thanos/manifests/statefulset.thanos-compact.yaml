@@ -27,9 +27,9 @@ spec:
         - --deduplication.func=penalty
         - --deduplication.replica-label=prometheus_replica
         - --objstore.config=$(OBJSTORE_CONFIG)
-        - --retention.resolution-raw=0s
-        - --retention.resolution-5m=0s
-        - --retention.resolution-1h=0s
+        - --retention.resolution-raw=30d
+        - --retention.resolution-5m=90d
+        - --retention.resolution-1h=10y
         env:
         - name: OBJSTORE_CONFIG
           valueFrom:
@@ -69,5 +69,3 @@ spec:
       volumes:
       - name: thanos-data-dir
         emptyDir: {}
-
-
