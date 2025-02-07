@@ -23,6 +23,7 @@ spec:
         - --wait
         - --data-dir
         - /data
+        - --compact.enable-vertical-compaction
         - --deduplication.func=penalty
         - --deduplication.replica-label=prometheus_replica
         - --objstore.config=$(OBJSTORE_CONFIG)
