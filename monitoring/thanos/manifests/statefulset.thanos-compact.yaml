@@ -23,6 +23,7 @@ spec:
         - --wait
         - --data-dir
         - /data
+        - --deduplication.func=penalty
         - --deduplication.replica-label=prometheus_replica
         - --objstore.config=$(OBJSTORE_CONFIG)
         - --retention.resolution-raw=0s
