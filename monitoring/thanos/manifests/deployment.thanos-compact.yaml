@@ -23,10 +23,11 @@ spec:
         - --wait
         - --data-dir
         - /data
+        - --deduplication.replica-label=prometheus_replica
         - --objstore.config=$(OBJSTORE_CONFIG)
-        - --retention.resolution-raw=0d 
-        - --retention.resolution-5m=0d
-        - --retention.resolution-1h=0d
+        - --retention.resolution-raw=0s
+        - --retention.resolution-5m=0s
+        - --retention.resolution-1h=0s
         env:
         - name: OBJSTORE_CONFIG
           valueFrom:
