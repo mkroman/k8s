@@ -41,6 +41,7 @@ spec:
   securityContext:
     # Prometheus will fail to start because it can't write to the query log in
     # the attached volume without this.
+    runAsUser: 65534
     fsGroup: 65534
 
   # Configure persistent storage.
