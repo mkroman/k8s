@@ -75,9 +75,15 @@ spec:
             type: RuntimeDefault
         terminationMessagePolicy: FallbackToLogsOnError
         volumeMounts:
-        - name: thanos-data-dir
+        - name: thanos-data
           mountPath: /var/thanos/store
-      volumes:
-      - name: thanos-data-dir
-        emptyDir: {}
-
+    volumeClaimTemplates:
+    - metadata:
+        name: thanos-data
+      spec:
+        storageClassName: ssd-gp1x1
+        accessModes: 
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 15Gi
