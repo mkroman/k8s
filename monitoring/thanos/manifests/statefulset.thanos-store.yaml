@@ -75,11 +75,21 @@ spec:
             type: RuntimeDefault
         terminationMessagePolicy: FallbackToLogsOnError
         volumeMounts:
-        - name: thanos-data
+        - name: data
           mountPath: /var/thanos/store
+          readOnly: false
+      securityContext:
+        fsGroup: 65534
+        runAsGroup: 65532
+        runAsNonRoot: true
+        runAsUser: 65534
+        seccompProfile:
+          type: RuntimeDefault
   volumeClaimTemplates:
   - metadata:
-      name: thanos-data
+      name: data
+      labels:
+        app.kubernetes.io/name: thanos-store
     spec:
       storageClassName: ssd-gp1x1
       accessModes:
