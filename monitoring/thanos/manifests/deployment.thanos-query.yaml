@@ -15,16 +15,16 @@ spec:
         app.kubernetes.io/name: thanos-query
     spec:
       containers:
-      - args:
+      - name: thanos-query
+        args:
         - query
-        - --log.level=info
+        - --log.level=debug
         - --query.auto-downsampling
         - --query.replica-label=prometheus_replica
         - --query.replica-label=thanos_ruler_replica
         - --store=dnssrv+_grpc._tcp.thanos-sidecar.monitoring.svc.cluster.local
         - --store=dnssrv+_grpc._tcp.thanos-store.monitoring.svc.cluster.local
         image: quay.io/thanos/thanos:v0.37.2
-        name: thanos-query
         ports:
         - containerPort: 10902
           name: http

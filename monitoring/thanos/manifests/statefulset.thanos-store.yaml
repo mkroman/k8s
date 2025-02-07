@@ -15,17 +15,16 @@ spec:
         app.kubernetes.io/name: thanos-store
     spec:
       containers:
-      - name: thanos-compact
+      - name: thanos-store
         image: quay.io/thanos/thanos:v0.37.2
         args:
         - store
-        - --log.level=info
+        - --log.level=debug
         - --log.format=logfmt
         - --data-dir=/var/thanos/store
         - --objstore.config=$(OBJSTORE_CONFIG)
         - --index-cache.config=$(INDEX_CACHE_CONFIG)
         - --store.caching-bucket.config=$(CACHING_BUCKET_CONFIG)
-        - --ignore-deletion-marks-delay=24h
         env:
         - name: OBJSTORE_CONFIG
           valueFrom:
