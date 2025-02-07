@@ -1,7 +1,7 @@
 resources:
 - ./manifests/sealedsecret.thanos-storage.yaml
 - ./manifests/deployment.thanos-query.yaml
-- ./manifests/deployment.thanos-compact.yaml
+- ./manifests/statefulset.thanos-compact.yaml
 - ./manifests/statefulset.thanos-store.yaml
 - ./manifests/service.thanos-query.yaml
 - ./manifests/service.thanos-sidecar.yaml

@@ -1,5 +1,5 @@
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: thanos-compact
   labels:
@@ -67,3 +67,5 @@ spec:
       volumes:
       - name: thanos-data-dir
         emptyDir: {}
+
+
