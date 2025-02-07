@@ -77,13 +77,13 @@ spec:
         volumeMounts:
         - name: thanos-data
           mountPath: /var/thanos/store
-    volumeClaimTemplates:
-    - metadata:
-        name: thanos-data
-      spec:
-        storageClassName: ssd-gp1x1
-        accessModes: 
-        - ReadWriteOnce
-        resources:
-          requests:
-            storage: 15Gi
+  volumeClaimTemplates:
+  - metadata:
+      name: thanos-data
+    spec:
+      storageClassName: ssd-gp1x1
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 15Gi
