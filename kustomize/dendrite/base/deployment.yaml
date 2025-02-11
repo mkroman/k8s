@@ -42,14 +42,11 @@ spec:
         volumeMounts:
         - name: media
           mountPath: /var/dendrite/media
-        - name: tls
-          mountPath: /etc/dendrite/tls
-          readOnly: true
         - name: config
           mountPath: /etc/dendrite
           readOnly: true
-        - name: signing-key
-          mountPath: /etc/dendrite/signing
+        - name: tls
+          mountPath: /etc/dendrite/tls
           readOnly: true
       volumes:
       - name: media
@@ -61,9 +58,3 @@ spec:
       - name: config
         secret:
           secretName: dendrite-config
-      - name: signing-key
-        secret:
-          secretName: dendrite-config
-          items:
-          - key: matrix_key.pem
-            path: matrix_key.pem
