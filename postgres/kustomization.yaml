@@ -1,0 +1,5 @@
+resources:
+- manifests/sealedsecret.postgres-backup.yaml
+- manifests/sealedsecret.postgres-superuser-auth.yaml
+- manifests/cluster.postgres.yaml
+namespace: rwx

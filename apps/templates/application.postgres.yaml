@@ -1,0 +1,31 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: postgres
+  namespace: argocd
+  # Finalizer that ensures that project is not deleted until it is not referenced by any application
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  sourceRepos:
+  - {{ .Values.spec.source.repoURL }}
+  destinations:
+  - namespace: rwx
+    server: https://kubernetes.default.svc
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: postgres
+  namespace: argocd
+  # finalizers:
+  # - resources-finalizer.argocd.argoproj.io
+spec:
+  destination:
+    namespace: rwx
+    server: {{ .Values.spec.destination.server }}
+  project: postgres
+  source:
+    path: postgres
+    repoURL: {{ .Values.spec.source.repoURL }}
+    targetRevision: {{ .Values.spec.source.targetRevision }}

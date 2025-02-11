@@ -1,0 +1,88 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: postgres
+spec:
+  instances: 2
+  imageName: ghcr.io/cloudnative-pg/postgresql:14
+
+  resources:
+    limits:
+      cpu: '2'
+      memory: "4Gi"
+    requests:
+      cpu: "100m"
+      memory: "2Gi"
+
+  postgresql:
+    parameters:
+      max_connections: "2000"
+
+  backup:
+   retentionPolicy: "7d"
+   barmanObjectStore:
+     serverName: postgres-recovered-2024-08
+     endpointURL: https://s3.eu-central-003.backblazeb2.com
+     destinationPath: s3://dendrite-postgres-backup
+     s3Credentials:
+       accessKeyId:
+         key: AWS_ACCESS_KEY_ID
+         name: postgres-backup
+       region:
+         key: AWS_REGION
+         name: postgres-backup
+       secretAccessKey:
+         key: AWS_SECRET_ACCESS_KEY
+         name: postgres-backup
+     wal:
+       compression: gzip
+     data:
+       compression: gzip
+
+  bootstrap:
+    recovery:
+      backup:
+        name: postgres-backup-20240806033743
+        # source: postgres-recovered-2024-06
+      # recoveryTarget:
+      #   backupID: '20240526T033747'
+
+  externalClusters:
+  - name: postgres-recovered-2024-06
+    barmanObjectStore:
+      endpointURL: https://s3.eu-central-003.backblazeb2.com
+      destinationPath: s3://dendrite-postgres-backup
+      serverName: postgres-recovered-2024-06
+      s3Credentials:
+        accessKeyId:
+          key: AWS_ACCESS_KEY_ID
+          name: postgres-backup
+        region:
+          key: AWS_REGION
+          name: postgres-backup
+        secretAccessKey:
+          key: AWS_SECRET_ACCESS_KEY
+          name: postgres-backup
+      wal:
+        maxParallel: 8
+        compression: gzip
+      data:
+        compression: gzip
+
+  monitoring:
+    enablePodMonitor: false
+
+  # Do a switchover instead of restarting during a rolling upgrade, to prevent
+  # downtime.
+  # primaryUpdateMethod: switchover
+
+  storage:
+    size: 150Gi
+    storageClass: x-cnpg-data
+
+  superuserSecret:
+    name: postgres-superuser-auth
+
+  walStorage:
+    size: 250Gi
+    storageClass: x-cnpg-wal
