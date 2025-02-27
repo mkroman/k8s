@@ -30,3 +30,5 @@ spec:
     path: open-webui
     repoURL: {{ .Values.spec.source.repoURL }}
     targetRevision: {{ .Values.spec.source.targetRevision }}
+  syncPolicy:
+    automated: {}
