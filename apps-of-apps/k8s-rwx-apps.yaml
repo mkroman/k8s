@@ -24,8 +24,5 @@ applications:
   magistr-prod:
     path: magistr.dk/overlays/production
     disableNamespaceCreation: true
-  stromligning:
-    namespace: meta
-    disableNamespaceCreation: true
   chadgpt:
     disableNamespaceCreation: false
