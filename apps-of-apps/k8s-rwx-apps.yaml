@@ -24,5 +24,3 @@ applications:
   magistr-prod:
     path: magistr.dk/overlays/production
     disableNamespaceCreation: true
-  chadgpt:
-    disableNamespaceCreation: false
