@@ -1,0 +1,17 @@
+# Overrides for the magistr variant of this deployment.
+
+sealedSecret:
+  enabled: false
+
+irc:
+  # The hostname or IP address of the IRC server.
+  host: irc.quakenet.org
+  # The port number of the IRC server.
+  port: 6667
+  # Use a secure connection.
+  tls: false
+  # List of channels to join when initially connected.
+  channels:
+    - "#magistr"
+  # List of nicknames to ignore messages from.
+  ignored_nicks: ["arenamusen*", "robutler*", "hactar*", "schrute*", "chad*"]

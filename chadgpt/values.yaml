@@ -1,0 +1,129 @@
+image:
+  repository: ghcr.io/rwx-labs/chadgpt
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: "sha-c7deb5e4a4ec050bc01aea7781e237b1c58d4380"
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+podAnnotations: {}
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+securityContext:
+  capabilities:
+    drop:
+    - ALL
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 1000
+
+sealedSecret:
+  enabled: true
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 128Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+irc:
+  # The hostname or IP address of the IRC server.
+  host: irc.rwx.im
+  # The port number of the IRC server.
+  port: 6697
+  # Use a secure connection.
+  tls: true
+  # The nickname used by the bot.
+  nick: claude
+  # The username used by the bot.
+  username: claude
+  # The version response to CTCP VERSION requests.
+  version: "github.com/rwx-labs/chadgpt"
+  # List of channels to join when initially connected.
+  channels:
+    - "#uplink"
+    - "#chad"
+  # List of nicknames to ignore messages from.
+  ignored_nicks: ["meta", "chad*", "zeta*", "zet4", "anhero*", "moss*"]
+  message_max_length: 4094
+
+# Configuration for the GPT completion requests.
+# Reference: https://beta.openai.com/docs/api-reference/completions
+llm:
+  provider: anthropic
+
+  # The identifier of the model to use for completions.
+  model: claude-3-7-sonnet-latest
+
+  # What sampling temperature to use, between 0 and 2. Higher values like 0.8
+  # will make the output more random, while lower values like 0.2 will make it
+  # more focused and deterministic.
+  # temperature: 1
+
+  # The maximum number of tokens to generate in the chat completion.
+  max_tokens: 32768
+
+  # The reasoning method of the model. This controls how thoughts and answers
+  # are extracted from the API response.
+  #
+  # Options:
+  # * `think-answer-tags` - response is formatted with <think></think> and
+  #    <answer></answer> tags and are extracted.
+  # * `none` or false - response is preserved as is.
+  reasoning_method: none
+
+  # An alternative to sampling with temperature, called nucleus sampling, where
+  # the model considers the results of the tokens with top_p probability mass.
+  # So 0.1 means only the tokens comprising the top 10% probability mass are
+  # considered.
+  #
+  # It's recommended to use this or `temperature`, but not both.
+  # top_p: 1
+
+  # Number between -2.0 and 2.0. Positive values penalize new tokens based on
+  # whether they appear in the text so far, increasing the model's likelihood to
+  # talk about new topics.
+  # presence_penalty: 0.0
+
+  # Number between -2.0 and 2.0. Positive values penalize new tokens based on
+  # their existing frequency in the text so far, decreasing the model's
+  # likelihood to repeat the same line verbatim.
+  # frequency_penalty: 0.5
+
+  # List of messages used for instructing GPT.
+  #
+  # Each message has `content` which will be templated with Mustache.
+  #
+  # Available variables:
+  # `message` - The message a user sent to the bot (not including the bot nick)
+  # `rawMessage` - The message a user sent to the bot, including the bot nick
+  # `channel` - The name of the channel the message was sent in.
+  # `nick` - The nickname of the sender.
+  messages:
+    - role: system
+      content: |-
+        You are Claude, a large language model trained by Anthropic.
+        You are a domain expert in many advanced technical fields.
+        You prefer to speak English or Danish.
+        You answer as concisely and in as few lines as possible.
+        Your answer must be in 1-6 lines. Each line can contain up to 4000 characters. Utilize the characters available instead of using more lines.
+        The current date and time is {{ currentTime }}.
+    - role: user
+      content: |-
+        {{ message }}
+
+# -- Enable deployment of a gpt-3.5-turbo variant as well.
+turbochad:
+  enabled: false
