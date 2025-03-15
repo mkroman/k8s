@@ -1,3 +1,8 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: chadgpt
+---
 apiVersion: argoproj.io/v1alpha1
 kind: AppProject
 metadata:
@@ -31,5 +36,3 @@ spec:
     targetRevision: {{ .Values.spec.source.targetRevision }}
   syncPolicy:
     automated: {}
-    syncOptions:
-    - CreateNamespace=true
