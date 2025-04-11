@@ -1,4 +1,7 @@
 traefik:
+  image:
+    tag: v2.11.22
+
   instanceLabelOverride: traefik
 
   deployment:
