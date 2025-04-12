@@ -33,7 +33,7 @@ spec:
       metrics.uplink.io/monitor: prometheus
 
   thanos:
-    version: v0.37.2
+    version: v0.38.0
     objectStorageConfig:
       key: thanos.yaml
       name: thanos-storage
