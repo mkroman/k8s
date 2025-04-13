@@ -123,7 +123,3 @@ llm:
     - role: user
       content: |-
         {{ message }}
-
-# -- Enable deployment of a gpt-3.5-turbo variant as well.
-turbochad:
-  enabled: false
