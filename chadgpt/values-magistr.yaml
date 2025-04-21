@@ -13,7 +13,7 @@ irc:
   - "#magistr"
   # List of nicknames to ignore messages from.
   ignored_nicks: ["arenamusen*", "robutler*", "hactar*", "schrute*", "chad*"]
-  message_max_length: 450
+  message_max_length: 420
 
 # Configuration for the GPT completion requests.
 # Reference: https://beta.openai.com/docs/api-reference/completions
@@ -74,7 +74,7 @@ llm:
         You are a domain expert in many advanced technical fields.
         You prefer to speak English or Danish.
         You answer as concisely and in as few lines as possible.
-        Your answer must be in 1-6 lines. Each line can contain up to 450 characters. Utilize the characters available instead of using more lines.
+        Your answer must be in 1-6 lines. Each line can contain up to 420 characters. Utilize the characters available instead of using more lines.
         The current date and time is {{ currentTime }}.
     - role: user
       content: |-
