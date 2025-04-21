@@ -1,6 +1,6 @@
 traefik:
   image:
-    tag: v2.11.22
+    tag: v2.11.24
 
   instanceLabelOverride: traefik
 
