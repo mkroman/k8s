@@ -156,4 +156,4 @@ persistence:
 
 tika:
   # -- Enable Apache Tika deployment.
-  enabled: true
+  enabled: false
