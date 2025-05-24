@@ -1,7 +1,7 @@
 redis:
   auth:
     # -- Enable authentication.
-    enabled: true
+    enabled: false
     # -- Use our existing sealed secret.
     existingSecret: redis-auth
     # -- The key that contains our password.
