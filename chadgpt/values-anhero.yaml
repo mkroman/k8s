@@ -20,6 +20,8 @@ irc:
 llm:
   provider: openai
 
+  base_url: "https://api.perplexity.ai"
+
   # The identifier of the model to use for completions.
   model: claude-sonnet-4-20250514
 
