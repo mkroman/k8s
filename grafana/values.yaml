@@ -1,6 +1,6 @@
 grafana:
-  image:
-    tag: 12.0.1
+  # image:
+  #   tag: 12.0.1
   # -- Set the number of replicas to deploy.
   replicas: 2
 
