@@ -16,8 +16,13 @@ vector:
       address: 127.0.0.1:8686
       playground: false
     sources:
+      generate_syslog:
+        type: demo_logs
+        format: syslog
       kubernetes_logs:
         type: kubernetes_logs
+        node_annotation_fields:
+          node_labels: "" # Disable node labels as kubevirt adds a whole lot and we don't care about them
       host_metrics:
         filesystem:
           devices:
@@ -34,16 +39,7 @@ vector:
         type: prometheus_exporter
         inputs: [host_metrics, internal_metrics]
         address: 0.0.0.0:9090
-        # aggregator:
-        #   type: vector
-        #   inputs: [host_metrics, internal_metrics, kubernetes_logs]
-        #   address: "vector-aggregator.vector.svc.cluster.local:6000"
-      quickwit:
-        type: http
-        method: post
-        inputs: [vector_logs]
-        encoding:
-          codec: json
-        framing:
-          method: newline_delimited
-        uri: "http://quickwit-control-plane.quickwit-prod.svc.cluster.local:7280/api/v1/otel-logs-v0_7/ingest"
+      aggregator:
+        type: vector
+        inputs: [host_metrics, internal_metrics, kubernetes_logs]
+        address: "vector-aggregator.vector.svc.cluster.local:6000"

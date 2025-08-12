@@ -5,7 +5,7 @@ metadata:
   labels:
     prometheus.prometheus-operator.dev/instance: prometheus
 spec:
-  replicas: 2
+  replicas: 1
 
   serviceAccountName: prometheus
 

@@ -1,0 +1,15 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "vector.fullname" . }}
+  labels:
+    metrics.uplink.io/monitor: prometheus
+    {{- include "vector.selectorLabels" $ | nindent 4 }}
+spec:
+  endpoints:
+  - interval: 30s
+    targetPort: 9090
+    path: /metrics
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ include "vector.fullname" . }}

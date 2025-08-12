@@ -14,8 +14,8 @@ vector:
     data_dir: /vector-data-dir
     api:
       enabled: true
-      address: 127.0.0.1:8686
-      playground: false
+      address: 0.0.0.0:8686
+      playground: true
     sources:
       internal_metrics:
         type: internal_metrics
@@ -23,17 +23,55 @@ vector:
         address: 0.0.0.0:6000
         type: vector
         version: "2"
+      generate_syslog:
+        type: demo_logs
+        format: syslog
+
     transforms:
       vector_logs:
         type: filter
         inputs: [vector]
         condition:
           type: is_log
+
+      syslog_otel_logs:
+        type: remap
+        inputs: [generate_syslog]
+        source: |-
+            structured = parse_syslog!(.message)
+            .timestamp_nanos = to_unix_timestamp!(structured.timestamp, unit: "nanoseconds")
+            .body = structured
+            .service_name = structured.appname
+            .resource_attributes.source_type = .source_type
+            .resource_attributes.host.hostname = structured.hostname
+            .resource_attributes.service.name = structured.appname
+            .attributes.syslog.procid = structured.procid
+            .attributes.syslog.facility = structured.facility
+            .attributes.syslog.version = structured.version
+            .severity_text = if includes(["emerg", "err", "crit", "alert"], structured.severity) {
+              "ERROR"
+            } else if structured.severity == "warning" {
+              "WARN"
+            } else if structured.severity == "debug" {
+              "DEBUG"
+            } else if includes(["info", "notice"], structured.severity) {
+              "INFO"
+            } else {
+             structured.severity
+            }
+            .scope_name = structured.msgid
+            del(.host)
+            del(.message)
+            del(.timestamp)
+            del(.service)
+            del(.source_type)
+
     sinks:
       prom_exporter:
         type: prometheus_exporter
         inputs: [internal_metrics]
         address: 0.0.0.0:9090
+
       quickwit:
         type: http
         method: post
@@ -42,4 +80,12 @@ vector:
           codec: json
         framing:
           method: newline_delimited
-        uri: "http://quickwit-control-plane.quickwit-prod.svc.cluster.local:7280/api/v1/otel-logs-v0_7/ingest"
+        uri: "http://quickwit-indexer.quickwit-prod.svc.cluster.local:7280/api/v1/vector-kubernetes_logs-v0_1/ingest"
+
+      # debug:
+      #   type: console
+      #   inputs: [vector_logs]
+      #   encoding:
+      #     codec: json
+      #   framing:
+      #     method: newline_delimited
