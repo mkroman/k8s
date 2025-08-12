@@ -73,7 +73,6 @@ spec:
     automated:
       prune: true
       selfHeal: true
-      allowEmpty: false
     syncOptions:
     - ApplyOutOfSyncOnly=true
     - PruneLast=true
@@ -108,7 +107,6 @@ spec:
     automated:
       prune: true
       selfHeal: true
-      allowEmpty: false
     syncOptions:
     - ApplyOutOfSyncOnly=true
     - PruneLast=true
