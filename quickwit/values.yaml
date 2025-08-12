@@ -1,0 +1,40 @@
+quickwit:
+  environment:
+    QW_DISABLE_TELEMETRY: 1
+  environmentFrom:
+  - secretRef:
+      name: quickwit
+
+  searcher:
+    replicaCount: 3
+
+  indexer:
+    replicaCount: 1
+
+  metastore:
+    replicaCount: 1
+
+    extraEnvFrom:
+    - secretRef:
+        name: quickwit-metastore
+
+  # Quickwit configuration
+    #
+  # Warning: This config is writed directly into a configMap
+  # to avoid passing sensitive value you can pass environment variables.
+  # https://quickwit.io/docs/configuration/node-config#using-environment-variables-in-the-configuration
+  config:
+    version: 0.8
+    listen_address: 0.0.0.0
+    gossip_listen_port: 7282
+    data_dir: /quickwit/qwdata
+    default_index_root_uri: s3://quickwit-prod/indexes
+
+    metastore:
+      postgres:
+        max_num_connections: 50
+
+    storage:
+      s3:
+        endpoint: "https://s3.eu-central-003.backblazeb2.com"
+        region: "eu-central-003"
