@@ -19,7 +19,7 @@ quickwit:
         name: quickwit-metastore
 
   # Quickwit configuration
-    #
+  #
   # Warning: This config is writed directly into a configMap
   # to avoid passing sensitive value you can pass environment variables.
   # https://quickwit.io/docs/configuration/node-config#using-environment-variables-in-the-configuration
