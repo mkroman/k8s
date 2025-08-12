@@ -4,6 +4,9 @@ grafana:
   # -- Set the number of replicas to deploy.
   replicas: 2
 
+  plugins:
+  - quickwit-quickwit-datasource
+
   # -- Configure the Grafana instance.
   grafana.ini:
     server:
