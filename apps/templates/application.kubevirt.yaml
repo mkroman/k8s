@@ -39,6 +39,9 @@ spec:
     # Pod priority and preemption
   - group: scheduling.k8s.io
     kind: PriorityClass
+  # Containerized Data Importer (CDI) resources
+  - group: cdi.kubevirt.io
+    kind: CDI
   # Allow all namespaced-scoped resources to be created, except for ResourceQuota, LimitRange, NetworkPolicy
   namespaceResourceBlacklist:
   - group: ''
