@@ -38,3 +38,9 @@ quickwit:
       s3:
         endpoint: "https://s3.eu-central-003.backblazeb2.com"
         region: "eu-central-003"
+
+  # Deploy the ServiceMonitor so we can pick up metrics.
+  serviceMonitor:
+    enabled: true
+    additionalLabels:
+      metrics.uplink.io/monitor: prometheus
