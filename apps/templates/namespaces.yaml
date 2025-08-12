@@ -17,6 +17,11 @@ metadata:
 apiVersion: v1
 kind: Namespace
 metadata:
+  name: nats
+---
+apiVersion: v1
+kind: Namespace
+metadata:
   name: traefik
   labels:
     im.rwx.infra/tls: 'true'
