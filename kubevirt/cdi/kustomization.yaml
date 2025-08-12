@@ -1,0 +1,3 @@
+resources:
+- ./cdi-operator-1.62.0.yaml
+- ./cdi-cr-1.62.0.yaml
