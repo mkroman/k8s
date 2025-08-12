@@ -36,6 +36,9 @@ spec:
   # lazy to deal with it
   - group: ''
     kind: 'Namespace'
+    # Pod priority and preemption
+  - group: scheduling.k8s.io
+    kind: PriorityClass
   # Allow all namespaced-scoped resources to be created, except for ResourceQuota, LimitRange, NetworkPolicy
   namespaceResourceBlacklist:
   - group: ''
