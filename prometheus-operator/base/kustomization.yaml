@@ -1,5 +1,5 @@
-resources:
-- ./manifests/prometheus-operator-v0.79.2.yaml
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: prometheus-operator
+resources:
+- ./manifests/prometheus-operator-v0.84.1.yaml
