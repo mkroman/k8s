@@ -19,7 +19,7 @@ spec:
         image: quay.io/thanos/thanos:v0.37.2
         args:
         - store
-        - --log.level=debug
+        - --log.level=info
         - --log.format=logfmt
         - --data-dir=/var/thanos/store
         - --objstore.config=$(OBJSTORE_CONFIG)

@@ -18,7 +18,7 @@ spec:
       - name: thanos-query
         args:
         - query
-        - --log.level=debug
+        - --log.level=info
         - --query.auto-downsampling
         - --query.replica-label=prometheus_replica
         - --query.replica-label=thanos_ruler_replica
