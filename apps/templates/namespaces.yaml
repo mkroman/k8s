@@ -12,11 +12,6 @@ metadata:
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: nats
----
-apiVersion: v1
-kind: Namespace
-metadata:
   name: mosquitto
 ---
 apiVersion: v1
