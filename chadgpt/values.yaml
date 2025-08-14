@@ -2,28 +2,23 @@ image:
   repository: ghcr.io/rwx-labs/chadgpt
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "sha-c7deb5e4a4ec050bc01aea7781e237b1c58d4380"
-
+  tag: "skid"
 imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""
-
 podAnnotations: {}
-
 podSecurityContext: {}
-  # fsGroup: 2000
+# fsGroup: 2000
 
 securityContext:
   capabilities:
     drop:
-    - ALL
+      - ALL
   readOnlyRootFilesystem: true
   runAsNonRoot: true
   runAsUser: 1000
-
 sealedSecret:
   enabled: true
-
 resources:
   limits:
     cpu: 500m
@@ -31,13 +26,9 @@ resources:
   # requests:
   #   cpu: 100m
   #   memory: 128Mi
-
 nodeSelector: {}
-
 tolerations: []
-
 affinity: {}
-
 irc:
   # The hostname or IP address of the IRC server.
   host: irc.rwx.im
@@ -58,15 +49,12 @@ irc:
   # List of nicknames to ignore messages from.
   ignored_nicks: ["meta", "chad*", "zeta*", "zet4", "anhero*", "moss*"]
   message_max_length: 4094
-
 # Configuration for the GPT completion requests.
 # Reference: https://beta.openai.com/docs/api-reference/completions
 llm:
   provider: anthropic
-
   # The identifier of the model to use for completions.
   model: claude-sonnet-4-20250514
-
   # What sampling temperature to use, between 0 and 2. Higher values like 0.8
   # will make the output more random, while lower values like 0.2 will make it
   # more focused and deterministic.
@@ -74,7 +62,6 @@ llm:
 
   # The maximum number of tokens to generate in the chat completion.
   max_tokens: 32768
-
   # The reasoning method of the model. This controls how thoughts and answers
   # are extracted from the API response.
   #
@@ -83,7 +70,6 @@ llm:
   #    <answer></answer> tags and are extracted.
   # * `none` or false - response is preserved as is.
   reasoning_method: none
-
   # An alternative to sampling with temperature, called nucleus sampling, where
   # the model considers the results of the tokens with top_p probability mass.
   # So 0.1 means only the tokens comprising the top 10% probability mass are
@@ -122,4 +108,4 @@ llm:
         The current date and time is {{ currentTime }}.
     - role: user
       content: |-
-        {{ message }}
+        {{ &message }}

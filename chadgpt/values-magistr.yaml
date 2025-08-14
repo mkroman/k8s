@@ -78,4 +78,4 @@ llm:
         The current date and time is {{ currentTime }}.
     - role: user
       content: |-
-        {{ message }}
+        {{ &message }}
