@@ -38,7 +38,7 @@ data:
       # temperature: 1
 
       # The maximum number of tokens to generate in the chat completion.
-      max_tokens: {{ .Values.llm.max_tokens }}
+      max_completion_tokens: {{ .Values.llm.max_completion_tokens }}
 
       # The reasoning method of the model. This controls how thoughts and answers
       # are extracted from the API response.
