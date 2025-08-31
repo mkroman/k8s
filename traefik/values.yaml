@@ -41,11 +41,9 @@ traefik:
     prometheus:
       service:
         enabled: true
-        labels:
-          team: frontend
 
       serviceMonitor:
         enabled: true
         additionalLabels:
-          team: frontend
+          metrics.uplink.io/monitor: prometheus
         jobLabel: app.kubernetes.io/instance
