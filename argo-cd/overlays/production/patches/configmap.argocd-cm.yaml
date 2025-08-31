@@ -21,7 +21,7 @@ data:
     - openid
     - profile
     - email
-    - 'https://rwx.im/claims/groups'
+    - 'https://rwx.im/roles'
     logoutURL: https://rwx-prod.eu.auth0.com/oidc/logout?id_token_hint={{token}}&post_logout_redirect_uri={{logoutRedirectURL}}
 
   resource.exclusions: |
