@@ -123,7 +123,7 @@ open_webui:
     # -- Enable or disable registration of new users.
     registration: false
     # -- The default user role for new users (pending, user or admin)
-    userRole: pending
+    # userRole: pending
     # -- The port that the WebUI should be running on.
     port: 8080
     # The URL where Open WebUI is reachable.
