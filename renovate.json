@@ -3,5 +3,8 @@
   "extends": [
     "config:recommended",
     "config:best-practices"
-  ]
+  ],
+  "argocd": {
+    "managerFilePatterns": ["/application([^/]*)\\.ya?ml$/"]
+  }
 }
