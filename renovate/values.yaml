@@ -1,7 +1,7 @@
 image:
   repository: renovate/renovate
   pullPolicy: IfNotPresent
-  tag: "latest"
+  tag: "latest@sha256:0233bd7dc95ccedd851cc1d6b4d9510ca001b22ccf55b251a0663583102e40c7"
 
 imagePullSecrets: []
 

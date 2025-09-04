@@ -18,6 +18,6 @@ resources:
 - base/servicemonitor.dendrite.yaml
 images:
 - name: matrixdotorg/dendrite-monolith
-  newTag: v0.14.1
+  newTag: v0.14.1@sha256:a0212bbbfdee8f38a1b6680eedffa3ad4d9f3cfb86c9d1f0250c8ea122d54ea2
 - name: nginx
-  newTag: 1.27.5
+  newTag: 1.27.5@sha256:6784fb0834aa7dbbe12e3d7471e69c290df3e6ba810dc38b34ae33d3c1c05f7d
