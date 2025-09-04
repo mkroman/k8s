@@ -2,7 +2,7 @@ image:
   repository: ghcr.io/hikhvar/mqtt2prometheus
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "v0.1.7"
+  tag: "v0.1.7@sha256:893b02eca9c6fb034adb55cc6f31719dfc57ffb5eaf4e32b40304a02eddfda6f"
 
 imagePullSecrets: []
 nameOverride: ""
