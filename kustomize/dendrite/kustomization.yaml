@@ -20,4 +20,4 @@ images:
 - name: matrixdotorg/dendrite-monolith
   newTag: v0.15.2@sha256:7dafe6edfc8cfab758a68a4cf20414df1ade4a36b45b1852554d81fb70b1272c
 - name: nginx
-  newTag: 1.27.5@sha256:6784fb0834aa7dbbe12e3d7471e69c290df3e6ba810dc38b34ae33d3c1c05f7d
+  newTag: 1.29.1@sha256:33e0bbc7ca9ecf108140af6288c7c9d1ecc77548cbfd3952fd8466a75edefe57
