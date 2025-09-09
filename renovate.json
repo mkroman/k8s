@@ -7,23 +7,17 @@
   "customManagers": [
     {
       "customType": "regex",
-      "managerFilePatterns": ["/open-webui/Chart\\.yaml$/"],
+      "managerFilePatterns": ["Chart\\.ya?ml$"],
       "matchStrings": [
-        "appVersion:\\s*[\"']?(?<currentValue>[^\\s\"']+)[\"']?"
-      ],
-      "datasourceTemplate": "github-releases",
-      "depNameTemplate": "open-webui/open-webui",
-      "versioningTemplate": "semver"
-    }
-  ],
-  "packageRules": [
+        "#\\s*renovate:\\s*datasource=(?<datasource>\\S+)\\s+depName=(?<depName>\\S+)(?:\\s+packageName=(?<packageName>\\S+))?(?:\\s+versioning=(?<versioning>\\S+))?.*?\\n\\s*appVersion:\\s*[\"']?(?<currentValue>[^\\s\"']+)[\"']?"
+      ]
+    },
     {
-      "matchManagers": ["custom.regex"],
-      "matchFileNames": ["open-webui/Chart.yaml"],
-      "commitMessageTopic": "open-webui appVersion",
-      "commitMessageExtra": "to {{newVersion}}",
-      "semanticCommitType": "chore",
-      "semanticCommitScope": "helm"
+      "customType": "regex",
+      "managerFilePatterns": ["Chart\\.ya?ml$"],
+      "matchStrings": [
+        "appVersion:\\s*[\"']?(?<currentValue>[^\\s\"']+)[\"']?\\s*#\\s*renovate:\\s*datasource=(?<datasource>\\S+)\\s+depName=(?<depName>\\S+)(?:\\s+packageName=(?<packageName>\\S+))?(?:\\s+versioning=(?<versioning>\\S+))?"
+      ]
     }
   ]
 }
