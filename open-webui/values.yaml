@@ -8,7 +8,7 @@ image:
   # This sets the pull policy for images.
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: ""
+  tag: "@sha256:2964a606181b1db2ce45deff111fe6438f331058154a6ea5e4b01a3070a6630b"
   # Optional suffix to add to images.
   suffix: "-slim"
 

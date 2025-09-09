@@ -4,7 +4,7 @@ image:
   repository: vectorim/element-web
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: ""
+  tag: "@sha256:239157316728343e2ae651393fbdc702a800f36028f77b04375cea159ae8d6d5"
 
 imagePullSecrets: []
 nameOverride: ""
