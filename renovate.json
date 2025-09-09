@@ -25,6 +25,13 @@
       "matchPackageNames": ["traefik"],
       "matchDatasources": ["helm"],
       "allowedVersions": "< 28.0.0"
+    },
+    {
+      "matchManagers": ["helm-values"],
+      "pinDigests": false
     }
+  ],
+  "ignorePaths": [
+    "renovate/**"
   ]
 }
