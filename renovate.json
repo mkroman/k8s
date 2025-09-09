@@ -19,5 +19,12 @@
         "appVersion:\\s*[\"']?(?<currentValue>[^\\s\"']+)[\"']?\\s*#\\s*renovate:\\s*datasource=(?<datasource>\\S+)\\s+depName=(?<depName>\\S+)(?:\\s+packageName=(?<packageName>\\S+))?(?:\\s+versioning=(?<versioning>\\S+))?"
       ]
     }
+  ],
+  "packageRules": [
+    {
+      "matchPackageNames": ["traefik"],
+      "matchDatasources": ["helm"],
+      "allowedVersions": "< 28.0.0"
+    }
   ]
 }
