@@ -3,5 +3,27 @@
   "extends": [
     "config:recommended",
     "config:best-practices"
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "fileMatch": ["open-webui/Chart\\.yaml$"],
+      "matchStrings": [
+        "appVersion:\\s*[\"']?(?<currentValue>[^\\s\"']+)[\"']?"
+      ],
+      "datasourceTemplate": "github-releases",
+      "depNameTemplate": "open-webui/open-webui",
+      "versioningTemplate": "semver"
+    }
+  ],
+  "packageRules": [
+    {
+      "matchManagers": ["regex"],
+      "matchFiles": ["open-webui/Chart.yaml"],
+      "commitMessageTopic": "open-webui appVersion",
+      "commitMessageExtra": "to {{newVersion}}",
+      "semanticCommitType": "chore",
+      "semanticCommitScope": "helm"
+    }
   ]
 }
