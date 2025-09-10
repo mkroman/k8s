@@ -1,5 +1,0 @@
-resources:
-- ../../frr
-- ./manifests/ipaddresspool.yaml
-- ./manifests/bgpadvertisement.yaml
-- ./manifests/bgppeer.ubnt-er-4.yaml

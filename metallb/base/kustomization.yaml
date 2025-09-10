@@ -1,2 +1,0 @@
-resources:
-- ./manifests/metallb-native-v0.14.3.yaml

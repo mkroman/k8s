@@ -63,18 +63,6 @@ data:
     jqPathExpressions:
     - '.spec.conversion.webhook.clientConfig.caBundle'
 
-  resource.customizations.ignoreDifferences.metallb.io_IPAddressPool: |
-    jqPathExpressions:
-    - '.status'
-
-  resource.customizations.ignoreDifferences.metallb.io_BGPAdvertisement: |
-    jqPathExpressions:
-    - '.status'
-
-  resource.customizations.ignoreDifferences.metallb.io_BGPPeer: |
-    jqPathExpressions:
-    - '.status'
-
   resource.customizations.ignoreDifferences.cert-manager.io_Certificate: |
     jqPathExpressions:
     - '.spec.duration'
