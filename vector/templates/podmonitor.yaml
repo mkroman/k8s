@@ -6,9 +6,9 @@ metadata:
     metrics.uplink.io/monitor: prometheus
     {{- include "vector.selectorLabels" $ | nindent 4 }}
 spec:
-  endpoints:
+  podMetricsEndpoints:
   - interval: 30s
-    targetPort: 9090
+    portNumber: 9090
     path: /metrics
   selector:
     matchLabels:

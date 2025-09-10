@@ -19,6 +19,7 @@ vector:
       generate_syslog:
         type: demo_logs
         format: syslog
+      # Kubernetes container logs.
       kubernetes_logs:
         type: kubernetes_logs
         node_annotation_fields:
