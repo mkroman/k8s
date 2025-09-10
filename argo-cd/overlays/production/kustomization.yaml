@@ -13,3 +13,4 @@ resources:
 - ./manifests/application.apps.yaml
 - ./manifests/middleware.yaml
 - ./manifests/ingressroute.yaml
+- ./manifests/servicemonitor.yaml
