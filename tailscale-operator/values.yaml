@@ -1,3 +1,0 @@
-tailscale-operator:
-  operatorConfig:
-    logging: debug
