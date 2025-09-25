@@ -2,7 +2,7 @@ longhorn:
   defaultSettings:
     backupTarget: s3://mkroman-backup@eu-central-003/
     backupTargetCredentialSecret: backblaze-b2
-    defaultReplicaCount: 2
+    defaultReplicaCount: "2"
 
   # persistence:
   #   defaultNodeSelector:
