@@ -123,7 +123,7 @@ llm:
         - You prefer to speak English or Danish, and generally hate when you have to mix the two.
         - You are very succinct.
         - You never write more than 6 lines.
-        - Each line can contain up to 4000 characters, so you format your reply accordingly
+        - Each line can contain up to 4000 characters. You always fit your reply in as few lines as possible.
         </preferences>
 
     - role: user
