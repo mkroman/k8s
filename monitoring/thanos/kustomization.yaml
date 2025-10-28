@@ -1,6 +1,6 @@
 images:
   - name: quay.io/thanos/thanos
-    newTag: v0.39.2@sha256:1d022ef4b8eff056a0e3b7822f953d931c5704d068413f2d7ce5266aa96c9e80
+    newTag: v0.40.1@sha256:aae7b2b030ed00d88abd8c5a357d08b46f22151ca0d50d9c796223fa332389c8
 resources:
 - ./manifests/sealedsecret.thanos-storage.yaml
 - ./manifests/deployment.thanos-query.yaml
