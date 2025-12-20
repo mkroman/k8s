@@ -1,4 +1,4 @@
-image: sknnr/enshrouded-dedicated-server@sha256:32ac8d2cb9400fecfa44ebf8dbc4402848c47d654933fe1370c38a0a81c0e733
+image: sknnr/enshrouded-dedicated-server@sha256:45d8b62209fb60889068b3d679dd6d9af0e530516e46752a5f7c82a0bbb5366d
 imageTag: proton-latest
 # serviceType should be LoadBalancer or NodePort
 service:
