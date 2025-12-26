@@ -7,4 +7,4 @@ version: 0.1.0
 dependencies:
 - name: vector
   repository: https://helm.vector.dev
-  version: 0.48.0
+  version: 0.49.0
