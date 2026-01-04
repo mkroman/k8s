@@ -1,0 +1,49 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: zeta
+  namespace: argocd
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  sourceRepos:
+  - {{ .Values.repository | quote }}
+  destinations:
+  - namespace: zeta-prod
+    server: https://kubernetes.default.svc
+
+  # Allow all namespaced-scoped resources to be created, except for ResourceQuota, LimitRange, NetworkPolicy
+  namespaceResourceBlacklist:
+  - group: ''
+    kind: ResourceQuota
+  - group: ''
+    kind: LimitRange
+  - group: ''
+    kind: NetworkPolicy
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zeta
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  destination:
+    namespace: zeta-prod
+    server: {{ .Values.spec.destination.server }}
+  project: zeta
+  source:
+    path: zeta
+    repoURL: {{ .Values.spec.source.repoURL }}
+    targetRevision: {{ .Values.spec.source.targetRevision }}
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - ApplyOutOfSyncOnly=true
+    - PruneLast=true
+    - PrunePropagationPolicy=foreground
