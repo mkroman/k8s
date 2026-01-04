@@ -1,0 +1,45 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "zeta.fullname" . }}
+data:
+  config.toml: |
+    [database]
+    # The URL to connect to the database.
+    url = "overriden by environment variables"
+    # The maximum idle duration for individual connections.
+    idle_timeout = "30s"
+    # The maximum number of connections that the database pool should maintain.
+    max_connections = 5
+
+    {{- with .Values.zeta.irc }}
+    [irc]
+    # The client's nickname.
+    nickname = {{ .nickname | quote }}
+    # Alternate nicks to use when the primary one is in use.
+    alt_nicks = {{ .alt_nicks | toJson }}
+    # The hostname to connect to.
+    hostname = {{ .hostname | quote }}
+    # The port number to connect on.
+    port = {{ .port | default 6667 }}
+    should_ghost = false
+    {{- end }}
+
+    {{- with .Values.zeta.irc.tls }}
+    # Whether or not to use TLS.
+    tls.enabled = {{ ternary "true" "false" .enabled }}
+    {{- end }}
+
+    {{- with .Values.zeta.irc.channels }}
+    # List of channels to join.
+    {{- range $idx, $value := . }}
+    [[irc.channels]]
+    name = {{ $value.name | quote }}
+    {{- end }}
+    {{- end }}
+
+    {{- with .Values.zeta.tracing }}
+    # Configure tracing.
+    [tracing]
+    enabled = {{ ternary "true" "false" .enabled }}
+    {{- end }}

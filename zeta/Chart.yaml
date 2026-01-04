@@ -1,0 +1,6 @@
+apiVersion: v2
+name: zeta
+description: Zeta is an opinionated IRC bot with a bunch of plugins
+type: application
+version: 0.1.0
+appVersion: "0.2.0"

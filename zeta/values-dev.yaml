@@ -1,0 +1,17 @@
+envFrom:
+- secretRef:
+    name: zeta-env-dev
+    optional: false
+
+zeta:
+  irc:
+    nickname: zeta-dev
+    alt_nicks: ["zet4-dev", "ze74-dev", "zeta-dev_"]
+    hostname: irc.rwx.im
+    tls:
+      enabled: true
+    channels:
+      "#zeta.dev": {}
+
+  tracing:
+    enabled: true
