@@ -1,4 +1,4 @@
 resources:
-- ./manifests/cnpg-1.26.1.yaml
-- ./manifests/plugin-barman-cloud-0.5.0.yaml
+- ./manifests/cnpg-1.27.3.yaml
+- ./manifests/plugin-barman-cloud-0.11.0.yaml
 namespace: cnpg-system
