@@ -14,20 +14,9 @@ traefik:
     # Don't check for new versions.
     checkNewVersion: false
 
-  service:
-    annotations:
-      io.cilium/lb-ipam-ips: 10.0.3.1
-    spec:
-      # Use a local traffic policy so we can get the users origin ip
-      externalTrafficPolicy: Local
-
-  # Configuration providers.
-  providers:
-    # Enable Kubernetes CRD provider.
-    kubernetesCRD:
-      enabled: true
-      # Allow IngressRoutes to reference resources in other namespaces
-      allowCrossNamespace: true
+  logs:
+    general:
+      level: DEBUG
 
   metrics:
     # Enable prometheus metrics
@@ -40,3 +29,18 @@ traefik:
         additionalLabels:
           metrics.uplink.io/monitor: prometheus
         jobLabel: app.kubernetes.io/instance
+
+  # Configuration providers.
+  providers:
+    # Enable Kubernetes CRD provider.
+    kubernetesCRD:
+      enabled: true
+      # Allow IngressRoutes to reference resources in other namespaces
+      allowCrossNamespace: true
+
+  service:
+    annotations:
+      io.cilium/lb-ipam-ips: 10.0.3.1
+    spec:
+      # Use a local traffic policy so we can get the users origin ip
+      externalTrafficPolicy: Local
