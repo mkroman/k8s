@@ -19,3 +19,4 @@ spec:
     syncOptions:
     - ApplyOutOfSyncOnly=true
     - ServerSideApply=true
+    - ClientSideApplyMigration=false
