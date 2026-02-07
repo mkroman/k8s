@@ -63,8 +63,6 @@ spec:
           mountPath: /mosquitto/data
         - name: mosquitto-config
           mountPath: /mosquitto/config
-        - name: mosquitto-passwd
-          mountPath: /mosquitto/config
       volumes:
       - name: mosquitto-config
         projected:
