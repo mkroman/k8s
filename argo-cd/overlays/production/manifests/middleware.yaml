@@ -1,3 +1,4 @@
+---
 apiVersion: traefik.io/v1alpha1
 kind: Middleware
 metadata:
@@ -6,3 +7,12 @@ spec:
   headers:
     customResponseHeaders:
       Cache-Control: max-age=3600
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: argocd-redirect-https
+spec:
+  redirectScheme:
+    scheme: https
+    permanent: true
