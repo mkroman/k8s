@@ -1,6 +1,9 @@
 traefik:
   instanceLabelOverride: traefik
 
+  core:
+    defaultRuleSyntax: "v2"
+
   deployment:
     # Deploy multiple replicas.
     replicas: 1
