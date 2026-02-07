@@ -1,9 +1,9 @@
 apiVersion: v2
 name: traefik
-description: A helm chart for traefik v2
+description: A helm chart for traefik v3
 type: application
-version: 0.1.8
+version: 0.2.0
 dependencies:
 - name: traefik
-  version: 27.0.2
+  version: 39.0.0
   repository: https://helm.traefik.io/traefik

@@ -1,40 +1,30 @@
 traefik:
-  image:
-    tag: v2.11.29
-
   instanceLabelOverride: traefik
 
   deployment:
-    # kind: DaemonSet
+    # Deploy multiple replicas.
     replicas: 3
 
-  # Don't send anonymous usage statistics
-  globalArguments: []
-
-  ingressClass:
-    enabled: true
-    isDefaultClass: true
+  global:
+    # Disable sending of anonymous usage statistics.
+    sendAnonymousUsage: false
+    # Don't check for new versions.
+    checkNewVersion: false
 
   service:
     annotations:
       io.cilium/lb-ipam-ips: 10.0.3.1
-
     spec:
       # Use a local traffic policy so we can get the users origin ip
       externalTrafficPolicy: Local
 
+  # Configuration providers.
   providers:
+    # Enable Kubernetes CRD provider.
     kubernetesCRD:
       enabled: true
       # Allow IngressRoutes to reference resources in other namespaces
       allowCrossNamespace: true
-
-    kubernetesIngress:
-      enabled: true
-
-      publishedService:
-        # -- This is used to determine resource health
-        enabled: true
 
   metrics:
     # Enable prometheus metrics
