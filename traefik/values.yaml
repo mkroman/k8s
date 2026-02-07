@@ -1,12 +1,9 @@
 traefik:
   instanceLabelOverride: traefik
 
-  core:
-    defaultRuleSyntax: "v2"
-
   deployment:
     # Deploy multiple replicas.
-    replicas: 1
+    replicas: 3
 
   global:
     # Disable sending of anonymous usage statistics.
@@ -16,7 +13,8 @@ traefik:
 
   logs:
     general:
-      level: DEBUG
+      format: json
+      level: INFO
 
   metrics:
     # Enable prometheus metrics
