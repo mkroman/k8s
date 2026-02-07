@@ -11,8 +11,7 @@ spec:
   - kind: Rule
     match: Host(`longhorn.infra.rwx.im`)
     middlewares:
-    - name: redirect-to-https
-      namespace: rwx
+    - name: longhorn-redirect-https
     services:
     - name: longhorn-frontend
       port: 80

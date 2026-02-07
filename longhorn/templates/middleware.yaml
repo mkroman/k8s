@@ -6,4 +6,12 @@ metadata:
 spec:
   basicAuth:
     secret: longhorn-http-auth
-
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: longhorn-redirect-https
+spec:
+  redirectScheme:
+    permanent: true
+    scheme: https
