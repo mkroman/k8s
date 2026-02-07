@@ -15,6 +15,11 @@ traefik:
     general:
       format: json
       level: INFO
+    access:
+      # Enable access logs.
+      enabled: true
+      format: json
+
 
   metrics:
     # Enable prometheus metrics
