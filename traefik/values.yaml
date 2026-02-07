@@ -17,7 +17,7 @@ traefik:
       level: INFO
     access:
       # Enable access logs.
-      enabled: true
+      enabled: false
       format: json
 
 
