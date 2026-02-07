@@ -16,7 +16,7 @@ spec:
           type: RuntimeDefault
       containers:
       - name: mosquitto
-        image: eclipse-mosquitto:latest
+        image: eclipse-mosquitto:2.0.22
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
