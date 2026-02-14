@@ -4,7 +4,7 @@ metadata:
   name: postgres
 spec:
   instances: 1
-  imageName: ghcr.io/cloudnative-pg/postgresql:17
+  imageName: ghcr.io/cloudnative-pg/postgresql:14
 
   resources:
     limits:
