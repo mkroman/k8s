@@ -35,9 +35,9 @@ spec:
          key: AWS_SECRET_ACCESS_KEY
          name: postgres-backup
      wal:
-       compression: gzip
+       compression: zstd
      data:
-       compression: gzip
+       compression: zstd
 
   bootstrap:
     recovery:
