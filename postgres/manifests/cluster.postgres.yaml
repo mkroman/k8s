@@ -21,7 +21,7 @@ spec:
   backup:
    retentionPolicy: "7d"
    barmanObjectStore:
-     serverName: postgres-recovered-2024-08
+     serverName: postgres-2026-02
      endpointURL: https://s3.eu-central-003.backblazeb2.com
      destinationPath: s3://dendrite-postgres-backup
      s3Credentials:
@@ -41,18 +41,18 @@ spec:
 
   bootstrap:
     recovery:
-      backup:
-        name: postgres-backup-20240806033743
-        # source: postgres-recovered-2024-06
+      # backup:
+      #   name: postgres-backup-20240806033743
+      source: postgres-recovered-2024-08
       # recoveryTarget:
       #   backupID: '20240526T033747'
 
   externalClusters:
-  - name: postgres-recovered-2024-06
+  - name: postgres-recovered-2024-08
     barmanObjectStore:
       endpointURL: https://s3.eu-central-003.backblazeb2.com
       destinationPath: s3://dendrite-postgres-backup
-      serverName: postgres-recovered-2024-06
+      serverName: postgres-recovered-2024-08
       s3Credentials:
         accessKeyId:
           key: AWS_ACCESS_KEY_ID
