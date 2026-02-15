@@ -20,56 +20,17 @@ spec:
     parameters:
       max_connections: "2000"
 
-  backup:
-   retentionPolicy: "7d"
-   barmanObjectStore:
-     serverName: postgres-2026-02
-     endpointURL: https://s3.eu-central-003.backblazeb2.com
-     destinationPath: s3://dendrite-postgres-backup
-     s3Credentials:
-       accessKeyId:
-         key: AWS_ACCESS_KEY_ID
-         name: postgres-backup
-       region:
-         key: AWS_REGION
-         name: postgres-backup
-       secretAccessKey:
-         key: AWS_SECRET_ACCESS_KEY
-         name: postgres-backup
-     wal:
-       compression: gzip
-     data:
-       compression: gzip
-
   bootstrap:
     recovery:
-      # backup:
-      #   name: postgres-backup-20240806033743
       source: postgres-recovered-2024-08
-      # recoveryTarget:
-      #   backupID: '20240526T033747'
 
   externalClusters:
   - name: postgres-recovered-2024-08
-    barmanObjectStore:
-      endpointURL: https://s3.eu-central-003.backblazeb2.com
-      destinationPath: s3://dendrite-postgres-backup
-      serverName: postgres-recovered-2024-08
-      s3Credentials:
-        accessKeyId:
-          key: AWS_ACCESS_KEY_ID
-          name: postgres-backup
-        region:
-          key: AWS_REGION
-          name: postgres-backup
-        secretAccessKey:
-          key: AWS_SECRET_ACCESS_KEY
-          name: postgres-backup
-      wal:
-        maxParallel: 8
-        compression: gzip
-      data:
-        compression: gzip
+    plugin:
+      name: barman-cloud.cloudnative-pg.io
+      parameters:
+        barmanObjectName: postgres-backup-b2
+        serverName: postgres-recovered-2024-08
 
   monitoring:
     enablePodMonitor: false
@@ -77,6 +38,11 @@ spec:
   # Do a switchover instead of restarting during a rolling upgrade, to prevent
   # downtime.
   # primaryUpdateMethod: switchover
+  plugins:
+  - name: barman-cloud.cloudnative-pg.io
+    isWALArchiver: true
+    parameters:
+      barmanObjectName: postgres-backup-b2
 
   storage:
     size: 150Gi

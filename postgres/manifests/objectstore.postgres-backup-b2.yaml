@@ -1,0 +1,21 @@
+apiVersion: barmancloud.cnpg.io/v1
+kind: ObjectStore
+metadata:
+  name: postgres-backup-b2
+spec:
+  configuration:
+    endpointURL: https://s3.eu-central-003.backblazeb2.com
+    destinationPath: s3://dendrite-postgres-backup
+    s3Credentials:
+      accessKeyId:
+        key: AWS_ACCESS_KEY_ID
+        name: postgres-backup
+      region:
+        key: AWS_REGION
+        name: postgres-backup
+      secretAccessKey:
+        key: AWS_SECRET_ACCESS_KEY
+        name: postgres-backup
+    wal:
+      maxParallel: 4
+      compression: gzip

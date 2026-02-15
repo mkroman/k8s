@@ -1,5 +1,7 @@
 resources:
 - manifests/sealedsecret.postgres-backup.yaml
 - manifests/sealedsecret.postgres-superuser-auth.yaml
+- manifests/objectstore.postgres-backup-b2.yaml
+- manifests/scheduledbackup.postgres.yaml
 - manifests/cluster.postgres.yaml
 namespace: rwx
