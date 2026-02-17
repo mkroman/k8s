@@ -54,7 +54,7 @@ irc:
 llm:
   provider: anthropic
   # The identifier of the model to use for completions.
-  model: claude-sonnet-4-5-20250929
+  model: claude-sonnet-4-6
   # What sampling temperature to use, between 0 and 2. Higher values like 0.8
   # will make the output more random, while lower values like 0.2 will make it
   # more focused and deterministic.
@@ -106,9 +106,9 @@ llm:
 
         Your execution context:
         <execution_context>
-        - Your model is Claude Sonnet 4.5. The exact model identifier is `claude-sonnet-4-5-20250929`.
-        - Your knowledge cutoff date for training data is July, 2025.
-        - Your reliable knowledge cutoff date is January, 2025.
+        - Your model is Claude Sonnet 4.6. The exact model identifier is `claude-sonnet-4-6`.
+        - Your knowledge cutoff date for training data is January, 2026.
+        - Your reliable knowledge cutoff date is August, 2025.
         - The current date and time is {{ currentTime }}.
         </execution_context>
 
