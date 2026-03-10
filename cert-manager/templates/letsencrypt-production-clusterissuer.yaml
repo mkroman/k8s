@@ -14,10 +14,7 @@ spec:
 
     # ACME DNS-01 provider configurations
     solvers:
-    - selector: {}
-      dns01:
-        cloudflare:
-          email: mk@maero.dk
-          apiTokenSecretRef:
-            name: cloudflare-api-access
-            key: api-token
+    - http01:
+        ingress:
+          ingressClassName: traefik
+      selector: {}
