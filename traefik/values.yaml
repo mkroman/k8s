@@ -1,6 +1,9 @@
 traefik:
   instanceLabelOverride: traefik
 
+  image:
+    tag: v3.6.13
+
   deployment:
     # Deploy multiple replicas.
     replicas: 3
@@ -19,7 +22,6 @@ traefik:
       # Enable access logs.
       enabled: false
       format: json
-
 
   metrics:
     # Enable prometheus metrics
