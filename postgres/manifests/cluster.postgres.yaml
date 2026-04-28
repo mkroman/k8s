@@ -22,15 +22,16 @@ spec:
 
   bootstrap:
     recovery:
-      source: postgres-recovered-2024-08
+      backup:
+        name: postgres-backup-20260421033743
 
   externalClusters:
-  - name: postgres-recovered-2024-08
-    plugin:
-      name: barman-cloud.cloudnative-pg.io
-      parameters:
-        barmanObjectName: postgres-backup-b2
-        serverName: postgres-recovered-2024-08
+    - name: postgres-recovered-2024-08
+      plugin:
+        name: barman-cloud.cloudnative-pg.io
+        parameters:
+          barmanObjectName: postgres-backup-b2
+          serverName: postgres-recovered-2024-08
 
   monitoring:
     enablePodMonitor: false
@@ -39,10 +40,10 @@ spec:
   # downtime.
   # primaryUpdateMethod: switchover
   plugins:
-  - name: barman-cloud.cloudnative-pg.io
-    isWALArchiver: true
-    parameters:
-      barmanObjectName: postgres-backup-b2
+    - name: barman-cloud.cloudnative-pg.io
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: postgres-backup-b2
 
   storage:
     size: 150Gi
