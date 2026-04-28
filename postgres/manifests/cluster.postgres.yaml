@@ -26,12 +26,12 @@ spec:
         name: postgres-backup-20260421033743
 
   externalClusters:
-    - name: postgres-recovered-2024-08
+    - name: postgres-2026-04
       plugin:
         name: barman-cloud.cloudnative-pg.io
         parameters:
           barmanObjectName: postgres-backup-b2
-          serverName: postgres-recovered-2024-08
+          serverName: postgres-2026-04
 
   monitoring:
     enablePodMonitor: false
