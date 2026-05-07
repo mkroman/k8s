@@ -14,7 +14,6 @@ spec:
 
     # ACME DNS-01 provider configurations
     solvers:
-    - http01:
-        ingress:
-          ingressClassName: traefik
-      selector: {}
+      - http01:
+          ingress:
+            ingressClassName: traefik
