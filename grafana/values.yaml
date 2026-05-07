@@ -5,9 +5,8 @@ grafana:
   replicas: 2
 
   plugins:
-  - quickwit-quickwit-datasource
-
-  # -- Configure the Grafana instance.
+    - quickwit-quickwit-datasource
+    # -- Configure the Grafana instance.
   grafana.ini:
     server:
       domain: grafana.infra.rwx.im
@@ -44,4 +43,4 @@ ingress:
   enabled: true
   hostname: grafana.infra.rwx.im
   tls:
-    secretName: infra-rwx-im-tls
+    secretName: grafana.infra.rwx.im-tls
