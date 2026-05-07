@@ -39,4 +39,4 @@ spec:
       port: 80
       scheme: h2c
   tls:
-    secretName: infra-rwx-im-tls
+    secretName: argo-cd.infra.rwx.im-tls
