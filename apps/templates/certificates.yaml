@@ -8,11 +8,12 @@ spec:
   secretName: infra-rwx-im-tls
   secretTemplate:
     annotations:
-      kubed.appscode.com/sync: 'im.rwx.infra/tls=true'
+      replicator.v1.mittwald.de/replicate-to: >
+        argocd,grafana,longhorn-system,meta-oss,meta-webhook,meta,monitoring,rwx,traefik
   issuerRef:
     name: letsencrypt-production
     kind: ClusterIssuer
   commonName: '*.infra.rwx.im'
   dnsNames:
-  - infra.rwx.im
-  - '*.infra.rwx.im'
+    - infra.rwx.im
+    - '*.infra.rwx.im'
