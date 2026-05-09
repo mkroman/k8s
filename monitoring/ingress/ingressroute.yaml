@@ -15,7 +15,7 @@ spec:
       kind: Service
       port: 9090
   tls:
-    secretName: infra-rwx-im-tls
+    secretName: prometheus.infra.rwx.im-tls
 ---
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
@@ -34,4 +34,4 @@ spec:
       kind: Service
       port: 10902
   tls:
-    secretName: infra-rwx-im-tls
+    secretName: thanos-query.infra.rwx.im-tls

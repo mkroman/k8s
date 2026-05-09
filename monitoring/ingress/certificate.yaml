@@ -1,0 +1,24 @@
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: prometheus.infra.rwx.im
+spec:
+  secretName: prometheus.infra.rwx.im-tls
+  issuerRef:
+    name: letsencrypt-production
+    kind: ClusterIssuer
+  dnsNames:
+    - prometheus.infra.rwx.im
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: thanos-query.infra.rwx.im
+spec:
+  secretName: thanos-query.infra.rwx.im-tls
+  issuerRef:
+    name: letsencrypt-production
+    kind: ClusterIssuer
+  dnsNames:
+    - thanos-query.infra.rwx.im
