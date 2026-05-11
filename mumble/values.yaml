@@ -2,6 +2,8 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
+replicaCount: 1
+
 image:
   repository: mumblevoip/mumble-server
   pullPolicy: IfNotPresent
@@ -20,7 +22,7 @@ podSecurityContext:
 securityContext:
   capabilities:
     drop:
-    - ALL
+      - ALL
   readOnlyRootFilesystem: true
   runAsNonRoot: true
   runAsUser: 10000
@@ -28,6 +30,7 @@ securityContext:
 
 service:
   type: LoadBalancer
+  # The LoadBalancer IP to use. If not set, the cloud provider will assign one.
   loadBalancerIP: "10.0.3.2"
   port: 31738
 
@@ -43,7 +46,21 @@ nodeSelector: {}
 
 tolerations: []
 
+networkPolicy:
+  enabled: false
+
 affinity: {}
+
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+  maxUnavailable: 1
+
+persistence:
+  enabled: true
+  accessModes:
+    - ReadWriteOnce
+  size: 500Mi
 
 murmur:
   # The name of the server.
@@ -52,10 +69,33 @@ murmur:
   # Maximum number of concurrent clients allowed.
   users: 1000
 
-  # Maximum bandwidth (in bits per second) clients are allowed to send speech
-  # at.
+  # Maximum number of concurrent users per channel.
+  usersPerChannel: 0
+
+  # Maximum bandwidth (in bits per second) clients are allowed to send speech at.
   bandwidth: 256000
+
+  # Password to join server. Leave empty to make the server public.
+  serverPassword: ""
+
+  # Welcome message sent to clients when they connect.
+  welcomeText: "<br />Welcome to this server running <b>Murmur</b>.<br />Enjoy
+    your stay!<br />"
 
   tls:
     # The name of the secret that contains a tls certificate and key.
     secretName: rwx-im-tls
+
+# Liveness probe configuration
+livenessProbe:
+  tcpSocket:
+    port: mumble
+  initialDelaySeconds: 30
+  periodSeconds: 10
+
+# Readiness probe configuration
+readinessProbe:
+  tcpSocket:
+    port: mumble
+  initialDelaySeconds: 15
+  periodSeconds: 10

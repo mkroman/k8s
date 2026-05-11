@@ -117,7 +117,7 @@ data:
     ; Welcome message sent to clients when they connect.
     ; If the welcome message is set to an empty string,
     ; no welcome message will be sent to clients.
-    welcometext="<br />Welcome to this server running <b>Murmur</b>.<br />Enjoy your stay!<br />"
+    welcometext={{ .Values.murmur.welcomeText | quote }}
 
     ; Port to bind TCP and UDP sockets to.
     port=64738
@@ -127,7 +127,7 @@ data:
     ;host=
 
     ; Password to join server.
-    serverpassword=
+    serverpassword={{ .Values.murmur.serverPassword | quote }}
 
     ; Maximum bandwidth (in bits per second) clients are allowed
     ; to send speech at.
@@ -144,12 +144,14 @@ data:
     ;timeout=30
 
     ; Maximum number of concurrent clients allowed.
-    users=1000
+    users={{ .Values.murmur.users }}
 
     ; Where users sets a blanket limit on the number of clients per virtual server,
     ; usersperchannel sets a limit on the number per channel. The default is 0, for
     ; no limit.
-    ;usersperchannel=0
+    {{- with .Values.usersPerChannel }}
+    usersperchannel={{ . | int }}
+    {{- end }}
 
     ; Per-user rate limiting
     ;

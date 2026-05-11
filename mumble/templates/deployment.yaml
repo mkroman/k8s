@@ -8,7 +8,7 @@ metadata:
 spec:
   strategy:
     type: Recreate
-  replicas: 1
+  replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
       {{- include "mumble.selectorLabels" . | nindent 6 }}
@@ -43,12 +43,14 @@ spec:
           - name: mumble-udp
             containerPort: 64738
             protocol: UDP
-          # livenessProbe:
-          #   tcpSocket:
-          #     port: mumble
-          # readinessProbe:
-          #   tcpSocket:
-          #     port: mumble
+          {{- with .Values.livenessProbe }}
+          livenessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.readinessProbe }}
+          readinessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:
@@ -79,6 +81,12 @@ spec:
       - name: config
         configMap:
           name: {{ include "mumble.fullname" . }}-config
+      {{- if .Values.persistence.enabled }}
       - name: data
         persistentVolumeClaim:
           claimName: {{ include "mumble.fullname" . }}-data
+      {{- else }}
+      - name: data
+        emptyDir: {}
+      {{- end }}
+

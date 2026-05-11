@@ -7,7 +7,9 @@ metadata:
     {{- include "mumble.labels" . | nindent 4 }}
 spec:
   type: {{ .Values.service.type }}
+  {{- if .Values.service.loadBalancerIP }}
   loadBalancerIP: {{ .Values.service.loadBalancerIP | quote }}
+  {{- end }}
   externalTrafficPolicy: Local
   ports:
   - port: {{ .Values.service.port }}
@@ -20,3 +22,4 @@ spec:
     name: mumble-udp
   selector:
     {{- include "mumble.selectorLabels" . | nindent 4 }}
+
