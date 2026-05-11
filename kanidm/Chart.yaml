@@ -1,0 +1,6 @@
+apiVersion: v2
+name: kanidm
+description: Kanidm is a modern and simple identity management platform written in Rust.
+type: application
+version: 0.1.0
+appVersion: "1.9.2"
