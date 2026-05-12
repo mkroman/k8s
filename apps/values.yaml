@@ -100,7 +100,7 @@ newApplications:
   - name: cloudnative-pg
     project: cloudnative-pg
     destination:
-      namespace: cloudnative-pg
+      namespace: cnpg-system
     source:
       repoURL: https://github.com/mkroman/k8s
       path: cloudnative-pg
