@@ -47,6 +47,12 @@ projects:
     sourceRepos:
       - https://github.com/mkroman/k8s
 
+  - name: cloudnative-pg
+    destinations:
+      - namespace: cnpg-system
+    sourceRepos:
+      - https://github.com/mkroman/k8s
+
   - name: open-webui
     destinations:
       - namespace: rwx-openwebui-prod
@@ -90,6 +96,22 @@ newApplications:
       helm:
         valueFiles:
           - values-magistr.yaml
+
+  - name: cloudnative-pg
+    project: cloudnative-pg
+    destination:
+      namespace: cloudnative-pg
+    source:
+      repoURL: https://github.com/mkroman/k8s
+      path: cloudnative-pg
+    syncPolicy:
+      automated:
+        prune: true
+        selfHeal: true
+      syncOptions:
+        - ApplyOutOfSyncOnly=true
+        # We need to use server-side apply because the CRD metadata is too large.
+        - ServerSideApply=true
 
   - name: open-webui
     project: open-webui
