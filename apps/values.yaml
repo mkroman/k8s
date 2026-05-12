@@ -84,6 +84,12 @@ projects:
         kind: ClusterRoleBinding
     namespaceResourceBlacklist: []
 
+  - name: mosquitto
+    destinations:
+      - namespace: mosquitto
+    sourceRepos:
+      - https://github.com/mkroman/k8s
+
   - name: mumble
     destinations:
       - namespace: rwx
