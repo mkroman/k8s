@@ -84,6 +84,10 @@ murmur:
   timeout: 30
   # -- Allow clients to use HTML in messages, user comments and channel descriptions?
   allowHtml: true
+  # -- Automatically ban bad clients making repeat connections
+  # Note: we disable this because it bans kubernetes pods from doing a health
+  # check.
+  autobanAttempts: 0
 
   tls:
     # The name of the secret that contains a tls certificate and key.

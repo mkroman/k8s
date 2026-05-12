@@ -390,7 +390,9 @@ data:
     ; To disable, set autobanAttempts or autobanTimeframe to 0. Commenting these
     ; settings out will cause Murmur to use the defaults:
     ;
-    ;autobanAttempts=10
+    {{- if ne .Values.murmur.autobanAttempts nil }}
+    autobanAttempts={{ . | int }}
+    {{- end }}
     ;autobanTimeframe=120
     ;autobanTime=300
 
