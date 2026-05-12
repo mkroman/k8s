@@ -12,9 +12,4 @@ metadata:
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: mqtt2prometheus
----
-apiVersion: v1
-kind: Namespace
-metadata:
   name: magistr-prod

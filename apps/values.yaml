@@ -127,6 +127,12 @@ projects:
     sourceRepos:
       - https://github.com/mkroman/k8s
 
+  - name: mqtt2prometheus
+    destinations:
+      - namespace: mqtt2prometheus
+    sourceRepos:
+      - https://github.com/mkroman/k8s
+
   - name: nats
     description: "NATS messaging system for data layer services"
     destinations:
@@ -222,6 +228,7 @@ namespaces:
   - name: longhorn-system
   - name: monitoring
   - name: mosquitto
+  - name: mqtt2prometheus
   - name: nats
   - name: prometheus-operator
   - name: quickwit-prod
@@ -314,6 +321,25 @@ newApplications:
     source:
       repoURL: https://github.com/mkroman/k8s
       path: mosquitto
+
+  - name: mqtt2prometheus
+    project: mqtt2prometheus
+    destination:
+      namespace: mqtt2prometheus
+    source:
+      repoURL: https://github.com/mkroman/k8s
+      path: mqtt2prometheus
+
+  - name: mqtt2prometheus-mqtt-topic
+    project: mqtt2prometheus
+    destination:
+      namespace: mqtt2prometheus
+    source:
+      repoURL: https://github.com/mkroman/k8s
+      path: mqtt2prometheus
+      helm:
+        valueFiles:
+          - values-topic-metrics.yaml
 
   - name: nats
     project: nats
