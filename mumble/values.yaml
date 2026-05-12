@@ -156,15 +156,7 @@ certificate:
     group: "cert-manager.io"
 
 # Liveness probe configuration
-livenessProbe:
-  tcpSocket:
-    port: mumble
-  initialDelaySeconds: 30
-  periodSeconds: 10
+livenessProbe: {}
 
 # Readiness probe configuration
-readinessProbe:
-  tcpSocket:
-    port: mumble
-  initialDelaySeconds: 15
-  periodSeconds: 10
+readinessProbe: {}
