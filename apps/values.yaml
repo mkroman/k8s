@@ -71,11 +71,17 @@ projects:
         name: cnpg-system
 
   - name: monitoring
-    description: "Cluster monitoring stack (prometheus, grafana, ...)"
+    description: "Cluster monitoring stack (prometheus, thanos, grafana, ..)"
     destinations:
       - namespace: grafana
+      - namespace: monitoring
     sourceRepos:
       - https://github.com/mkroman/k8s
+    clusterResourceWhitelist:
+      - group: rbac.authorization.k8s.io
+        kind: ClusterRole
+      - group: rbac.authorization.k8s.io
+        kind: ClusterRoleBinding
 
   - name: open-webui
     destinations:
@@ -145,6 +151,14 @@ newApplications:
     source:
       repoURL: https://github.com/mkroman/k8s
       path: grafana
+
+  - name: monitoring
+    project: monitoring
+    destination:
+      namespace: monitoring
+    source:
+      repoURL: https://github.com/mkroman/k8s
+      path: monitoring
 
   - name: open-webui
     project: open-webui
