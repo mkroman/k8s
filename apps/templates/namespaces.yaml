@@ -7,11 +7,6 @@ metadata:
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: prometheus-operator
----
-apiVersion: v1
-kind: Namespace
-metadata:
   name: vector
 ---
 apiVersion: v1

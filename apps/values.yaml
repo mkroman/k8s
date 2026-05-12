@@ -172,6 +172,7 @@ namespaces:
   - name: monitoring
   - name: mosquitto
   - name: nats
+  - name: prometheus-operator
   - name: rwx-openwebui-prod
   - name: traefik
   - name: zeta-prod
