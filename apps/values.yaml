@@ -135,6 +135,11 @@ projects:
       - namespace: rwx-redis-prod
     sourceRepos:
       - https://github.com/mkroman/k8s
+    namespaceResourceBlacklist:
+      - group: ''
+        kind: ResourceQuota
+      - group: ''
+        kind: LimitRange
 
   - name: sealed-secrets
     description: "Encrypted secrets operator for Kubernetes"
