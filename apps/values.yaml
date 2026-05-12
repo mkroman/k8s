@@ -18,9 +18,22 @@ projects:
   - name: cert-manager
     destinations:
       - namespace: cert-manager
+      - namespace: kube-system
     sourceRepos:
       - https://github.com/mkroman/k8s
-    clusterResourceBlacklist: []
+    clusterResourceWhitelist:
+      - kind: ClusterRole
+        group: rbac.authorization.k8s.io
+      - kind: ClusterRoleBinding
+        group: rbac.authorization.k8s.io
+      - kind: MutatingWebhookConfig
+        group: admissionregistration.k8s.io
+      - kind: ValidatingWebhookConfiguration
+        group: admissionregistration.k8s.io
+      - kind: CustomResourceDefinition
+        group: apiextensions.k8s.io
+      - kind: ClusterIssuer
+        group: cert-manager.io
 
   - name: chadgpt
     destinations:
