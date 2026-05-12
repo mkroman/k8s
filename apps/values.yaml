@@ -129,6 +129,13 @@ projects:
     sourceRepos:
       - https://github.com/mkroman/k8s
 
+  - name: redis
+    description: "Redis sentinel deployment"
+    destinations:
+      - namespace: rwx-redis-prod
+    sourceRepos:
+      - https://github.com/mkroman/k8s
+
   - name: sealed-secrets
     description: "Encrypted secrets operator for Kubernetes"
     destinations:
@@ -181,6 +188,7 @@ namespaces:
   - name: nats
   - name: prometheus-operator
   - name: quickwit-prod
+  - name: rwx-redis-prod
   - name: rwx-openwebui-prod
   - name: traefik
   - name: zeta-prod
@@ -296,6 +304,14 @@ newApplications:
     source:
       repoURL: https://github.com/mkroman/k8s
       path: quickwit
+
+  - name: redis
+    project: redis
+    destination:
+      namespace: rwx-redis-prod
+    source:
+      repoURL: https://github.com/mkroman/k8s
+      path: redis
 
   - name: sealed-secrets
     project: sealed-secrets
