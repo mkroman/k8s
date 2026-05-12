@@ -26,7 +26,7 @@ projects:
         group: rbac.authorization.k8s.io
       - kind: ClusterRoleBinding
         group: rbac.authorization.k8s.io
-      - kind: MutatingWebhookConfig
+      - kind: MutatingWebhookConfiguration
         group: admissionregistration.k8s.io
       - kind: ValidatingWebhookConfiguration
         group: admissionregistration.k8s.io
