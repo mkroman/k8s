@@ -16,6 +16,8 @@ applications:
 # -- List of Argo CD projects.
 projects:
   - name: cert-manager
+    description: "Manages the deployment of cert-manager and its associated cluster-wide resources
+      (CRDs, Webhooks, and ClusterIssuers)."
     destinations:
       - namespace: cert-manager
       - namespace: kube-system
@@ -48,6 +50,7 @@ projects:
       - https://github.com/mkroman/k8s
 
   - name: cloudnative-pg
+    description: "Manages the deployment, configuration, and lifecycle of the CloudNativePG operator."
     destinations:
       - namespace: cnpg-system
     sourceRepos:
@@ -67,6 +70,13 @@ projects:
         group: ""
         name: cnpg-system
 
+  - name: monitoring
+    description: "Cluster monitoring stack (prometheus, grafana, ...)"
+    destinations:
+      - namespace: grafana
+    sourceRepos:
+      - https://github.com/mkroman/k8s
+
   - name: open-webui
     destinations:
       - namespace: rwx-openwebui-prod
@@ -85,6 +95,7 @@ namespaces:
   - name: cert-manager
   - name: chadgpt
   - name: chadgpt-magistr
+  - name: grafana
   - name: rwx-openwebui-prod
   - name: zeta-prod
   - name: zeta-dev
@@ -126,6 +137,14 @@ newApplications:
         - ApplyOutOfSyncOnly=true
         # We need to use server-side apply because the CRD metadata is too large.
         - ServerSideApply=true
+
+  - name: grafana
+    project: monitoring
+    destination:
+      namespace: grafana
+    source:
+      repoURL: https://github.com/mkroman/k8s
+      path: grafana
 
   - name: open-webui
     project: open-webui
