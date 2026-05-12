@@ -266,7 +266,7 @@ newApplications:
   - name: prometheus-operator
     project: prometheus-operator
     destination:
-      namespace: rwx-oprometheus-operator
+      namespace: prometheus-operator
     source:
       repoURL: https://github.com/mkroman/k8s
       path: prometheus-operator/base
