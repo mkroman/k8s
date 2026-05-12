@@ -22,8 +22,22 @@ projects:
     sourceRepos:
       - https://github.com/mkroman/k8s
 
+  - name: chadgpt
+    destinations:
+      - namespace: chadgpt
+    sourceRepos:
+      - https://github.com/mkroman/k8s
+
+  - name: chadgpt-magistr
+    destinations:
+      - namespace: chadgpt-magistr
+    sourceRepos:
+      - https://github.com/mkroman/k8s
+
 # List of namespaces to create.
 namespaces:
+  - name: chadgpt
+  - name: chadgpt-magistr
   - name: zeta-prod
   - name: zeta-dev
 
@@ -40,3 +54,18 @@ newApplications:
       helm:
         valueFiles:
           - values-prod.yaml
+
+  - name: chadgpt
+    project: chadgpt
+    source:
+      repoURL: https://github.com/mkroman/k8s
+      path: chadgpt
+
+  - name: chadgpt-magistr
+    project: chadgpt-magistr
+    source:
+      repoURL: https://github.com/mkroman/k8s
+      path: chadgpt
+      helm:
+        valueFiles:
+          - values-magistr.yaml
