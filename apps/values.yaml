@@ -84,6 +84,12 @@ projects:
         kind: ClusterRoleBinding
     namespaceResourceBlacklist: []
 
+  - name: mumble
+    destinations:
+      - namespace: rwx
+    sourceRepos:
+      - https://github.com/mkroman/k8s
+
   - name: open-webui
     destinations:
       - namespace: rwx-openwebui-prod
@@ -162,6 +168,14 @@ newApplications:
     source:
       repoURL: https://github.com/mkroman/k8s
       path: monitoring
+
+  - name: mumble
+    project: mumble
+    destination:
+      namespace: rwx
+    source:
+      repoURL: https://github.com/mkroman/k8s
+      path: mumble
 
   - name: mosquitto
     project: mosquitto
