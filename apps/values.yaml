@@ -47,6 +47,12 @@ projects:
     sourceRepos:
       - https://github.com/mkroman/k8s
 
+  - name: open-webui
+    destinations:
+      - namespace: rwx-openwebui-prod
+    sourceRepos:
+      - https://github.com/mkroman/k8s
+
   - name: zeta
     destinations:
       - namespace: zeta-prod
@@ -59,6 +65,7 @@ namespaces:
   - name: cert-manager
   - name: chadgpt
   - name: chadgpt-magistr
+  - name: rwx-openwebui-prod
   - name: zeta-prod
   - name: zeta-dev
 
@@ -83,6 +90,14 @@ newApplications:
       helm:
         valueFiles:
           - values-magistr.yaml
+
+  - name: open-webui
+    project: open-webui
+    destination:
+      namespace: rwx-openwebui-prod
+    source:
+      repoURL: https://github.com/mkroman/k8s
+      path: open-webui
 
   - name: zeta
     annotations:
