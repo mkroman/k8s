@@ -103,6 +103,25 @@ projects:
     sourceRepos:
       - https://github.com/mkroman/k8s
 
+  - name: open-webui
+    destinations:
+      - namespace: rwx-openwebui-prod
+    sourceRepos:
+      - https://github.com/mkroman/k8s
+
+  - name: prometheus-operator
+    destinations:
+      - namespace: prometheus-operator
+    sourceRepos:
+      - https://github.com/mkroman/k8s
+    clusterResourceWhitelist:
+      - group: apiextensions.k8s.io
+        kind: CustomResourceDefinition
+      - group: rbac.authorization.k8s.io
+        kind: ClusterRole
+      - group: rbac.authorization.k8s.io
+        kind: ClusterRoleBinding
+
   - name: sealed-secrets
     description: "Encrypted secrets operator for Kubernetes"
     destinations:
@@ -120,12 +139,6 @@ projects:
         kind: ValidatingWebhookConfiguration
       - group: admissionregistration.k8s.io
         kind: MutatingWebhookConfiguration
-
-  - name: open-webui
-    destinations:
-      - namespace: rwx-openwebui-prod
-    sourceRepos:
-      - https://github.com/mkroman/k8s
 
   - name: traefik
     description: "Cloud-native application proxy"
@@ -249,6 +262,21 @@ newApplications:
     source:
       repoURL: https://github.com/mkroman/k8s
       path: open-webui
+
+  - name: prometheus-operator
+    project: prometheus-operator
+    destination:
+      namespace: rwx-oprometheus-operator
+    source:
+      repoURL: https://github.com/mkroman/k8s
+      path: prometheus-operator/base
+    syncPolicy:
+      automated:
+        selfHeal: true
+      syncOptions:
+        - ApplyOutOfSyncOnly=true
+        # We need to use server-side apply because the CRD metadata is too large.
+        - ServerSideApply=true
 
   - name: sealed-secrets
     project: sealed-secrets
