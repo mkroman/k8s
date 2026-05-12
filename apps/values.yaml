@@ -17,7 +17,7 @@ applications:
 projects:
   - name: cert-manager
     destinations:
-      - namespace: chadgpt
+      - namespace: cert-manager
     sourceRepos:
       - https://github.com/mkroman/k8s
 
