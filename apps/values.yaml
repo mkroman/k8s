@@ -19,6 +19,8 @@ projects:
     destinations:
       - namespace: zeta-prod
       - namespace: zeta-dev
+    sourceRepos:
+      - https://github.com/mkroman/k8s
 
 # List of namespaces to create.
 namespaces:

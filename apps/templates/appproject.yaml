@@ -68,10 +68,6 @@ spec:
       kind: LimitRange
     - group: 'networking.k8s.io'
       kind: NetworkPolicy
-    - group: 'rbac.authorization.k8s.io'
-      kind: Role
-    - group: 'rbac.authorization.k8s.io'
-      kind: RoleBinding
   {{- end }}
 
   {{- with .orphanedResources }}
