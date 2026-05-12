@@ -14,10 +14,26 @@ metadata:
     - resources-finalizer.argocd.argoproj.io
   {{- end }}
 spec:
-  destination:
-    namespace: {{ $.Values.spec.destination.namespace }}
-    server: {{ $.Values.spec.destination.server }}
   project: {{ .project | default "default" | quote }}
+
+  destination:
+  {{- with .destination }}
+    namespace: {{ .namespace | default $appName | quote }}
+    {{- if .server }}
+    server: {{ .server | quote }}
+    {{- end }}
+    {{- if .name }}
+    name: {{ .name | quote }}
+    {{- end }}
+    {{- if and (not .server) (not .name) }}
+    server: "https://kubernetes.default.svc"
+    name: "in-cluster"
+    {{- end }}
+  {{- else }}
+    namespace: {{ $appName | quote }}
+    server: "https://kubernetes.default.svc"
+    name: "in-cluster"
+  {{- end }}
 
   {{/* Support both `sources` and `source` */}}
   {{- if .sources }}

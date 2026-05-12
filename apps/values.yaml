@@ -27,10 +27,11 @@ namespaces:
 
 newApplications:
   - name: zeta
-    namespace: zeta-prod
     annotations:
       argocd.argoproj.io/sync-wave: "2"
     project: zeta
+    destination:
+      namespace: zeta-prod
     source:
       repoURL: https://github.com/mkroman/k8s
       path: zeta
