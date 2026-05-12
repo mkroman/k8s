@@ -15,10 +15,9 @@ applications:
 
 # -- List of Argo CD projects.
 projects:
-  - name: zeta
+  - name: cert-manager
     destinations:
-      - namespace: zeta-prod
-      - namespace: zeta-dev
+      - namespace: chadgpt
     sourceRepos:
       - https://github.com/mkroman/k8s
 
@@ -31,6 +30,13 @@ projects:
   - name: chadgpt-magistr
     destinations:
       - namespace: chadgpt-magistr
+    sourceRepos:
+      - https://github.com/mkroman/k8s
+
+  - name: zeta
+    destinations:
+      - namespace: zeta-prod
+      - namespace: zeta-dev
     sourceRepos:
       - https://github.com/mkroman/k8s
 
