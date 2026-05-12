@@ -82,6 +82,7 @@ projects:
         kind: ClusterRole
       - group: rbac.authorization.k8s.io
         kind: ClusterRoleBinding
+    namespaceResourceBlacklist: []
 
   - name: open-webui
     destinations:
@@ -102,6 +103,7 @@ namespaces:
   - name: chadgpt
   - name: chadgpt-magistr
   - name: grafana
+  - name: monitoring
   - name: rwx-openwebui-prod
   - name: zeta-prod
   - name: zeta-dev
