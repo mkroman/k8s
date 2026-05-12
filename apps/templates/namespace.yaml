@@ -1,0 +1,7 @@
+{{- range .Values.namespaces }}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ required "Namespace must have a .name" .name | quote }}
+---
+{{- end }}
