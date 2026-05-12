@@ -261,12 +261,8 @@ data:
 
     ; If you have a proper SSL certificate, you can provide the filenames here.
     ; Otherwise, Murmur will create its own certificate automatically.
-    {{- with .Values.murmur.tls.certPath }}
-    sslCert={{ . }}
-    {{- end }}
-    {{- with .Values.murmur.tls.keyPath }}
-    sslKey={{ . }}
-    {{- end }}
+    sslCert=/etc/secrets/tls/tls.crt
+    sslKey=/etc/secrets/tls/tls.key
 
     ; If the keyfile specified above is encrypted with a passphrase, you can enter
     ; it in this setting. It must be plaintext, so you may wish to adjust the
