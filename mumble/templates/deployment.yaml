@@ -77,7 +77,13 @@ spec:
       volumes:
       - name: tls
         secret:
-          secretName: {{ .Values.murmur.tls.secretName }}
+          {{- with .Values.murmur.tls.secretName }}
+          secretName: {{ . | quote }}
+          {{- else }}
+          {{- if .Values.certificate.enabled }}
+          secretName: {{ include "mumble.certSecretName" $ | quote }}
+          {{- end }}
+          {{- end }}
       - name: config
         configMap:
           name: {{ include "mumble.fullname" . }}-config

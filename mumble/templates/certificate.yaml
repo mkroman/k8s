@@ -1,0 +1,70 @@
+{{- if .Values.certificate.enabled }}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "mumble.fullname" . }}-cert
+  labels:
+    {{- include "mumble.labels" . | nindent 4 }}
+    {{- with .Values.certificate.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with .Values.certificate.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  secretName: {{ include "mumble.certSecretName" . | quote }}
+
+  {{- with .Values.certificate.commonName }}
+  commonName: {{ . | quote }}
+  {{- end }}
+
+  {{- with .Values.certificate.dnsNames }}
+  dnsNames:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.certificate.ipAddresses }}
+  ipAddresses:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.certificate.duration }}
+  duration: {{ . | quote }}
+  {{- end }}
+  {{- with .Values.certificate.renewBefore }}
+  renewBefore: {{ . | quote }}
+  {{- end }}
+  issuerRef:
+    {{- required "certificate.issuerRef is required - provide at least .name and .kind" .Values.certificate.issuerRef | toYaml | nindent 4 }}
+  privateKey:
+    {{- with .Values.certificate.privateKey }}
+    {{- with .algorithm }}
+    algorithm: {{ . | quote }}
+    {{- end }}
+    {{- with .encoding }}
+    encoding: {{ . | quote }}
+    {{- end }}
+    {{- with .size }}
+    size: {{ . | int }}
+    {{- end }}
+    rotationPolicy: {{ .rotationPolicy | default "Always" | quote }}
+    {{- else }}
+    rotationPolicy: "Always"
+    {{- end }}
+
+  {{- with .Values.certificate.usages }}
+  usages:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+
+  {{- with .Values.certificate.secretTemplate }}
+  secretTemplate:
+    {{- with .annotations }}
+    annotations:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- with .labels }}
+    labels:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+  {{- end }}
+{{- end }}

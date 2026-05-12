@@ -63,28 +63,93 @@ persistence:
   size: 500Mi
 
 murmur:
-  # The name of the server.
+  # -- The name of the server.
   serverName: rwx.im
-
-  # Maximum number of concurrent clients allowed.
-  users: 1000
-
-  # Maximum number of concurrent users per channel.
-  usersPerChannel: 0
-
-  # Maximum bandwidth (in bits per second) clients are allowed to send speech at.
-  bandwidth: 256000
-
-  # Password to join server. Leave empty to make the server public.
+  # -- Password to join server. Leave empty to make the server public.
   serverPassword: ""
-
-  # Welcome message sent to clients when they connect.
-  welcomeText: "<br />Welcome to this server running <b>Murmur</b>.<br />Enjoy
-    your stay!<br />"
+  # -- Welcome message sent to clients when they connect.
+  welcomeText: "<br />Welcome to this server running <b>Murmur</b>.<br />Enjoy your stay!<br />"
+  # -- Maximum number of concurrent clients allowed.
+  users: 1000
+  # -- Maximum number of concurrent users per channel. Defaults to 0, which
+  # means unlimited.
+  usersPerChannel: 0
+  # -- Maximum bandwidth (in bits per second) clients are allowed to send speech at.
+  bandwidth: 256000
+  # -- SQLite write-ahead log (WAL) mode. 0 - default, 1 - WAL with synchronous=NORMAL, 2 - WAL with synchronous=FULL.
+  sqliteWal: 2
+  # -- Specific IP or hostname to bind to.
+  host: ""
+  # -- Timeout in seconds for idle clients.
+  timeout: 30
+  # -- Allow clients to use HTML in messages, user comments and channel descriptions?
+  allowHtml: true
 
   tls:
     # The name of the secret that contains a tls certificate and key.
-    secretName: rwx-im-tls
+    # Defaults to the private key of the generated certificate if `certificate.enabled`.
+    secretName: ""
+
+certificate:
+  # -- Enable generation of a cert-manager Certificate resource
+  enabled: true
+
+  # -- Custom labels to add to the Certificate
+  labels: {}
+
+  # -- Custom annotations to add to the Certificate
+  annotations: {}
+
+  # -- The Common Name (CN) for the certificate
+  commonName: "rwx.im"
+
+  # Subject Alternative Names (SANs) - strictly required by modern browsers
+  dnsNames:
+    - rwx.im
+    - mumble.rwx.im
+
+  # -- The name of the secret to create. Defaults to "{{ include "mumble.fullname" . }}-tls"
+  secretName: "mumble.rwx.im-tls"
+
+  # -- A list of IP addresses for the certificate
+  ipAddresses: []
+
+  # -- Certificate duration (e.g., 2160h for 90 days)
+  duration: ""
+
+  # -- How long before expiration the certificate should be renewed
+  renewBefore: ""
+
+  privateKey:
+    # -- Algorithm to use (RSA or ECDSA)
+    algorithm: ECDSA
+    # -- Encoding format (PKCS1 or PKCS8)
+    encoding: PKCS1
+    # -- Size of the private key (2048, 4096, 8192 for RSA; 256, 384, 521 for ECDSA)
+    size: 256
+    # -- Rotation policy. "Always" is recommended for zero-downtime key rotation.
+    rotationPolicy: Always
+
+  # -- Extended Key Usages (EKUs) assigned to the certificate.
+  usages:
+    - server auth
+    - client auth
+
+  # -- Labels and annotations to propagate onto the managed TLS Secret.
+  secretTemplate:
+    # -- Annotations to add to the managed TLS Secret.
+    annotations: {}
+    # -- Labels to add to the managed TLS Secret.
+    labels: {}
+
+  # -- Reference to the certificate issuer.
+  issuerRef:
+    # -- Name of the cert-manager Issuer or ClusterIssuer (Required if certificate is enabled)
+    name: "letsencrypt-production"
+    # -- Kind of the Issuer ("Issuer" or "ClusterIssuer")
+    kind: "ClusterIssuer"
+    # -- Group of the Issuer
+    group: "cert-manager.io"
 
 # Liveness probe configuration
 livenessProbe:

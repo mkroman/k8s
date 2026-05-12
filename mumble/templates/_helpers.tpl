@@ -49,3 +49,10 @@ Selector labels
 app.kubernetes.io/name: {{ include "mumble.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
+
+{{/*
+Create certificate secret name.
+*/}}
+{{- define "mumble.certSecretName" -}}
+{{- .Values.certificate.secretName | default (printf "%s-tls" (include "mumble.fullname" .)) }}
+{{- end }}

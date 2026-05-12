@@ -42,7 +42,9 @@ data:
     ; 2 - Use write-ahead log with synchronous=FULL.
     ;     All database writes are synchronized to disk when they are made.
     ;     If Murmur crashes, the database will be include all completed writes.
-    ;sqlite_wal=0
+    {{- if ne .Values.murmur.sqliteWal nil }}
+    sqlite_wal={{ .Values.murmur.sqliteWal }}
+    {{- end }}
 
     ; If you wish to use something other than SQLite, you'll need to set the name
     ; of the database above, and also uncomment the below.
@@ -124,7 +126,9 @@ data:
 
     ; Specific IP or hostname to bind to.
     ; If this is left blank (default), Murmur will bind to all available addresses.
-    ;host=
+    {{- with .Values.murmur.host }}
+    host={{ . | quote }}
+    {{- end }}
 
     ; Password to join server.
     serverpassword={{ .Values.murmur.serverPassword | quote }}
@@ -141,7 +145,9 @@ data:
     ; Note that this has no effect on idle clients or people who are AFK. It will
     ; only affect people who are already disconnected, and just haven't told the
     ; server.
-    ;timeout=30
+    {{- if ne .Values.murmur.timeout nil }}
+    timeout={{ .Values.murmur.timeout }}
+    {{- end }}
 
     ; Maximum number of concurrent clients allowed.
     users={{ .Values.murmur.users }}
@@ -149,8 +155,8 @@ data:
     ; Where users sets a blanket limit on the number of clients per virtual server,
     ; usersperchannel sets a limit on the number per channel. The default is 0, for
     ; no limit.
-    {{- with .Values.usersPerChannel }}
-    usersperchannel={{ . | int }}
+    {{- if ne .Values.murmur.usersPerChannel nil }}
+    usersperchannel={{ .Values.murmur.usersPerChannel | int }}
     {{- end }}
 
     ; Per-user rate limiting
@@ -218,7 +224,9 @@ data:
     ;imagemessagelength=131072
 
     ; Allow clients to use HTML in messages, user comments and channel descriptions?
-    ;allowhtml=true
+    {{- if hasKey .Values.murmur "allowHtml" }}
+    allowhtml={{ .Values.murmur.allowHtml }}
+    {{- end }}
 
     ; Murmur retains the per-server log entries in an internal database which
     ; allows it to be accessed over D-Bus/ICE.
@@ -253,8 +261,12 @@ data:
 
     ; If you have a proper SSL certificate, you can provide the filenames here.
     ; Otherwise, Murmur will create its own certificate automatically.
-    sslCert=/etc/secrets/tls/tls.crt
-    sslKey=/etc/secrets/tls/tls.key
+    {{- with .Values.murmur.tls.certPath }}
+    sslCert={{ . }}
+    {{- end }}
+    {{- with .Values.murmur.tls.keyPath }}
+    sslKey={{ . }}
+    {{- end }}
 
     ; If the keyfile specified above is encrypted with a passphrase, you can enter
     ; it in this setting. It must be plaintext, so you may wish to adjust the
