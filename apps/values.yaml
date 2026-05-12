@@ -104,6 +104,7 @@ namespaces:
   - name: chadgpt-magistr
   - name: grafana
   - name: monitoring
+  - name: mosquitto
   - name: rwx-openwebui-prod
   - name: zeta-prod
   - name: zeta-dev
@@ -161,6 +162,14 @@ newApplications:
     source:
       repoURL: https://github.com/mkroman/k8s
       path: monitoring
+
+  - name: mosquitto
+    project: mosquitto
+    destination:
+      namespace: mosquitto
+    source:
+      repoURL: https://github.com/mkroman/k8s
+      path: mosquitto
 
   - name: open-webui
     project: open-webui
