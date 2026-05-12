@@ -70,6 +70,37 @@ projects:
         group: ""
         name: cnpg-system
 
+  - name: longhorn
+    description: "Longhorn distributed block storage"
+    destinations:
+      - namespace: longhorn-system
+    sourceRepos:
+      - https://github.com/mkroman/k8s
+    clusterResourceWhitelist:
+      - group: "apiextensions.k8s.io"
+        kind: CustomResourceDefinition
+      - group: "rbac.authorization.k8s.io"
+        kind: ClusterRole
+      - group: "rbac.authorization.k8s.io"
+        kind: ClusterRoleBinding
+      - group: "storage.k8s.io"
+        kind: StorageClass
+      - group: "storage.k8s.io"
+        kind: CSIDriver
+      - group: "storage.k8s.io"
+        kind: CSINode
+      - group: "admissionregistration.k8s.io"
+        kind: MutatingWebhookConfiguration
+      - group: "admissionregistration.k8s.io"
+        kind: ValidatingWebhookConfiguration
+      - group: "scheduling.k8s.io"
+        kind: PriorityClass
+      - group: ""
+        kind: PersistentVolume
+      # Allows Longhorn nodes/engines (often managed by CRDs) to be cluster-scoped if necessary
+      - group: "longhorn.io"
+        kind: "*"
+
   - name: monitoring
     description: "Cluster monitoring stack (prometheus, thanos, grafana, ..)"
     destinations:
@@ -188,6 +219,7 @@ namespaces:
   - name: chadgpt
   - name: chadgpt-magistr
   - name: grafana
+  - name: longhorn-system
   - name: monitoring
   - name: mosquitto
   - name: nats
@@ -244,6 +276,20 @@ newApplications:
     source:
       repoURL: https://github.com/mkroman/k8s
       path: grafana
+
+  - name: longhorn
+    finalizers:
+      - resources-finalizer.argocd.argoproj.io
+      # The pre-delete-finalizer hook is necessary because of how longhorn deploys
+      # jobs on hooks.
+      - pre-delete-finalizer.argocd.argoproj.io
+      - pre-delete-finalizer.argocd.argoproj.io/cleanup
+    project: longhorn
+    destination:
+      namespace: longhorn-system
+    source:
+      repoURL: https://github.com/mkroman/k8s
+      path: longhorn
 
   - name: monitoring
     project: monitoring
