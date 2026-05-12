@@ -1,0 +1,75 @@
+{{- range .Values.newApplications }}
+{{- $appName := .name }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ required "A valid application .name is required" .name | quote }}
+  namespace: {{ $.Values.argocdNamespace }}
+  {{- if hasKey . "finalizers" }}
+  finalizers:
+    {{- .finalizers | default list | toYaml | nindent 4 }}
+  {{- else if ne .useDefaultFinalizers false }}
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  {{- end }}
+spec:
+  destination:
+    namespace: {{ $.Values.spec.destination.namespace }}
+    server: {{ $.Values.spec.destination.server }}
+  project: {{ .project | default "default" | quote }}
+
+  {{/* Support both `sources` and `source` */}}
+  {{- if .sources }}
+  sources:
+    {{- range .sources }}
+    - repoURL: {{ required (printf "repoURL is required in sources for application %s" $appName) .repoURL | quote }}
+      {{- if not .targetRevision }}
+      {{- if not .chart }}
+      targetRevision: "HEAD"
+      {{- end }}
+      {{- end }}
+      {{- if not (or .path .chart .ref) }}
+      path: "."
+      {{- end }}
+      {{- $rest := omit . "repoURL" }}
+      {{- if $rest }}
+      {{- toYaml $rest | nindent 6 }}
+      {{- end }}
+    {{- end }}
+  {{- else if .source }}
+  source:
+    repoURL: {{ required (printf "repoURL is required in source for application %s" $appName) .source.repoURL | quote }}
+    {{- if not .source.targetRevision }}
+    {{- if not .source.chart }}
+    targetRevision: "HEAD"
+    {{- end }}
+    {{- end }}
+    {{- if not (or .source.path .source.chart) }}
+    path: "."
+    {{- end }}
+    {{- $rest := omit .source "repoURL" }}
+    {{- if $rest }}
+    {{- toYaml $rest | nindent 4 }}
+    {{- end }}
+  {{- else }}
+  {{- fail (printf "Either 'source' or 'sources' must be provided for application %s" $appName) }}
+  {{- end }}
+
+  {{- if .syncPolicy }}
+  syncPolicy:
+    {{- toYaml .syncPolicy | nindent 4 }}
+  {{- else if ne .useDefaultSyncPolicy false }}
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions: []
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  {{- end }}
+{{- end }}

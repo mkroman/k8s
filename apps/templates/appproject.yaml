@@ -1,0 +1,102 @@
+{{- range $projIdx, $proj := .Values.projects }}
+{{- $label := (printf "projects[%d]" $projIdx) }}
+{{- $name := required (printf "%s is missing a valid .name" $label) .name }}
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: {{ $name | quote }}
+  namespace: {{ $.Values.argocdNamespace }}
+  {{- if .finalizers }}
+  finalizers:
+    {{- toYaml .finalizers | nindent 4 }}
+  {{- else if not (eq .useDefaultFinalizers false) }}
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  {{- end }}
+spec:
+  {{- with .description }}
+  description: {{ . | quote }}
+  {{- end }}
+
+  sourceRepos:
+  {{- .sourceRepos | default list | toYaml | nindent 4 }}
+
+  destinations:
+  {{- range $idx, $_ := (required (printf "%s is missing a list of .destinations" $label) .destinations) }}
+  - namespace: {{ required (printf "A valid .namespace is required for projects[%d].destinations[%d]" $projIdx $idx) .namespace | quote }}
+    {{- if .server }}
+    server: {{ .server | quote }}
+    {{- end }}
+    {{- if .name }}
+    name: {{ .name | quote }}
+    {{- end }}
+    {{- if and (not .server) (not .name) }}
+    server: "https://kubernetes.default.svc"
+    name: "in-cluster"
+    {{- end }}
+  {{- end }}
+
+  {{- if hasKey . "clusterResourceWhitelist" }}
+  clusterResourceWhitelist:
+    {{- if empty .clusterResourceWhitelist }}
+    []
+    {{- else }}
+    {{- toYaml .clusterResourceWhitelist | nindent 4 }}
+    {{- end }}
+  {{- else if not (hasKey . "clusterResourceBlacklist") }}
+  clusterResourceWhitelist: []
+  {{- end }}
+
+  {{- if hasKey . "clusterResourceBlacklist" }}
+  clusterResourceBlacklist:
+    {{- toYaml .clusterResourceBlacklist | nindent 4 }}
+  {{- end }}
+
+  {{- if hasKey . "namespaceResourceWhitelist" }}
+  namespaceResourceWhitelist:
+    {{- toYaml .namespaceResourceWhitelist | nindent 4 }}
+  {{- end }}
+
+  {{- if hasKey . "namespaceResourceBlacklist" }}
+  namespaceResourceBlacklist:
+    {{- toYaml .namespaceResourceBlacklist | nindent 4 }}
+  {{- else if not (hasKey . "namespaceResourceWhitelist") }}
+  namespaceResourceBlacklist:
+    - group: ''
+      kind: ResourceQuota
+    - group: ''
+      kind: LimitRange
+    - group: 'networking.k8s.io'
+      kind: NetworkPolicy
+    - group: 'rbac.authorization.k8s.io'
+      kind: Role
+    - group: 'rbac.authorization.k8s.io'
+      kind: RoleBinding
+  {{- end }}
+
+  {{- with .orphanedResources }}
+  orphanedResources:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+
+  {{- with .roles }}
+  roles:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+
+  {{- with .syncWindows }}
+  syncWindows:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+
+  {{- if hasKey . "permitOnlyProjectScopedClusters" }}
+  permitOnlyProjectScopedClusters: {{ .permitOnlyProjectScopedClusters }}
+  {{- end }}
+
+  {{- with .sourceNamespaces }}
+  # Support for "Applications in any namespace" feature
+  sourceNamespaces:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+---
+{{- end }}

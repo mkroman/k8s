@@ -1,5 +1,7 @@
 repository: https://github.com/mkroman/k8s.git
 
+argocdNamespace: argocd
+
 spec:
   destination:
     server: https://kubernetes.default.svc
@@ -8,5 +10,30 @@ spec:
     targetRevision: HEAD
 
 applications:
-- name: k8s-meta-apps
-- name: k8s-rwx-apps
+  - name: k8s-meta-apps
+  - name: k8s-rwx-apps
+
+# -- List of Argo CD projects.
+projects:
+  - name: zeta
+    destinations:
+      - namespace: zeta-prod
+      - namespace: zeta-dev
+
+# List of namespaces to create.
+namespaces:
+  - name: zeta-prod
+  - name: zeta-dev
+
+newApplications:
+  - name: zeta
+    namespace: zeta-prod
+    annotations:
+      argocd.argoproj.io/sync-wave: "2"
+    project: zeta
+    source:
+      repoURL: https://github.com/mkroman/k8s
+      path: zeta
+      helm:
+        valueFiles:
+          - values-prod.yaml
