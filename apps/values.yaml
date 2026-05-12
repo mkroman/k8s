@@ -103,6 +103,24 @@ projects:
     sourceRepos:
       - https://github.com/mkroman/k8s
 
+  - name: sealed-secrets
+    description: "Encrypted secrets operator for Kubernetes"
+    destinations:
+      - namespace: kube-system
+    sourceRepos:
+      - https://github.com/mkroman/k8s
+    clusterResourceWhitelist:
+      - group: apiextensions.k8s.io
+        kind: CustomResourceDefinition
+      - group: rbac.authorization.k8s.io
+        kind: ClusterRole
+      - group: rbac.authorization.k8s.io
+        kind: ClusterRoleBinding
+      - group: admissionregistration.k8s.io
+        kind: ValidatingWebhookConfiguration
+      - group: admissionregistration.k8s.io
+        kind: MutatingWebhookConfiguration
+
   - name: open-webui
     destinations:
       - namespace: rwx-openwebui-prod
@@ -231,6 +249,14 @@ newApplications:
     source:
       repoURL: https://github.com/mkroman/k8s
       path: open-webui
+
+  - name: sealed-secrets
+    project: sealed-secrets
+    destination:
+      namespace: kube-system
+    source:
+      repoURL: https://github.com/mkroman/k8s
+      path: sealed-secrets
 
   - name: traefik
     project: traefik
