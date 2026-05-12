@@ -63,8 +63,8 @@ projects:
         group: admissionregistration.k8s.io
       - kind: CustomResourceDefinition
         group: apiextensions.k8s.io
-      - kind: ''
-        group: Namespace
+      - kind: Namespace
+        group: ""
         name: cnpg-system
 
   - name: open-webui
