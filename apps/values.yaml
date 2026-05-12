@@ -36,24 +36,18 @@ projects:
 
 # List of namespaces to create.
 namespaces:
+  - name: cert-manager
   - name: chadgpt
   - name: chadgpt-magistr
   - name: zeta-prod
   - name: zeta-dev
 
 newApplications:
-  - name: zeta
-    annotations:
-      argocd.argoproj.io/sync-wave: "2"
-    project: zeta
-    destination:
-      namespace: zeta-prod
+  - name: cert-manager
+    project: cert-manager
     source:
       repoURL: https://github.com/mkroman/k8s
-      path: zeta
-      helm:
-        valueFiles:
-          - values-prod.yaml
+      path: cert-manager
 
   - name: chadgpt
     project: chadgpt
@@ -69,3 +63,16 @@ newApplications:
       helm:
         valueFiles:
           - values-magistr.yaml
+
+  - name: zeta
+    annotations:
+      argocd.argoproj.io/sync-wave: "2"
+    project: zeta
+    destination:
+      namespace: zeta-prod
+    source:
+      repoURL: https://github.com/mkroman/k8s
+      path: zeta
+      helm:
+        valueFiles:
+          - values-prod.yaml
