@@ -7,16 +7,6 @@ metadata:
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: nats
----
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: traefik
----
-apiVersion: v1
-kind: Namespace
-metadata:
   name: prometheus-operator
 ---
 apiVersion: v1
