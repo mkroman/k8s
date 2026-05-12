@@ -52,6 +52,15 @@ projects:
       - namespace: cnpg-system
     sourceRepos:
       - https://github.com/mkroman/k8s
+    clusterResourceWhitelist:
+      - kind: ClusterRole
+        group: rbac.authorization.k8s.io
+      - kind: ClusterRoleBinding
+        group: rbac.authorization.k8s.io
+      - kind: MutatingWebhookConfiguration
+        group: admissionregistration.k8s.io
+      - kind: CustomResourceDefinition
+        group: apiextensions.k8s.io
 
   - name: open-webui
     destinations:
