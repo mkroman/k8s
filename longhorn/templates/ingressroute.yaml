@@ -33,4 +33,4 @@ spec:
     - name: longhorn-frontend
       port: 80
   tls:
-    secretName: infra-rwx-im-tls
+    secretName: {{ include "longhorn.certSecretName" . | quote }}
