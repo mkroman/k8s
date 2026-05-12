@@ -96,6 +96,13 @@ projects:
     sourceRepos:
       - https://github.com/mkroman/k8s
 
+  - name: nats
+    description: "NATS messaging system for data layer services"
+    destinations:
+      - namespace: nats
+    sourceRepos:
+      - https://github.com/mkroman/k8s
+
   - name: open-webui
     destinations:
       - namespace: rwx-openwebui-prod
@@ -117,6 +124,7 @@ namespaces:
   - name: grafana
   - name: monitoring
   - name: mosquitto
+  - name: nats
   - name: rwx-openwebui-prod
   - name: zeta-prod
   - name: zeta-dev
@@ -190,6 +198,14 @@ newApplications:
     source:
       repoURL: https://github.com/mkroman/k8s
       path: mosquitto
+
+  - name: nats
+    project: nats
+    destination:
+      namespace: nats
+    source:
+      repoURL: https://github.com/mkroman/k8s
+      path: nats
 
   - name: open-webui
     project: open-webui
