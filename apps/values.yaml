@@ -122,6 +122,13 @@ projects:
       - group: rbac.authorization.k8s.io
         kind: ClusterRoleBinding
 
+  - name: quickwit
+    description: "Quickwit search and analytics engine"
+    destinations:
+      - namespace: quickwit-prod
+    sourceRepos:
+      - https://github.com/mkroman/k8s
+
   - name: sealed-secrets
     description: "Encrypted secrets operator for Kubernetes"
     destinations:
@@ -173,6 +180,7 @@ namespaces:
   - name: mosquitto
   - name: nats
   - name: prometheus-operator
+  - name: quickwit-prod
   - name: rwx-openwebui-prod
   - name: traefik
   - name: zeta-prod
@@ -278,6 +286,16 @@ newApplications:
         - ApplyOutOfSyncOnly=true
         # We need to use server-side apply because the CRD metadata is too large.
         - ServerSideApply=true
+
+  - name: quickwit
+    annotations:
+      argocd.argoproj.io/sync-wave: "2"
+    project: quickwit
+    destination:
+      namespace: quickwit-prod
+    source:
+      repoURL: https://github.com/mkroman/k8s
+      path: quickwit
 
   - name: sealed-secrets
     project: sealed-secrets
