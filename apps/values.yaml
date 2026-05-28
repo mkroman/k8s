@@ -38,12 +38,14 @@ projects:
         group: cert-manager.io
 
   - name: chadgpt
+    description: "LLM-powered IRC bot"
     destinations:
       - namespace: chadgpt
     sourceRepos:
       - https://github.com/mkroman/k8s
 
   - name: chadgpt-magistr
+    description: "Instance of chadgpt for the #magistr IRC channel"
     destinations:
       - namespace: chadgpt-magistr
     sourceRepos:
@@ -116,18 +118,21 @@ projects:
     namespaceResourceBlacklist: []
 
   - name: mosquitto
+    description: "Eclipse Mosquitto MQTT broker"
     destinations:
       - namespace: mosquitto
     sourceRepos:
       - https://github.com/mkroman/k8s
 
   - name: mumble
+    description: "Mumble (Murmur) VoIP server"
     destinations:
       - namespace: rwx
     sourceRepos:
       - https://github.com/mkroman/k8s
 
   - name: mqtt2prometheus
+    description: "Exports MQTT topic values as Prometheus metrics"
     destinations:
       - namespace: mqtt2prometheus
     sourceRepos:
@@ -141,12 +146,14 @@ projects:
       - https://github.com/mkroman/k8s
 
   - name: open-webui
+    description: "Self-hosted LLM chat interface (Open WebUI)"
     destinations:
       - namespace: rwx-openwebui-prod
     sourceRepos:
       - https://github.com/mkroman/k8s
 
   - name: prometheus-operator
+    description: "Manages the deployment and lifecycle of the Prometheus Operator and its CRDs"
     destinations:
       - namespace: prometheus-operator
     sourceRepos:
@@ -179,6 +186,7 @@ projects:
         kind: LimitRange
 
   - name: rwx
+    description: "rwx.im domain resources (databases, certificates, services)"
     destinations:
       - namespace: rwx
     sourceRepos:
@@ -243,6 +251,7 @@ projects:
         kind: ClusterRoleBinding
 
   - name: zeta
+    description: "Zeta IRC bot with plugins"
     destinations:
       - namespace: zeta-prod
       - namespace: zeta-dev
