@@ -11,19 +11,34 @@ vector:
 
   customConfig:
     data_dir: /vector-data-dir
+
+    # API configuration.
     api:
       enabled: true
       address: 127.0.0.1:8686
       playground: false
+
+    # List of sources.
     sources:
       generate_syslog:
         type: demo_logs
         format: syslog
-      # Kubernetes container logs.
+
+      # Enable OTel logs and traces.
+      otel:
+        type: opentelemetry
+        grpc:
+          address: 0.0.0.0:4317
+        http:
+          address: 0.0.0.0:4318
+
+      # Kubernetes container logs source.
       kubernetes_logs:
         type: kubernetes_logs
         node_annotation_fields:
           node_labels: "" # Disable node labels as kubevirt adds a whole lot and we don't care about them
+
+      # Host metrics source.
       host_metrics:
         filesystem:
           devices:
@@ -33,13 +48,20 @@ vector:
           mountPoints:
             excludes: ["*/proc/sys/fs/binfmt_misc"]
         type: host_metrics
+
+      # Internal Vector metrics source.
       internal_metrics:
         type: internal_metrics
+
+    # List of sinks.
     sinks:
+      # Set up a prometheus exporter interface.
       prom_exporter:
         type: prometheus_exporter
         inputs: [host_metrics, internal_metrics]
         address: 0.0.0.0:9090
+
+      # Export to an external aggregating Vector instance.
       aggregator:
         type: vector
         inputs: [host_metrics, internal_metrics, kubernetes_logs]

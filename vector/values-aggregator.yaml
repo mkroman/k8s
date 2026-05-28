@@ -1,7 +1,6 @@
 vector:
   replicas: 1
   role: "Aggregator"
-
   resources:
     requests:
       cpu: "200m"
@@ -10,6 +9,29 @@ vector:
       cpu: "600m"
       memory: "768Mi"
 
+  service:
+    ports:
+    - name: otlp-http
+      port: 4318
+      protocol: TCP
+      targetPort: 4318
+    - name: api
+      port: 8686
+      protocol: TCP
+      targetPort: 8686
+    - name: prom-exporter
+      port: 9090
+      protocol: TCP
+      targetPort: 9090
+    - name: vector
+      port: 6000
+      protocol: TCP
+      targetPort: 6000
+    - name: otlp-grpc
+      port: 4317
+      protocol: TCP
+      targetPort: 4317
+
   customConfig:
     data_dir: /vector-data-dir
     api:
@@ -17,23 +39,38 @@ vector:
       address: 0.0.0.0:8686
       playground: true
     sources:
-      internal_metrics:
-        type: internal_metrics
-      vector:
-        address: 0.0.0.0:6000
-        type: vector
-        version: "2"
+      # Automatically generate random syslogs for easier debugging.
       generate_syslog:
         type: demo_logs
         format: syslog
 
+      # Enable OTel logs and traces.
+      otel:
+        type: opentelemetry
+        grpc:
+          address: 0.0.0.0:4317
+        http:
+          address: 0.0.0.0:4318
+
+      # Monitor Vector metrics.
+      internal_metrics:
+        type: internal_metrics
+
+      # Enable ingestion of logs and traces directly from Vector instances.
+      vector:
+        address: 0.0.0.0:6000
+        type: vector
+        version: "2"
+
     transforms:
+      # Filter that only outputs logs from the vector source.
       vector_logs:
         type: filter
         inputs: [vector]
         condition:
           type: is_log
 
+      # Remap syslog messages to a OTel-compatible log structure.
       syslog_otel_logs:
         type: remap
         inputs: [generate_syslog]
@@ -60,7 +97,6 @@ vector:
              structured.severity
             }
             .scope_name = structured.msgid
-            del(.host)
             del(.message)
             del(.timestamp)
             del(.service)
