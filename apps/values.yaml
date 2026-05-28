@@ -146,12 +146,6 @@ projects:
     sourceRepos:
       - https://github.com/mkroman/k8s
 
-  - name: rwx
-    destinations:
-      - namespace: rwx
-    sourceRepos:
-      - https://github.com/mkroman/k8s
-
   - name: prometheus-operator
     destinations:
       - namespace: prometheus-operator
@@ -183,6 +177,12 @@ projects:
         kind: ResourceQuota
       - group: ''
         kind: LimitRange
+
+  - name: rwx
+    destinations:
+      - namespace: rwx
+    sourceRepos:
+      - https://github.com/mkroman/k8s
 
   - name: sealed-secrets
     description: "Encrypted secrets operator for Kubernetes"
@@ -218,6 +218,20 @@ projects:
       - group: networking.k8s.io
         kind: IngressClass
 
+  - name: vector-agent
+    description: "Node-local observability agent"
+    destinations:
+      - namespace: vector
+    sourceRepos:
+      - https://github.com/mkroman/k8s
+
+  - name: vector-aggregator
+    description: "Cluster observability aggregator"
+    destinations:
+      - namespace: vector
+    sourceRepos:
+      - https://github.com/mkroman/k8s
+
   - name: zeta
     destinations:
       - namespace: zeta-prod
@@ -241,6 +255,7 @@ namespaces:
   - name: rwx-redis-prod
   - name: rwx-openwebui-prod
   - name: traefik
+  - name: vector
   - name: zeta-prod
   - name: zeta-dev
 
@@ -420,6 +435,28 @@ newApplications:
     source:
       repoURL: https://github.com/mkroman/k8s
       path: traefik
+
+  - name: vector-agent
+    project: vector-agent
+    destination:
+      namespace: vector
+    source:
+      repoURL: https://github.com/mkroman/k8s
+      path: vector
+      helm:
+        valueFiles:
+          - values-agent.yaml
+
+  - name: vector-aggregator
+    project: vector-aggregator
+    destination:
+      namespace: vector
+    source:
+      repoURL: https://github.com/mkroman/k8s
+      path: vector
+      helm:
+        valueFiles:
+          - values-aggregator.yaml
 
   - name: zeta
     annotations:
