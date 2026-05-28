@@ -72,7 +72,7 @@ vector:
       # Remap syslog messages to a OTel-compatible log structure.
       syslog_otel_logs:
         type: remap
-        inputs: [generate_syslog]
+        inputs: []
         source: |-
           structured = parse_syslog!(.message)
           .timestamp_nanos = to_unix_timestamp!(structured.timestamp, unit: "nanoseconds")
