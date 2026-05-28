@@ -39,8 +39,22 @@ grafana:
     # image:
     #   tag: '3.8.4'
 
-ingress:
+ingressRoute:
   enabled: true
   hostname: grafana.infra.rwx.im
   tls:
     secretName: grafana.infra.rwx.im-tls
+
+certificate:
+  # -- Create the Certificate resource.
+  enabled: true
+  # -- Override the name of the certificate
+  name: grafana.infra.rwx.im
+  # -- The domain name
+  commonName: grafana.infra.rwx.im
+  # -- Reference to the certificate issuer
+  issuer:
+    kind: ClusterIssuer
+    name: letsencrypt-production
+  # -- Override the name of the secret that cert-manager will use.
+  secretName: ""

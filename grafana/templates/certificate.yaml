@@ -1,0 +1,18 @@
+{{- if .Values.certificate.enabled }}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "grafana.certificateName" . | quote }}
+spec:
+  dnsNames:
+  - {{ .Values.certificate.commonName | quote }}
+  {{- with .Values.certificate.issuer }}
+  issuerRef:
+    {{- . | toYaml | nindent 4 }}
+  {{- end }}
+  {{- with .Values.certificate.secretName }}
+  secretName: {{ . | quote }}
+  {{- else }}
+  secretName: {{ printf "%s-tls" (include "grafana.certificateName" $) | quote }}
+  {{- end }}
+{{- end }}

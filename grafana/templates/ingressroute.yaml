@@ -1,5 +1,5 @@
 {{- $fullName := .Release.Name -}}
-{{- if .Values.ingress.enabled }}
+{{- if .Values.ingressRoute.enabled }}
 ---
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
@@ -10,7 +10,7 @@ spec:
   - web
   routes:
   - kind: Rule
-    match: Host(`{{ .Values.ingress.hostname }}`)
+    match: Host(`{{ .Values.ingressRoute.hostname }}`)
     middlewares:
     - name: {{ $fullName }}-https-redirect
     services:
@@ -18,7 +18,7 @@ spec:
       kind: Service
       port: 80
 ---
-{{- with .Values.ingress.tls }}
+{{- with .Values.ingressRoute.tls }}
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
@@ -28,7 +28,7 @@ spec:
   - websecure
   routes:
   - kind: Rule
-    match: Host(`{{ $.Values.ingress.hostname }}`)
+    match: Host(`{{ $.Values.ingressRoute.hostname }}`)
     services:
     - name: {{ $fullName }}
       kind: Service
