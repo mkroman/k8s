@@ -11,33 +11,32 @@ vector:
 
   service:
     ports:
-    - name: otlp-http
-      port: 4318
-      protocol: TCP
-      targetPort: 4318
-    - name: api
-      port: 8686
-      protocol: TCP
-      targetPort: 8686
-    - name: prom-exporter
-      port: 9090
-      protocol: TCP
-      targetPort: 9090
-    - name: vector
-      port: 6000
-      protocol: TCP
-      targetPort: 6000
-    - name: otlp-grpc
-      port: 4317
-      protocol: TCP
-      targetPort: 4317
+      - name: otlp-http
+        port: 4318
+        protocol: TCP
+        targetPort: 4318
+      - name: api
+        port: 8686
+        protocol: TCP
+        targetPort: 8686
+      - name: prom-exporter
+        port: 9090
+        protocol: TCP
+        targetPort: 9090
+      - name: vector
+        port: 6000
+        protocol: TCP
+        targetPort: 6000
+      - name: otlp-grpc
+        port: 4317
+        protocol: TCP
+        targetPort: 4317
 
   customConfig:
     data_dir: /vector-data-dir
     api:
       enabled: true
       address: 0.0.0.0:8686
-      playground: true
     sources:
       # Automatically generate random syslogs for easier debugging.
       generate_syslog:
@@ -75,32 +74,32 @@ vector:
         type: remap
         inputs: [generate_syslog]
         source: |-
-            structured = parse_syslog!(.message)
-            .timestamp_nanos = to_unix_timestamp!(structured.timestamp, unit: "nanoseconds")
-            .body = structured
-            .service_name = structured.appname
-            .resource_attributes.source_type = .source_type
-            .resource_attributes.host.hostname = structured.hostname
-            .resource_attributes.service.name = structured.appname
-            .attributes.syslog.procid = structured.procid
-            .attributes.syslog.facility = structured.facility
-            .attributes.syslog.version = structured.version
-            .severity_text = if includes(["emerg", "err", "crit", "alert"], structured.severity) {
-              "ERROR"
-            } else if structured.severity == "warning" {
-              "WARN"
-            } else if structured.severity == "debug" {
-              "DEBUG"
-            } else if includes(["info", "notice"], structured.severity) {
-              "INFO"
-            } else {
-             structured.severity
-            }
-            .scope_name = structured.msgid
-            del(.message)
-            del(.timestamp)
-            del(.service)
-            del(.source_type)
+          structured = parse_syslog!(.message)
+          .timestamp_nanos = to_unix_timestamp!(structured.timestamp, unit: "nanoseconds")
+          .body = structured
+          .service_name = structured.appname
+          .resource_attributes.source_type = .source_type
+          .resource_attributes.host.hostname = structured.hostname
+          .resource_attributes.service.name = structured.appname
+          .attributes.syslog.procid = structured.procid
+          .attributes.syslog.facility = structured.facility
+          .attributes.syslog.version = structured.version
+          .severity_text = if includes(["emerg", "err", "crit", "alert"], structured.severity) {
+            "ERROR"
+          } else if structured.severity == "warning" {
+            "WARN"
+          } else if structured.severity == "debug" {
+            "DEBUG"
+          } else if includes(["info", "notice"], structured.severity) {
+            "INFO"
+          } else {
+           structured.severity
+          }
+          .scope_name = structured.msgid
+          del(.message)
+          del(.timestamp)
+          del(.service)
+          del(.source_type)
 
     sinks:
       prom_exporter:
@@ -116,8 +115,8 @@ vector:
           codec: json
         framing:
           method: newline_delimited
-        uri: "http://quickwit-indexer.quickwit-prod.svc.cluster.local:7280/api/v1/vector-kubernetes_logs-v0_1/ingest"
-
+        uri: "http://quickwit-indexer.quickwit-prod.svc.cluster.local:7280/api/v1/vector-kubernetes_logs-v0\
+          _1/ingest"
       # debug:
       #   type: console
       #   inputs: [vector_logs]
