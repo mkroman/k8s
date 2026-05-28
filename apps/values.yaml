@@ -16,8 +16,7 @@ applications:
 # -- List of Argo CD projects.
 projects:
   - name: cert-manager
-    description: "Manages the deployment of cert-manager and its associated cluster-wide resources
-      (CRDs, Webhooks, and ClusterIssuers)."
+    description: "Automated TLS certificate management via ACME"
     destinations:
       - namespace: cert-manager
       - namespace: kube-system
@@ -52,7 +51,7 @@ projects:
       - https://github.com/mkroman/k8s
 
   - name: cloudnative-pg
-    description: "Manages the deployment, configuration, and lifecycle of the CloudNativePG operator."
+    description: "CloudNativePG operator for PostgreSQL clusters"
     destinations:
       - namespace: cnpg-system
     sourceRepos:
@@ -104,7 +103,7 @@ projects:
         kind: "*"
 
   - name: monitoring
-    description: "Cluster monitoring stack (prometheus, thanos, grafana, ..)"
+    description: "Cluster monitoring stack (Prometheus, Thanos, Grafana)"
     destinations:
       - namespace: grafana
       - namespace: monitoring
@@ -174,7 +173,7 @@ projects:
       - https://github.com/mkroman/k8s
 
   - name: redis
-    description: "Redis sentinel deployment"
+    description: "Redis Sentinel high-availability deployment"
     destinations:
       - namespace: rwx-redis-prod
     sourceRepos:
@@ -193,7 +192,7 @@ projects:
       - https://github.com/mkroman/k8s
 
   - name: sealed-secrets
-    description: "Encrypted secrets operator for Kubernetes"
+    description: "Bitnami Sealed Secrets — encrypt secrets for GitOps"
     destinations:
       - namespace: kube-system
     sourceRepos:
@@ -211,7 +210,7 @@ projects:
         kind: MutatingWebhookConfiguration
 
   - name: traefik
-    description: "Cloud-native application proxy"
+    description: "Traefik ingress controller"
     destinations:
       - namespace: traefik
     sourceRepos:
