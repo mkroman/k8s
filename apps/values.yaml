@@ -224,6 +224,11 @@ projects:
       - namespace: vector
     sourceRepos:
       - https://github.com/mkroman/k8s
+    clusterResourceWhitelist:
+      - group: rbac.authorization.k8s.io
+        kind: ClusterRole
+      - group: rbac.authorization.k8s.io
+        kind: ClusterRoleBinding
 
   - name: vector-aggregator
     description: "Cluster observability aggregator"
@@ -231,6 +236,11 @@ projects:
       - namespace: vector
     sourceRepos:
       - https://github.com/mkroman/k8s
+    clusterResourceWhitelist:
+      - group: rbac.authorization.k8s.io
+        kind: ClusterRole
+      - group: rbac.authorization.k8s.io
+        kind: ClusterRoleBinding
 
   - name: zeta
     destinations:
