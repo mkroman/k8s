@@ -146,6 +146,12 @@ projects:
     sourceRepos:
       - https://github.com/mkroman/k8s
 
+  - name: rwx
+    destinations:
+      - namespace: rwx
+    sourceRepos:
+      - https://github.com/mkroman/k8s
+
   - name: prometheus-operator
     destinations:
       - namespace: prometheus-operator
@@ -356,6 +362,15 @@ newApplications:
     source:
       repoURL: https://github.com/mkroman/k8s
       path: open-webui
+
+  - name: postgres
+    project: rwx
+    useDefaultFinalizers: false # We don't accidentally want to delete a postgres cluster
+    destination:
+      namespace: rwx
+    source:
+      repoURL: https://github.com/mkroman/k8s
+      path: postgres
 
   - name: prometheus-operator
     project: prometheus-operator
