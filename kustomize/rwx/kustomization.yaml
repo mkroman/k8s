@@ -1,4 +1,0 @@
-namespace: rwx
-resources:
-- base/certificate.yaml
-- base/middleware.yaml
