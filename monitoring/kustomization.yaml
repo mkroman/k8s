@@ -1,4 +1,5 @@
 resources:
-- ./prometheus
-- ./thanos
-- ./ingress
+  - ./prometheus
+  - ./thanos
+  - ./alertmanager
+  - ./ingress

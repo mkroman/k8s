@@ -4,4 +4,3 @@ namespace: prometheus-operator
 resources:
   - ./base
   - ./admission-webhook
-  - ./alertmanager
