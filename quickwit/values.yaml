@@ -2,8 +2,8 @@ quickwit:
   environment:
     QW_DISABLE_TELEMETRY: 1
   environmentFrom:
-  - secretRef:
-      name: quickwit
+    - secretRef:
+        name: quickwit
 
   searcher:
     replicaCount: 3
@@ -15,8 +15,8 @@ quickwit:
     replicaCount: 1
 
     extraEnvFrom:
-    - secretRef:
-        name: quickwit-metastore
+      - secretRef:
+          name: quickwit-metastore
 
   # Quickwit configuration
   #
@@ -44,3 +44,27 @@ quickwit:
     enabled: true
     additionalLabels:
       metrics.uplink.io/monitor: prometheus
+
+  prometheusRule:
+    # -- Create the provided prometheus rule resources.
+    enabled: true
+
+    rules:
+      - alert: QuickwitSustainedHighThroughput
+        # Calculates the per-second rate of successfully processed documents
+        # over a 5-minute window, summed by index. Change "100" to a baseline
+        # that makes sense for your cluster's standard volume.
+        expr: sum by (index)
+          (rate(quickwit_indexing_processed_docs_total{docs_processed_status="valid"}[5m])) > 100
+
+        # The condition must be continuously met for 30 minutes before firing.
+        for: 30m
+
+        labels:
+          severity: warning # Route this label in Alertmanager to your preferred channel
+        annotations:
+          summary: "Sustained high document throughput on Quickwit index '{{ $labels.index }}'"
+          description: >-
+            The Quickwit index '{{ $labels.index }}' has experienced a sustained indexing throughput
+            of over 100 docs/sec for more than 30 minutes.  Current rate is {{ $value | humanize }}
+            docs/sec.
