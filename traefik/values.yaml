@@ -49,7 +49,6 @@ traefik:
       http3:
         # -- Enable HTTP/3 support.
         enabled: true
-        advertisedPort: 443
 
   # Configuration providers.
   providers:
