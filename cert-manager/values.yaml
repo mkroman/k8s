@@ -1,2 +1,13 @@
 cert-manager:
   installCRDs: true
+
+clusterIssuer:
+  # -- Enable the production letsencrypt cert issuer.
+  letsEncryptProduction:
+    enabled: true
+  # -- Enable the staging letsencrypt cert issuer.
+  letsEncryptStaging:
+    enabled: true
+  # -- Enable the self-signed certificate issuer.
+  selfSigned:
+    enabled: true
