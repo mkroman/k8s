@@ -1,0 +1,28 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: prometheus-operator-rulesmutation
+  annotations:
+    cert-manager.io/inject-ca-from: prometheus-operator/prometheus-operator-admission-webhook
+webhooks:
+  - clientConfig:
+      service:
+        name: admission-webhook
+        namespace: prometheus-operator
+        path: /admission-prometheusrules/mutate
+    # FailurePolicy is intentionally set to Fail to reject invalid objects at admission time.
+    failurePolicy: Fail
+    name: prometheusrulemutate.monitoring.coreos.com
+    namespaceSelector: {}
+    rules:
+      - apiGroups:
+          - monitoring.coreos.com
+        apiVersions:
+          - '*'
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - prometheusrules
+    admissionReviewVersions: ["v1", "v1beta1"]
+    sideEffects: None

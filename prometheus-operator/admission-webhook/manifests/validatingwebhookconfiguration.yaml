@@ -1,0 +1,57 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: prometheus-operator-rulesvalidation
+  annotations:
+    cert-manager.io/inject-ca-from: prometheus-operator/prometheus-operator-admission-webhook
+webhooks:
+  - clientConfig:
+      service:
+        name: admission-webhook
+        namespace: prometheus-operator
+        path: /admission-prometheusrules/validate
+    # FailurePolicy is intentionally set to Fail to reject invalid objects at admission time.
+    failurePolicy: Fail
+    name: prometheusrulevalidate.monitoring.coreos.com
+    namespaceSelector: {}
+    rules:
+      - apiGroups:
+          - monitoring.coreos.com
+        apiVersions:
+          - '*'
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - prometheusrules
+    admissionReviewVersions: ["v1", "v1beta1"]
+    sideEffects: None
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: prometheus-operator-alertmanager-config-validation
+  annotations:
+    cert-manager.io/inject-ca-from: prometheus-operator/prometheus-operator-admission-webhook
+webhooks:
+  - clientConfig:
+      service:
+        name: admission-webhook
+        namespace: prometheus-operator
+        path: /admission-alertmanagerconfigs/validate
+    # FailurePolicy is intentionally set to Fail to reject invalid objects at admission time.
+    failurePolicy: Fail
+    name: alertmanagerconfigsvalidate.monitoring.coreos.com
+    namespaceSelector: {}
+    rules:
+      - apiGroups:
+          - monitoring.coreos.com
+        apiVersions:
+          - v1alpha1
+        operations:
+          - CREATE
+          - UPDATE
+        resources:
+          - alertmanagerconfigs
+    admissionReviewVersions: ["v1", "v1beta1"]
+    sideEffects: None

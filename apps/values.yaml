@@ -411,9 +411,10 @@ newApplications:
       namespace: prometheus-operator
     source:
       repoURL: https://github.com/mkroman/k8s
-      path: prometheus-operator/base
+      path: prometheus-operator
     syncPolicy:
       automated:
+        prune: true
         selfHeal: true
       syncOptions:
         - ApplyOutOfSyncOnly=true
