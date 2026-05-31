@@ -229,6 +229,13 @@ projects:
         kind: ClusterRoleBinding
       - group: networking.k8s.io
         kind: IngressClass
+    syncPolicy:
+      automated:
+        prune: true
+        selfHeal: true
+      syncOptions:
+        - ApplyOutOfSyncOnly=true
+        - ServerSideApply=true
 
   - name: vector-agent
     description: "Node-local observability agent"
