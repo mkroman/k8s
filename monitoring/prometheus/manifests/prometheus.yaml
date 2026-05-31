@@ -52,3 +52,9 @@ spec:
         resources:
           requests:
             storage: 15Gi
+
+  alerting:
+    alertmanagers:
+      - namespace: monitoring
+        name: alertmanager
+        port: web
