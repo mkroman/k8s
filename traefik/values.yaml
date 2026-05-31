@@ -49,6 +49,7 @@ traefik:
       http3:
         # -- Enable HTTP/3 support.
         enabled: true
+        advertisedPort: 443
 
   # Configuration providers.
   providers:
@@ -64,4 +65,3 @@ traefik:
     spec:
       # Use a local traffic policy so we can get the users origin ip
       externalTrafficPolicy: Local
-    single: false
