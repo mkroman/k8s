@@ -44,6 +44,12 @@ traefik:
                 summary: "Traefik Down"
                 description: "{{ $labels.pod }} on {{ $labels.nodename }} is down"
 
+  ports:
+    websecure:
+      http3:
+        # -- Enable HTTP/3 support.
+        enabled: true
+
   # Configuration providers.
   providers:
     # Enable Kubernetes CRD provider.
