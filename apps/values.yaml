@@ -164,6 +164,11 @@ projects:
         kind: ClusterRole
       - group: rbac.authorization.k8s.io
         kind: ClusterRoleBinding
+      # The webhooks are needed for the admission and mutation webhooks
+      - group: admissionregistration.k8s.io
+        kind: ValidatingWebhookConfiguration
+      - group: admissionregistration.k8s.io
+        kind: MutatingWebhookConfiguration
 
   - name: quickwit
     description: "Quickwit search and analytics engine"
