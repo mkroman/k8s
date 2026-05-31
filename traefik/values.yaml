@@ -65,3 +65,4 @@ traefik:
     spec:
       # Use a local traffic policy so we can get the users origin ip
       externalTrafficPolicy: Local
+    single: false
