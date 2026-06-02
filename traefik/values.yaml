@@ -44,13 +44,6 @@ traefik:
                 summary: "Traefik Down"
                 description: "{{ $labels.pod }} on {{ $labels.nodename }} is down"
 
-  ports:
-    websecure:
-      http3:
-        # -- Enable HTTP/3 support.
-        enabled: true
-        advertisedPort: 8443
-
   # Configuration providers.
   providers:
     # Enable Kubernetes CRD provider.
@@ -66,4 +59,3 @@ traefik:
     spec:
       # Use a local traffic policy so we can get the users origin ip
       externalTrafficPolicy: Local
-    single: false
