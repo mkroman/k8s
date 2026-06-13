@@ -2,7 +2,8 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "config:recommended",
-    "config:best-practices"
+    "config:best-practices",
+    ":disableRateLimiting"
   ],
   "customManagers": [
     {
