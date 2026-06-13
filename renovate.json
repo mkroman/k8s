@@ -18,6 +18,13 @@
       "matchStrings": [
         "appVersion:\\s*[\"']?(?<currentValue>[^\\s\"']+)[\"']?\\s*#\\s*renovate:\\s*datasource=(?<datasource>\\S+)\\s+depName=(?<depName>\\S+)(?:\\s+packageName=(?<packageName>\\S+))?(?:\\s+versioning=(?<versioning>\\S+))?"
       ]
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["/values\\.ya?ml$/"],
+      "matchStrings": [
+        "#\\s*renovate:\\s*datasource=(?<datasource>\\S+)\\s+depName=(?<depName>\\S+)(?:\\s+packageName=(?<packageName>\\S+))?(?:\\s+versioning=(?<versioning>\\S+))?\\s*(?:\\r?\\n)\\s*tag:\\s*[\"']?(?<currentValue>[^\\s\"']+)[\"']?\\s*(?:\\r?\\n)\\s*sha:\\s*[\"']?(?<currentDigest>[^\\s\"']*)[\"']?"
+      ]
     }
   ],
   "packageRules": [

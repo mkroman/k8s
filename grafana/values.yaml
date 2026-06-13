@@ -1,12 +1,21 @@
 grafana:
-  # image:
-  #   tag: 12.0.1
+  image:
+    # renovate: datasource=docker depName=grafana/grafana
+    tag: 13.0.2
+    sha: ""
   # -- Set the number of replicas to deploy.
   replicas: 2
+
+  imageRenderer:
+    image:
+      # renovate: datasource=docker depName=grafana/grafana-image-renderer
+      tag: 5.8.9
+      sha: ""
 
   plugins:
     - quickwit-quickwit-datasource
     # -- Configure the Grafana instance.
+
   grafana.ini:
     server:
       domain: grafana.infra.rwx.im
@@ -25,19 +34,14 @@ grafana:
     dashboards:
       enabled: true
       # -- The label to watch for
-      label: 'grafana.com/dashboard'
+      label: "grafana.com/dashboard"
       # -- The value to match
-      labelValue: 'true'
+      labelValue: "true"
       # -- Only monitor ConfigMaps
       resource: configmap
 
   admin:
     existingSecret: grafana-auth
-
-  imageRenderer:
-    enabled: true
-    # image:
-    #   tag: '3.8.4'
 
 ingressRoute:
   enabled: true
