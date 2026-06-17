@@ -8,7 +8,7 @@ image:
   repository: mumblevoip/mumble-server
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: ""
+  tag: "@sha256:6215f35c73581009697471f85bc07420a3521dab57341d30ed68895c60b83d7a"
 
 imagePullSecrets: []
 nameOverride: ""
