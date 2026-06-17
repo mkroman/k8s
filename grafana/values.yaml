@@ -1,14 +1,17 @@
 grafana:
   image:
     # renovate: datasource=docker depName=grafana/grafana
+    repository: grafana/grafana
     tag: 13.0.2
     sha: ""
+
   # -- Set the number of replicas to deploy.
   replicas: 2
 
   imageRenderer:
     image:
       # renovate: datasource=docker depName=grafana/grafana-image-renderer
+      repository: grafana/grafana-image-renderer
       tag: 5.8.9
       sha: ""
 
