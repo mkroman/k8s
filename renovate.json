@@ -31,7 +31,7 @@
   "packageRules": [
     {
       "matchManagers": ["helm-values"],
-      "pinDigests": false
+      "pinDigests": true
     }
   ],
   "ignorePaths": [
