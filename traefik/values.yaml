@@ -16,14 +16,13 @@ traefik:
     # Don't check for new versions.
     checkNewVersion: false
 
-  logs:
-    general:
-      format: json
-      level: DEBUG
-    access:
-      # Enable access logs.
-      enabled: false
-      format: json
+  log:
+    format: json
+    level: DEBUG
+
+  accessLog:
+    enabled: false
+    format: json
 
   metrics:
     # Enable prometheus metrics
