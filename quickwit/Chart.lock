@@ -1,6 +1,6 @@
 dependencies:
 - name: quickwit
   repository: https://helm.quickwit.io
-  version: 0.8.4
-digest: sha256:a82f597fda7a764bb0161858d3bb9545d5af30c906b3bd28b03cc36112283ca9
-generated: "2026-03-10T12:37:27.614790855+01:00"
+  version: 0.8.5
+digest: sha256:edbd2730a93f5fc0491c441ee622023e17230d6f0a014d3bf4574c4bdec6b288
+generated: "2026-06-19T08:18:42.38687829+02:00"
