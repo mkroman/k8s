@@ -12,7 +12,7 @@ grafana:
     image:
       # renovate: datasource=docker depName=grafana/grafana-image-renderer
       repository: grafana/grafana-image-renderer
-      tag: 5.9.0
+      tag: 5.9.1
       sha: ""
 
   plugins:
