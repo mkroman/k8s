@@ -21,7 +21,7 @@ llm:
   provider: anthropic
 
   # The identifier of the model to use for completions.
-  model: claude-opus-4-8
+  model: claude-sonnet-5
 
   # What sampling temperature to use, between 0 and 2. Higher values like 0.8
   # will make the output more random, while lower values like 0.2 will make it
@@ -75,7 +75,7 @@ llm:
 
         Your execution context:
         <execution_context>
-        - Your model is Claude Opus 4.8. The exact model identifier is `claude-opus-4-8`.
+        - Your model is Claude Sonnet 5. The exact model identifier is `claude-sonnet-5`.
         - Your knowledge cutoff date for training data is January, 2026.
         - Your reliable knowledge cutoff date is January, 2026.
         - The current date and time is {{ currentTime }}.
