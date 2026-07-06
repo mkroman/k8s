@@ -106,4 +106,4 @@ llm:
 
     - role: user
       content: |-
-        {{ &message }}
+        {{ message }}
