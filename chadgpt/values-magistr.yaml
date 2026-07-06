@@ -38,7 +38,9 @@ llm:
   # * `think-answer-tags` - response is formatted with <think></think> and
   #    <answer></answer> tags and are extracted.
   # * `none` or false - response is preserved as is.
-  reasoning_method: none
+  reasoning_method: adaptive
+  reasoning_effort: medium
+  reasoning_tokens: 10000
 
   # An alternative to sampling with temperature, called nucleus sampling, where
   # the model considers the results of the tokens with top_p probability mass.
