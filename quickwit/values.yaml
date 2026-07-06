@@ -8,8 +8,18 @@ quickwit:
   searcher:
     replicaCount: 3
 
+    persistentVolume:
+      enabled: true
+      storage: "25Gi"
+      storageClass: "ssd-gp1x1"
+
   indexer:
     replicaCount: 1
+
+    persistentVolume:
+      enabled: true
+      storage: "50Gi"
+      storageClass: "ssd-gp1x1"
 
   metastore:
     replicaCount: 1
