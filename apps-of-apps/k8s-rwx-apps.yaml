@@ -10,17 +10,17 @@ destination:
 disableNamespaceCreation: false
 
 allowedNamespaces:
-- rwx
-- chadgpt
-- magistr-prod
-- meta
+  - rwx
+  - chadgpt
+  - magistr-prod
+  - meta
 
 # -- Allow access to all cluster resources.
 clusterResourceWhitelist:
-- group: '*'
-  kind: '*'
+  - group: "*"
+    kind: "*"
 
-applications:
-  magistr-prod:
-    path: magistr.dk/overlays/production
-    disableNamespaceCreation: true
+applications: {}
+  # magistr-prod:
+  #   path: magistr.dk/overlays/production
+  #   disableNamespaceCreation: true
