@@ -1,6 +1,6 @@
 dependencies:
 - name: traefik
   repository: https://helm.traefik.io/traefik
-  version: 41.0.1
-digest: sha256:aca6b44fb035568369cf85c7bc86def53181d829a32ed934947f4c75dbd4bf15
-generated: "2026-06-29T16:47:02.199001352+02:00"
+  version: 41.0.2
+digest: sha256:951a5c1393d8e3be703f59264cb8fa481567465bdc53b26cc2ad7a5cf5b4b42e
+generated: "2026-07-19T03:13:34.630529011+02:00"
