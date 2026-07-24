@@ -21,7 +21,7 @@ llm:
   provider: anthropic
 
   # The identifier of the model to use for completions.
-  model: claude-sonnet-5
+  model: claude-opus-5
 
   # What sampling temperature to use, between 0 and 2. Higher values like 0.8
   # will make the output more random, while lower values like 0.2 will make it
