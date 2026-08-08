@@ -4,3 +4,7 @@ metadata:
   name: cluster
 spec:
   replicas: 3
+  externalUrl: http://127.0.0.1:8001/api/v1/proxy/namespaces/monitoring/services/alertmanager:web/
+  resources:
+    requests:
+      memory: 400Mi

@@ -15,57 +15,57 @@ spec:
         app.kubernetes.io/name: thanos-compact
     spec:
       containers:
-      - name: thanos-compact
-        image: quay.io/thanos/thanos:v0.37.2
-        args:
-        - compact
-        - --log.level=info
-        - --wait
-        - --data-dir
-        - /data
-        - --compact.enable-vertical-compaction
-        - --deduplication.func=penalty
-        - --deduplication.replica-label=prometheus_replica
-        - --objstore.config=$(OBJSTORE_CONFIG)
-        - --retention.resolution-raw=30d
-        - --retention.resolution-5m=90d
-        - --retention.resolution-1h=10y
-        env:
-        - name: OBJSTORE_CONFIG
-          valueFrom:
-            secretKeyRef:
-              key: thanos.yaml
-              name: thanos-storage
-        livenessProbe:
-          failureThreshold: 4
-          httpGet:
-            path: /-/healthy
-            port: 10902
-            scheme: HTTP
-          periodSeconds: 30
-        readinessProbe:
-          failureThreshold: 20
-          httpGet:
-            path: /-/ready
-            port: 10902
-            scheme: HTTP
-          periodSeconds: 5
-        resources:
-          limits:
-            cpu: 0.42
-            memory: 420Mi
-          requests:
-            cpu: 0.123
-            memory: 123Mi
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop:
-            - ALL
-          readOnlyRootFilesystem: true
-        volumeMounts:
-        - name: thanos-data-dir
-          mountPath: /data
+        - name: thanos-compact
+          image: quay.io/thanos/thanos:v0.37.2
+          args:
+            - compact
+            - --log.level=info
+            - --wait
+            - --data-dir
+            - /data
+            - --compact.enable-vertical-compaction
+            - --deduplication.func=penalty
+            - --deduplication.replica-label=prometheus_replica
+            - --objstore.config=$(OBJSTORE_CONFIG)
+            - --retention.resolution-raw=15d
+            - --retention.resolution-5m=90d
+            - --retention.resolution-1h=10y
+          env:
+            - name: OBJSTORE_CONFIG
+              valueFrom:
+                secretKeyRef:
+                  key: thanos.yaml
+                  name: thanos-storage
+          livenessProbe:
+            failureThreshold: 4
+            httpGet:
+              path: /-/healthy
+              port: 10902
+              scheme: HTTP
+            periodSeconds: 30
+          readinessProbe:
+            failureThreshold: 20
+            httpGet:
+              path: /-/ready
+              port: 10902
+              scheme: HTTP
+            periodSeconds: 5
+          resources:
+            limits:
+              cpu: 0.42
+              memory: 420Mi
+            requests:
+              cpu: 0.123
+              memory: 123Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+          volumeMounts:
+            - name: thanos-data-dir
+              mountPath: /data
       volumes:
-      - name: thanos-data-dir
-        emptyDir: {}
+        - name: thanos-data-dir
+          emptyDir: {}
