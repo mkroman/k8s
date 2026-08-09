@@ -1,4 +1,24 @@
 traefik:
+  accessLog:
+    enabled: false
+    format: json
+    otlp:
+      http:
+        endpoint: http://vector-aggregator.vector.svc.cluster.local:4318/v1/logs
+
+  deployment:
+    # Deploy multiple replicas.
+    replicas: 3
+
+  experimental:
+    otlpLogs: true
+
+  global:
+    # Disable sending of anonymous usage statistics.
+    sendAnonymousUsage: false
+    # Don't check for new versions.
+    checkNewVersion: false
+
   instanceLabelOverride: traefik
 
   image:
@@ -7,23 +27,9 @@ traefik:
     tag: v3.7.10
     digest: "sha256:d6858791f9e74df44ca4014166647c41cdc2abd3bf2a71b832ca4e1c6a91b257"
 
-  deployment:
-    # Deploy multiple replicas.
-    replicas: 3
-
-  global:
-    # Disable sending of anonymous usage statistics.
-    sendAnonymousUsage: false
-    # Don't check for new versions.
-    checkNewVersion: false
-
   log:
     format: json
-    level: DEBUG
-
-  accessLog:
-    enabled: false
-    format: json
+    level: INFO
 
   metrics:
     # Enable prometheus metrics
