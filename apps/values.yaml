@@ -101,6 +101,7 @@ projects:
       # Allows Longhorn nodes/engines (often managed by CRDs) to be cluster-scoped if necessary
       - group: "longhorn.io"
         kind: "*"
+    namespaceResourceBlacklist: []
 
   - name: monitoring
     description: "Cluster monitoring stack (Prometheus, Thanos, Grafana)"
@@ -184,9 +185,9 @@ projects:
     sourceRepos:
       - https://github.com/mkroman/k8s
     namespaceResourceBlacklist:
-      - group: ''
+      - group: ""
         kind: ResourceQuota
-      - group: ''
+      - group: ""
         kind: LimitRange
 
   - name: rwx
