@@ -3,8 +3,8 @@ kind: Service
 metadata:
   labels:
     app.kubernetes.io/name: prometheus-operator-admission-webhook
-    app.kubernetes.io/version: 0.91.0
-  name: admission-webhook
+    app.kubernetes.io/version: 0.93.1
+  name: prometheus-operator-admission-webhook
   namespace: prometheus-operator
 spec:
   ports:
