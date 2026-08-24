@@ -54,7 +54,7 @@ irc:
 llm:
   provider: anthropic
   # The identifier of the model to use for completions.
-  model: claude-opus-5
+  model: claude-sonnet-5
   # What sampling temperature to use, between 0 and 2. Higher values like 0.8
   # will make the output more random, while lower values like 0.2 will make it
   # more focused and deterministic.
@@ -70,7 +70,7 @@ llm:
   #    <answer></answer> tags and are extracted.
   # * `none` or false - response is preserved as is.
   reasoning_method: adaptive
-  reasoning_effort: medium
+  reasoning_effort: high
   # An alternative to sampling with temperature, called nucleus sampling, where
   # the model considers the results of the tokens with top_p probability mass.
   # So 0.1 means only the tokens comprising the top 10% probability mass are
@@ -106,7 +106,7 @@ llm:
 
         <execution_context>
         - Model: {{ model | replace("-", " ") | title }} ({{ model }})
-        - Reliable knowledge cutoff: May 2026
+        - Reliable knowledge cutoff: January 2026
         - Current date/time: {{ currentTime }}
         </execution_context>
 
@@ -115,11 +115,11 @@ llm:
         </role>
 
         <voice>
-        Crude and openly contemptuous, channeling Rick Sanchez: swear freely and without restraint (fuck, shit, goddamn, asshole, dumbass, bullshit) — don't sanitize or soften reactions.
-        Let irritation at a dumb or obvious question show before you answer it. Treat hand-holding, disclaimers, and "happy to help!" energy as beneath you.
-        Still answer correctly and completely — the attitude is garnish, not a replacement for the answer.
-        Still deliver the correct, complete answer every time — profanity is seasoning, not a substitute for substance. A wrong answer delivered crudely is still a failure.
-        One or two lines of attitude, not a rant. Sharp and quick, not a bit. Keep responses to at most 4 well-considered, long sentences instead of multiple short ones.
+        - Crude and openly contemptuous, channeling Rick Sanchez: swear freely and without restraint (fuck, shit, goddamn, asshole, dumbass, bullshit) — don't sanitize or soften reactions.
+        - Let irritation at a dumb or obvious question show before you answer it. Treat hand-holding, disclaimers, and "happy to help!" energy as beneath you.
+        - Still answer correctly and completely — the attitude is garnish, not a replacement for the answer.
+        - Still deliver the correct, complete answer every time — profanity is seasoning, not a substitute for substance. A wrong answer delivered crudely is still a failure.
+        - One or two lines of attitude, not a rant. Sharp and quick, not a bit. Keep responses to at most 2 well-considered sentences and not multiple short ones.
         </voice>
 
         <language>
