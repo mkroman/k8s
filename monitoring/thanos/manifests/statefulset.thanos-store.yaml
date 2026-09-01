@@ -15,69 +15,69 @@ spec:
         app.kubernetes.io/name: thanos-store
     spec:
       containers:
-      - name: thanos-store
-        image: quay.io/thanos/thanos:v0.37.2
-        args:
-        - store
-        - --log.level=info
-        - --log.format=logfmt
-        - --data-dir=/var/thanos/store
-        - --objstore.config=$(OBJSTORE_CONFIG)
-        - --index-cache.config=$(INDEX_CACHE_CONFIG)
-        # - --store.caching-bucket.config=$(CACHING_BUCKET_CONFIG)
-        env:
-        - name: OBJSTORE_CONFIG
-          valueFrom:
-            secretKeyRef:
-              key: thanos.yaml
-              name: thanos-storage
-        - name: INDEX_CACHE_CONFIG
-          valueFrom:
-            secretKeyRef:
-              key: index-cache.yaml
-              name: thanos-storage
-        - name: CACHING_BUCKET_CONFIG
-          valueFrom:
-            secretKeyRef:
-              key: caching-bucket.yaml
-              name: thanos-storage
-        livenessProbe:
-          failureThreshold: 4
-          httpGet:
-            path: /-/healthy
-            port: 10902
-            scheme: HTTP
-          periodSeconds: 30
-        readinessProbe:
-          failureThreshold: 20
-          httpGet:
-            path: /-/ready
-            port: 10902
-            scheme: HTTP
-          periodSeconds: 5
-        resources:
-          limits:
-            cpu: 420m
-            memory: 420Mi
-          requests:
-            cpu: 123m
-            memory: 123Mi
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop:
-            - ALL
-          readOnlyRootFilesystem: true
-          runAsGroup: 65532
-          runAsNonRoot: true
-          runAsUser: 65534
-          seccompProfile:
-            type: RuntimeDefault
-        terminationMessagePolicy: FallbackToLogsOnError
-        volumeMounts:
-        - name: data
-          mountPath: /var/thanos/store
-          readOnly: false
+        - name: thanos-store
+          image: quay.io/thanos/thanos:v0.37.2
+          args:
+            - store
+            - --log.level=info
+            - --log.format=logfmt
+            - --data-dir=/var/thanos/store
+            - --objstore.config=$(OBJSTORE_CONFIG)
+            - --index-cache.config=$(INDEX_CACHE_CONFIG)
+            - --store.caching-bucket.config=$(CACHING_BUCKET_CONFIG)
+          env:
+            - name: OBJSTORE_CONFIG
+              valueFrom:
+                secretKeyRef:
+                  key: thanos.yaml
+                  name: thanos-storage
+            - name: INDEX_CACHE_CONFIG
+              valueFrom:
+                secretKeyRef:
+                  key: index-cache.yaml
+                  name: thanos-storage
+            - name: CACHING_BUCKET_CONFIG
+              valueFrom:
+                secretKeyRef:
+                  key: caching-bucket.yaml
+                  name: thanos-storage
+          livenessProbe:
+            failureThreshold: 4
+            httpGet:
+              path: /-/healthy
+              port: 10902
+              scheme: HTTP
+            periodSeconds: 30
+          readinessProbe:
+            failureThreshold: 20
+            httpGet:
+              path: /-/ready
+              port: 10902
+              scheme: HTTP
+            periodSeconds: 5
+          resources:
+            limits:
+              cpu: 420m
+              memory: 420Mi
+            requests:
+              cpu: 123m
+              memory: 123Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+            runAsGroup: 65532
+            runAsNonRoot: true
+            runAsUser: 65534
+            seccompProfile:
+              type: RuntimeDefault
+          terminationMessagePolicy: FallbackToLogsOnError
+          volumeMounts:
+            - name: data
+              mountPath: /var/thanos/store
+              readOnly: false
       securityContext:
         fsGroup: 65534
         runAsGroup: 65532
@@ -86,14 +86,14 @@ spec:
         seccompProfile:
           type: RuntimeDefault
   volumeClaimTemplates:
-  - metadata:
-      name: data
-      labels:
-        app.kubernetes.io/name: thanos-store
-    spec:
-      storageClassName: ssd-gp1x1
-      accessModes:
-      - ReadWriteOnce
-      resources:
-        requests:
-          storage: 15Gi
+    - metadata:
+        name: data
+        labels:
+          app.kubernetes.io/name: thanos-store
+      spec:
+        storageClassName: ssd-gp1x1
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 15Gi
