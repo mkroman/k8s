@@ -1,33 +1,28 @@
 redis:
-  kubectl:
-    image:
-      registry: docker.io
-      repository: bitnamilegacy/kubectl
-      # Use an older tag that doesn't enforce FIPS strict mode
-      tag: 1.32.4
+  architecture: replication
+  # kubectl:
+  #   image:
+  #     registry: docker.io
+  #     repository: bitnamilegacy/kubectl
+  #     # Use an older tag that doesn't enforce FIPS strict mode
+  #     tag: 1.32.4
+
   auth:
     # -- Enable authentication.
     enabled: true
+    # -- Enable authentication on sentinels.
+    sentinel: true
     # -- Use our existing sealed secret.
     existingSecret: redis-auth
     # -- The key that contains our password.
     existingSecretPasswordKey: password
 
-  sentinel:
-    # Enable Redis Sentinal for HA.
-    enabled: true
-
-    # Configure the master service resource.
-    masterService:
-      # Create a master service that points to the current master.
+  master:
+    persistence:
+      # -- Enable persistence.
       enabled: true
-
-  replica:
-    automountServiceAccountToken: true
-
-  rbac:
-    # Create RBAC resources.
-    create: true
+      # -- Use a fast non-replicated volume.
+      storageClass: ssd-gp1x1
 
   metrics:
     # Enable metrics.
@@ -39,3 +34,24 @@ redis:
       # Make the ServiceMonitor discoverable by prometheus.
       additionalLabels:
         metrics.uplink.io/monitor: prometheus
+
+  rbac:
+    # Create RBAC resources.
+    create: true
+
+  replica:
+    # -- automountServiceAccountToken: true
+    persistence:
+      # -- Enable persistence.
+      enabled: true
+      # -- Use a fast non-replicated volume.
+      storageClass: ssd-gp1x1
+
+  sentinel:
+    # Enable Redis Sentinal for HA.
+    enabled: true
+
+    # Configure the master service resource.
+    masterService:
+      # Create a master service that points to the current master.
+      enabled: true
