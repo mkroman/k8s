@@ -24,6 +24,8 @@ redis:
       # -- Use a fast non-replicated volume.
       storageClass: ssd-gp1x1
 
+    resourcesPreset: "medium"
+
   metrics:
     # Enable metrics.
     enabled: true
