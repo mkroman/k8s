@@ -1,5 +1,5 @@
 redis:
-  architecture: replication
+  architecture: standalone
   # kubectl:
   #   image:
   #     registry: docker.io
@@ -49,7 +49,7 @@ redis:
 
   sentinel:
     # Enable Redis Sentinal for HA.
-    enabled: true
+    enabled: false
 
     # Configure the master service resource.
     masterService:
