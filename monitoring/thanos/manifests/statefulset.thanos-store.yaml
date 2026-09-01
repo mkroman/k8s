@@ -45,14 +45,14 @@ spec:
                   key: caching-bucket.yaml
                   name: thanos-storage
           livenessProbe:
-            failureThreshold: 4
+            failureThreshold: 20
             httpGet:
               path: /-/healthy
               port: 10902
               scheme: HTTP
             periodSeconds: 30
           readinessProbe:
-            failureThreshold: 20
+            failureThreshold: 40
             httpGet:
               path: /-/ready
               port: 10902
