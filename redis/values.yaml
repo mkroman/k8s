@@ -11,7 +11,7 @@ redis:
     # -- Enable authentication.
     enabled: true
     # -- Enable authentication on sentinels.
-    sentinel: true
+    sentinel: false
     # -- Use our existing sealed secret.
     existingSecret: redis-auth
     # -- The key that contains our password.
@@ -34,6 +34,47 @@ redis:
       # Make the ServiceMonitor discoverable by prometheus.
       additionalLabels:
         metrics.uplink.io/monitor: prometheus
+
+  networkPolicy:
+    # -- Enable the NetworkPolicy resource.
+    enabled: true
+
+    allowExternal: false # Restricts port 6379 & 26379 to labeled pods only
+    allowExternalEgress: true
+
+    extraIngress:
+      # Allow Thanos Store pods
+      - from:
+          - namespaceSelector:
+              matchLabels:
+                kubernetes.io/metadata.name: monitoring
+            podSelector:
+              matchLabels:
+                app.kubernetes.io/component: store-gateway
+        ports:
+          - port: 6379
+            protocol: TCP
+          - port: 26379
+            protocol: TCP
+
+      # Allow Open WebUI pods
+      - from:
+          - namespaceSelector:
+              matchLabels:
+                kubernetes.io/metadata.name: rwx-openwebui-prod
+            podSelector:
+              matchLabels:
+                app.kubernetes.io/name: open-webui
+        ports:
+          - port: 6379
+            protocol: TCP
+          - port: 26379
+            protocol: TCP
+
+    metrics:
+      allowExternal: false # Restricts port 9121 to specified namespaces only
+      ingressNSMatchLabels:
+        kubernetes.io/metadata.name: monitoring
 
   rbac:
     # Create RBAC resources.
