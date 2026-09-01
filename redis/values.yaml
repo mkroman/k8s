@@ -40,7 +40,7 @@ redis:
     create: true
 
   replica:
-    # -- automountServiceAccountToken: true
+    automountServiceAccountToken: true
     persistence:
       # -- Enable persistence.
       enabled: true
