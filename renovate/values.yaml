@@ -135,7 +135,7 @@ args: []
 #    https://docs.renovatebot.com/examples/self-hosting/#logging
 env:
   LOG_LEVEL: info
-  LOG_FORMAT: plain
+  LOG_FORMAT: json
 
 # -- Extra envFrom sources (Secrets/ConfigMaps) applied after the credential
 #    Secret. Do not use this for the credential Secret itself; use
@@ -148,13 +148,13 @@ envFrom: []
 # https://docs.renovatebot.com/self-hosted-configuration/#persistrepodata
 persistence:
   # -- Create/use a PersistentVolumeClaim for the Renovate working directory.
-  enabled: false
+  enabled: true
   # -- Use an existing PVC instead of creating one.
   existingClaim: ""
   # -- Storage class name for the created PVC. null uses the cluster default.
-  storageClass: null
+  storageClass: ssd-gp1x1
   # -- Requested PVC size.
-  size: 8Gi
+  size: 20Gi
   # -- Access mode for the created PVC.
   accessModes:
     - ReadWriteOnce
