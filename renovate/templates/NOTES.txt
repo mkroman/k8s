@@ -1,0 +1,41 @@
+Renovate {{ .Chart.AppVersion }} has been deployed as a CronJob.
+
+    CronJob:  {{ include "renovate.fullname" . }} (namespace: {{ .Release.Namespace }})
+    Schedule: {{ .Values.cronjob.schedule }} (concurrencyPolicy: {{ .Values.cronjob.concurrencyPolicy }})
+
+{{- $hasCredentials := or .Values.renovate.existingSecret .Values.renovate.secrets }}
+
+{{- if .Values.renovate.existingSecret }}
+Credentials are read from the existing Secret "{{ .Values.renovate.existingSecret }}".
+{{- else if .Values.renovate.secrets }}
+Credentials are managed by this release in Secret "{{ include "renovate.secretName" . }}".
+Note: values-defined secrets end up in your values files - prefer `renovate.existingSecret`.
+{{- else }}
+******************************************************************************
+ACTION REQUIRED - no credentials configured.
+
+Create a Secret with the token for your platform and reference it via
+`renovate.existingSecret` (recommended) or `renovate.secrets`:
+
+  kubectl -n {{ .Release.Namespace }} create secret generic {{ include "renovate.secretName" . }} \
+    --from-literal=RENOVATE_TOKEN='<platform-token>'
+
+  helm upgrade {{ .Release.Name }} --reuse-values \
+    --set renovate.existingSecret={{ include "renovate.secretName" . }}
+
+See: https://docs.renovatebot.com/getting-started/running/#authentication
+******************************************************************************
+{{- end }}
+
+Autodiscovery is enabled for repositories tagged "managed-by-renovate".
+Tag your repositories with that topic (or adjust `renovate.config`) for Renovate
+to pick them up. https://docs.renovatebot.com/self-hosted-configuration/#autodiscovertopics
+
+Tips:
+  * Test first with a dry run:  helm upgrade {{ .Release.Name }} --reuse-values \
+                                  --set renovate.config.dryRun=full
+  * Trigger a run immediately:  kubectl -n {{ .Release.Namespace }} create job \
+                                  --from=cronjob/{{ include "renovate.fullname" . }} renovate-manual
+  * Inspect logs:               kubectl -n {{ .Release.Namespace }} logs job/renovate-manual
+  * Keep the bot updated:       bump image.tag regularly (docs recommend pinning
+                                each release). https://docs.renovatebot.com/getting-started/running/#docker-images

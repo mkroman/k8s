@@ -1,74 +1,251 @@
-image:
-  repository: renovate/renovate
-  pullPolicy: IfNotPresent
-  tag: "latest@sha256:0233bd7dc95ccedd851cc1d6b4d9510ca001b22ccf55b251a0663583102e40c7"
+# Default values for the renovate chart.
+#
+# Official Renovate documentation:
+#   Self-hosting guide:          https://docs.renovatebot.com/getting-started/running/
+#   Self-hosted config options:  https://docs.renovatebot.com/self-hosted-configuration/
+#   Kubernetes examples:         https://docs.renovatebot.com/examples/self-hosting/
+#   Security and permissions:    https://docs.renovatebot.com/security-and-permissions/
+#   Image tags:                  https://hub.docker.com/r/renovate/renovate/tags
 
-imagePullSecrets: []
-
+# -- Override the name of the chart (used in resource names).
 nameOverride: ""
+
+# -- Override the full release name (used in resource names).
 fullnameOverride: ""
 
+image:
+  # -- Registry prefix. Leave empty for Docker Hub, e.g. "ghcr.io/renovatebot".
+  registry: ""
+  # -- Image repository. The default ("slim") flavor downloads language tooling at
+  #    runtime; per the docs this flavor is recommended for most users.
+  #    https://docs.renovatebot.com/getting-started/running/#docker-images
+  repository: renovate/renovate
+  # -- Image tag. MUST be a pinned version per the official recommendation to
+  #    keep the bot up to date. Append "-full" for the (several GB) image with
+  #    pre-installed tooling, e.g. "44.56.3-full".
+  #    Defaults to .Chart.AppVersion when empty.
+  tag: ""
+  # -- Image pull policy.
+  pullPolicy: IfNotPresent
+
+# -- List of image pull secrets for private registries.
+imagePullSecrets: []
+
 cronjob:
-  # -- The schedule in Cron format, see https://en.wikipedia.org/wiki/Cron.
-  schedule: '@hourly'
+  # -- Cron schedule. The official docs recommend running Renovate hourly.
+  #    https://docs.renovatebot.com/getting-started/running/#hosting-renovate
+  schedule: "@hourly"
+  # -- Concurrency policy. "Forbid" prevents overlapping runs, as shown in the
+  #    official Kubernetes example.
+  concurrencyPolicy: Forbid
+  # -- Set to true to temporarily suspend all runs.
+  suspend: false
+  # -- Number of successful finished jobs to retain.
+  successfulJobsHistoryLimit: 3
+  # -- Number of failed finished jobs to retain (logs are useful for
+  #    troubleshooting token/config problems).
+  failedJobsHistoryLimit: 3
+  # -- Deadline in seconds for starting the job if it misses its schedule.
+  #    Set to a number (e.g. 300) to enforce; null means "no deadline".
+  startingDeadlineSeconds: null
+  # -- Time zone for the schedule, e.g. "Etc/UTC" (requires Kubernetes >= 1.27).
+  timeZone: ""
+  # -- Auto-delete finished Job/Pods after this many seconds.
+  #    Set to a number (e.g. 600) to enable; null disables TTL cleanup.
+  ttlSecondsAfterFinished: null
+  # -- Pod retry count for failed runs. 0 avoids hammering the platform API
+  #    (and burning rate limits) when a run fails repeatedly; failures are
+  #    retried at the next schedule tick instead.
+  backoffLimit: 0
+  # -- Maximum wall-clock duration of a single run in seconds.
+  #    Set to a number to enforce; null disables the deadline.
+  activeDeadlineSeconds: null
+  # -- Additional annotations for the CronJob object.
+  annotations: {}
 
-persistence:
-  # -- Enable provisioning of a persistent volume.
-  enabled: true
-
-  # -- The desired access modes the volume should have.
-  #
-  # Reference: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#access-modes
-  accessModes:
-  - ReadWriteOnce
-
-  # -- The minimum storage size to request.
-  size: 1Gi
-
-  # -- The name of the StorageClass to use to provivision the dynamic block
-  # volume.
-  storageClassName: ""
-
-# -- Renovate configuration - this is converted directly to JSON.
 renovate:
-  # -- Enable autodiscovery of repositories.
-  autodiscovery: true
+  # Renovate global (self-hosted) configuration, rendered as JSON into a
+  # ConfigMap mounted via RENOVATE_CONFIG_FILE=/opt/renovate/config.json.
+  #
+  # These options are administrator-only; repository-level options belong in
+  # each repo's own renovate.json instead.
+  # https://docs.renovatebot.com/self-hosted-configuration/
+  #
+  # This default configuration enables autodiscovery of every repository the
+  # bot account can access that carries the "managed-by-renovate" topic.
+  # https://docs.renovatebot.com/configuration-options/
+  config:
+    autodiscover: true
+    # Limit autodiscovery to repositories tagged with this topic.
+    autodiscoverTopics:
+      - managed-by-renovate
+    platform: github
+    # Must match the dedicated bot account used for the token.
+    # https://docs.renovatebot.com/getting-started/running/#authentication
+    gitAuthor: "Renovate Bot <173308+mkroman@users.noreply.github.com>"
+    assignees:
+      - mkroman
+    prFooter: ""
+    reviewers: []
+    # Cache repository metadata between runs for faster, cheaper runs.
+    # https://docs.renovatebot.com/self-hosted-configuration/#repositorycache
+    repositoryCache: enabled
+    onboardingConfig:
+      extends:
+        - config:recommended
+        - config:best-practices
+        - ":disableRateLimiting"
 
-  # -- Limit autodiscovery to these topics.
-  autodiscoveryTopics: [managed-by-renovate]
+  # -- Use an existing ConfigMap instead of rendering `renovate.config`.
+  #    It must contain a `config.json` key. When set, the inline config above
+  #    is ignored and no ConfigMap is created by the chart.
+  existingConfigMap: ""
 
-  platform: github
+  # -- Preferred credential handling (recommended): reference an
+  #    externally-managed Secret that holds environment variables such as:
+  #      RENOVATE_TOKEN            - token for the configured platform
+  #      RENOVATE_GITHUB_COM_TOKEN - github.com PAT used for changelogs when
+  #                                  hosting on another platform
+  #    https://docs.renovatebot.com/examples/self-hosting/
+  existingSecret: ""
 
-  gitAuthor: "Renovate Bot <renovate.bot@maero.dk>"
+  # -- Opt-in alternative to `existingSecret`: create a Secret from this map.
+  #    Keys are env variable names, values are raw (stringData) values.
+  #    Only use for testing - prefer `existingSecret` to keep tokens out of
+  #    values files.
+  #    Example:
+  #      secrets:
+  #        RENOVATE_TOKEN: ghp_exampletoken
+  secrets: {}
 
-  onboardingConfig:
-    extends:
-    - config:recommended
+  # -- Directory (mounted from the ConfigMap) holding config.json.
+  configMountPath: /opt/renovate
+  # -- Working directory for cloned repositories and caches
+  #    (RENOVATE_BASE_DIR), backed by the `persistence` volume below.
+  #    https://docs.renovatebot.com/examples/self-hosting/#filedirectory-usage
+  baseDirPath: /tmp/renovate
 
-podAnnotations: {}
+# -- Additional CLI arguments passed to the `renovate` binary,
+#    e.g. ["company/repo-one", "company/repo-two"].
+#    Unnecessary when autodiscover is enabled.
+args: []
 
-podSecurityContext: {}
-  # fsGroup: 2000
+# -- Plain environment variables for the Renovate container.
+#    Useful for LOG_LEVEL / LOG_FORMAT (use "info"/"json" for parsable logs):
+#    https://docs.renovatebot.com/examples/self-hosting/#logging
+env:
+  LOG_LEVEL: info
+  LOG_FORMAT: plain
 
-securityContext:
+# -- Extra envFrom sources (Secrets/ConfigMaps) applied after the credential
+#    Secret. Do not use this for the credential Secret itself; use
+#    `renovate.existingSecret`.
+envFrom: []
+
+# Persist /tmp/renovate (repositories + caches) in a PersistentVolumeClaim.
+# With an emptyDir (default) the cache is cold on every run; enabling a PVC
+# makes `repositoryCache: enabled` (and persistRepoData) effective across runs.
+# https://docs.renovatebot.com/self-hosted-configuration/#persistrepodata
+persistence:
+  # -- Create/use a PersistentVolumeClaim for the Renovate working directory.
+  enabled: false
+  # -- Use an existing PVC instead of creating one.
+  existingClaim: ""
+  # -- Storage class name for the created PVC. null uses the cluster default.
+  storageClass: null
+  # -- Requested PVC size.
+  size: 8Gi
+  # -- Access mode for the created PVC.
+  accessModes:
+    - ReadWriteOnce
+  # -- Options for the default emptyDir volume (used when persistence is
+  #    disabled), e.g. "8Gi". Empty string means no size limit.
+  emptyDir:
+    sizeLimit: ""
+
+serviceAccount:
+  # -- Create a dedicated ServiceAccount. Renovate needs no Kubernetes API
+  #    access, so token mounting is disabled by default.
+  create: true
+  # -- Mount the ServiceAccount token into pods. Keep false unless a manager
+  #    requires Kubernetes API access.
+  automount: false
+  # -- Name of the ServiceAccount. Defaults to the release fullname when
+  #    creating, or "default" when not creating.
+  name: ""
+  # -- Additional annotations for the ServiceAccount.
+  annotations: {}
+
+podSecurityContext:
+  # The official image runs as UID/GID 12021.
+  # https://docs.renovatebot.com/examples/self-hosting/#self-signed-tlsssl-certificates
+  runAsNonRoot: true
+  runAsUser: 12021
+  runAsGroup: 12021
+  fsGroup: 12021
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false
   capabilities:
     drop:
-    - ALL
-  allowPrivilegeEscalation: false
-  readOnlyRootFilesystem: true
-  runAsNonRoot: true
-  runAsUser: 1000
+      - ALL
 
+# -- Container resource requests/limits. Renovate is memory-hungry on large
+#    repositories; raise the memory limit if runs get OOM-killed.
 resources:
-  limits:
-    cpu: 1
-    memory: 512Mi
   requests:
     cpu: 100m
-    memory: 128Mi
+    memory: 512Mi
+  limits:
+    memory: 1Gi
 
+# -- Priority class name for the pod.
+priorityClassName: ""
+
+# -- Labels added to the pod template.
+podLabels: {}
+# -- Annotations added to the pod template (e.g. for reloader or monitoring).
+podAnnotations: {}
+
+# -- Node selector for the pod.
 nodeSelector: {}
-
+# -- Tolerations for the pod.
 tolerations: []
-
+# -- Affinity rules for the pod.
 affinity: {}
+
+networkPolicy:
+  # -- Create a NetworkPolicy restricting pod egress. Renovate needs DNS plus
+  #    HTTPS (and optionally SSH) to the platform and package registries.
+  enabled: false
+  # -- Egress rules. Defaults allow DNS and outbound web traffic; tighten the
+  #    0.0.0.0/0 rules to your platform/registry CIDRs for real isolation.
+  egress:
+    # DNS resolution
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    # Platform APIs, git over HTTPS, and package registries
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - port: 80
+          protocol: TCP
+        - port: 443
+          protocol: TCP
+        - port: 22
+          protocol: TCP
+
+# -- Additional volumes for the pod (e.g. SSH keys or custom CA certificates).
+#    https://docs.renovatebot.com/examples/self-hosting/#kubernetes-for-gitlab-using-git-over-ssh
+extraVolumes: []
+# -- Additional volumeMounts for the Renovate container.
+extraVolumeMounts: []

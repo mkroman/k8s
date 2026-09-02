@@ -1,5 +1,39 @@
 apiVersion: v2
-description: Personal deployment of the Renovate bot
 name: renovate
+description: >-
+  Self-hosted Renovate (dependency update automation) deployed on Kubernetes as
+  a scheduled CronJob, following the official self-hosting guidance at
+  https://docs.renovatebot.com/
 type: application
 version: 0.1.0
+appVersion: "44.56.3"
+kubeVersion: ">=1.21.0-0"
+home: https://docs.renovatebot.com/
+icon: https://docs.renovatebot.com/assets/images/logo.png
+sources:
+  - https://github.com/renovatebot/renovate
+keywords:
+  - renovate
+  - dependency-updates
+  - automation
+  - cronjob
+maintainers:
+  - name: mkroman
+annotations:
+  artifacthub.io/license: AGPL-3.0-only
+  # Default image; overridden when image.tag/image.registry change. Pinned
+  # versions only, per the Helm image best practice.
+  artifacthub.io/images: |
+    - name: renovate
+      image: renovate/renovate:44.56.3
+  artifacthub.io/links: |-
+    - name: Running Renovate (self-hosting guide)
+      url: https://docs.renovatebot.com/getting-started/running/
+    - name: Self-hosted configuration options
+      url: https://docs.renovatebot.com/self-hosted-configuration/
+    - name: Kubernetes self-hosting examples
+      url: https://docs.renovatebot.com/examples/self-hosting/
+    - name: Security and permissions
+      url: https://docs.renovatebot.com/security-and-permissions/
+    - name: Docker image tags
+      url: https://hub.docker.com/r/renovate/renovate/tags

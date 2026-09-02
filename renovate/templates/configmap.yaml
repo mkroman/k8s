@@ -1,9 +1,11 @@
+{{- if and (not .Values.renovate.existingConfigMap) .Values.renovate.config }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ include "renovate.fullname" . }}
+  name: {{ include "renovate.fullname" . | quote }}
   labels:
     {{- include "renovate.labels" . | nindent 4 }}
 data:
-  config.json: |-
-    {{- .Values.renovate | toPrettyJson | nindent 4 }}
+  config.json: |
+    {{- toPrettyJson .Values.renovate.config | nindent 4 }}
+{{- end }}

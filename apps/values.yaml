@@ -190,6 +190,18 @@ projects:
       - group: ""
         kind: LimitRange
 
+  - name: renovate
+    description: "Self-hosted Renovate (dependency update automation)"
+    destinations:
+      - namespace: renovate
+    sourceRepos:
+      - https://github.com/mkroman/k8s
+    namespaceResourceBlacklist:
+      - group: ""
+        kind: ResourceQuota
+      - group: ""
+        kind: LimitRange
+
   - name: rwx
     description: "rwx.im domain resources (databases, certificates, services)"
     destinations:
@@ -283,6 +295,7 @@ namespaces:
   - name: nats
   - name: prometheus-operator
   - name: quickwit-prod
+  - name: renovate
   - name: rwx-redis-prod
   - name: rwx-openwebui-prod
   - name: traefik
@@ -451,6 +464,12 @@ newApplications:
     source:
       repoURL: https://github.com/mkroman/k8s
       path: redis
+
+  - name: renovate
+    project: renovate
+    source:
+      repoURL: https://github.com/mkroman/k8s
+      path: renovate
 
   - name: sealed-secrets
     project: sealed-secrets

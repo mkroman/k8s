@@ -1,56 +1,140 @@
+{{- $fullname := include "renovate.fullname" . }}
+{{- $hasConfigFile := or .Values.renovate.existingConfigMap .Values.renovate.config }}
 apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: {{ include "renovate.fullname" . }}
+  name: {{ $fullname }}
   labels:
     {{- include "renovate.labels" . | nindent 4 }}
+  {{- with .Values.cronjob.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
-  concurrencyPolicy: Forbid
+  schedule: {{ required "cronjob.schedule must be set (e.g. \"@hourly\")" .Values.cronjob.schedule | quote }}
+  concurrencyPolicy: {{ .Values.cronjob.concurrencyPolicy }}
+  suspend: {{ .Values.cronjob.suspend }}
+  successfulJobsHistoryLimit: {{ .Values.cronjob.successfulJobsHistoryLimit }}
+  failedJobsHistoryLimit: {{ .Values.cronjob.failedJobsHistoryLimit }}
+  {{- if not (kindIs "invalid" .Values.cronjob.startingDeadlineSeconds) }}
+  startingDeadlineSeconds: {{ .Values.cronjob.startingDeadlineSeconds }}
+  {{- end }}
+  {{- with .Values.cronjob.timeZone }}
+  timeZone: {{ . | quote }}
+  {{- end }}
   jobTemplate:
     spec:
+      backoffLimit: {{ .Values.cronjob.backoffLimit }}
+      {{- if not (kindIs "invalid" .Values.cronjob.activeDeadlineSeconds) }}
+      activeDeadlineSeconds: {{ .Values.cronjob.activeDeadlineSeconds }}
+      {{- end }}
+      {{- if not (kindIs "invalid" .Values.cronjob.ttlSecondsAfterFinished) }}
+      ttlSecondsAfterFinished: {{ .Values.cronjob.ttlSecondsAfterFinished }}
+      {{- end }}
       template:
         metadata:
+          labels:
+            {{- include "renovate.selectorLabels" . | nindent 12 }}
+            {{- with .Values.podLabels }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
           {{- with .Values.podAnnotations }}
           annotations:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-          labels:
-            {{- include "renovate.selectorLabels" . | nindent 12 }}
         spec:
+          restartPolicy: Never
+          serviceAccountName: {{ include "renovate.serviceAccountName" . | quote }}
+          automountServiceAccountToken: {{ .Values.serviceAccount.automount }}
           {{- with .Values.imagePullSecrets }}
           imagePullSecrets:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-          automountServiceAccountToken: false
-          containers:
-          - name: renovate
-            securityContext:
-              {{- toYaml .Values.securityContext | nindent 14 }}
-            image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
-            imagePullPolicy: {{ .Values.image.pullPolicy }}
-            {{- with .Values.resources }}
-            resources: 
-              {{- . | toYaml | nindent 14 }}
-            {{- end }}
-            env:
-            - name: LOG_LEVEL
-              value: debug
-            - name: RENOVATE_CONFIG_FILE
-              value: /opt/renovate/config.js
-            envFrom:
-            - secretRef:
-                name: renovate-env
-            volumeMounts:
-            - name: config
-              mountPath: /opt/renovate
-            - name: cache
-              mountPath: /tmp/renovate
-          restartPolicy: Never
+          {{- with .Values.podSecurityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.priorityClassName }}
+          priorityClassName: {{ . | quote }}
+          {{- end }}
+          {{- with .Values.nodeSelector }}
+          nodeSelector:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.affinity }}
+          affinity:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.tolerations }}
+          tolerations:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           volumes:
-          - name: config
-            configMap:
-              name: renovate-config
-          - name: cache
-            persistentVolumeClaim:
-              claimName: {{ include "renovate.fullname" . }}-cache
-  schedule: {{ .Values.cronjob.schedule | quote }}
+            {{- if $hasConfigFile }}
+            - name: config
+              configMap:
+                name: {{ default $fullname .Values.renovate.existingConfigMap | quote }}
+            {{- end }}
+            {{- if .Values.persistence.enabled }}
+            - name: work
+              persistentVolumeClaim:
+                claimName: {{ default $fullname .Values.persistence.existingClaim | quote }}
+            {{- else if .Values.persistence.emptyDir.sizeLimit }}
+            - name: work
+              emptyDir:
+                sizeLimit: {{ .Values.persistence.emptyDir.sizeLimit }}
+            {{- else }}
+            - name: work
+              emptyDir: {}
+            {{- end }}
+            {{- with .Values.extraVolumes }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          containers:
+            - name: renovate
+              image: {{ include "renovate.image" . | quote }}
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              {{- with .Values.args }}
+              args:
+                {{- toYaml . | nindent 16 }}
+              {{- end }}
+              env:
+                {{- if $hasConfigFile }}
+                - name: RENOVATE_CONFIG_FILE
+                  value: {{ printf "%s/config.json" .Values.renovate.configMountPath | quote }}
+                {{- end }}
+                - name: RENOVATE_BASE_DIR
+                  value: {{ .Values.renovate.baseDirPath | quote }}
+                {{- range $key, $value := .Values.env }}
+                - name: {{ $key }}
+                  value: {{ $value | quote }}
+                {{- end }}
+              {{- if or .Values.renovate.existingSecret .Values.renovate.secrets .Values.envFrom }}
+              envFrom:
+                {{- if or .Values.renovate.existingSecret .Values.renovate.secrets }}
+                - secretRef:
+                    name: {{ include "renovate.secretName" . }}
+                {{- end }}
+                {{- with .Values.envFrom }}
+                {{- toYaml . | nindent 16 }}
+                {{- end }}
+              {{- end }}
+              volumeMounts:
+                {{- if $hasConfigFile }}
+                - name: config
+                  mountPath: {{ .Values.renovate.configMountPath | quote }}
+                  readOnly: true
+                {{- end }}
+                - name: work
+                  mountPath: {{ .Values.renovate.baseDirPath | quote }}
+                {{- with .Values.extraVolumeMounts }}
+                {{- toYaml . | nindent 16 }}
+                {{- end }}
+              {{- with .Values.containerSecurityContext }}
+              securityContext:
+                {{- toYaml . | nindent 16 }}
+              {{- end }}
+              {{- with .Values.resources }}
+              resources:
+                {{- toYaml . | nindent 16 }}
+              {{- end }}

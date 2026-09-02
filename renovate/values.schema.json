@@ -1,0 +1,236 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "renovate chart values",
+  "type": "object",
+  "properties": {
+    "nameOverride": {
+      "type": "string",
+      "description": "Override the name of the chart."
+    },
+    "fullnameOverride": {
+      "type": "string",
+      "description": "Override the full release name."
+    },
+    "image": {
+      "type": "object",
+      "properties": {
+        "registry": {
+          "type": "string",
+          "description": "Registry prefix; empty for Docker Hub."
+        },
+        "repository": {
+          "type": "string",
+          "description": "Image repository."
+        },
+        "tag": {
+          "type": "string",
+          "description": "Pinned image tag; defaults to .Chart.AppVersion when empty."
+        },
+        "pullPolicy": {
+          "type": "string",
+          "enum": ["Always", "IfNotPresent", "Never"],
+          "description": "Image pull policy."
+        }
+      }
+    },
+    "imagePullSecrets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" }
+        }
+      }
+    },
+    "cronjob": {
+      "type": "object",
+      "required": ["schedule"],
+      "properties": {
+        "schedule": {
+          "type": "string",
+          "description": "Cron schedule, e.g. @hourly."
+        },
+        "concurrencyPolicy": {
+          "type": "string",
+          "enum": ["Allow", "Forbid", "Replace"]
+        },
+        "suspend": {
+          "type": "boolean"
+        },
+        "successfulJobsHistoryLimit": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "failedJobsHistoryLimit": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "startingDeadlineSeconds": {
+          "type": ["integer", "null"],
+          "minimum": 0
+        },
+        "timeZone": {
+          "type": "string"
+        },
+        "ttlSecondsAfterFinished": {
+          "type": ["integer", "null"],
+          "minimum": 0
+        },
+        "backoffLimit": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "activeDeadlineSeconds": {
+          "type": ["integer", "null"],
+          "minimum": 0
+        },
+        "annotations": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        }
+      }
+    },
+    "renovate": {
+      "type": "object",
+      "properties": {
+        "config": {
+          "type": "object",
+          "description": "Renovate global (self-hosted) configuration, rendered to config.json."
+        },
+        "existingConfigMap": {
+          "type": "string",
+          "description": "Existing ConfigMap with a config.json key; disables inline config."
+        },
+        "existingSecret": {
+          "type": "string",
+          "description": "Existing Secret with RENOVATE_* env variables, consumed via envFrom."
+        },
+        "secrets": {
+          "type": "object",
+          "description": "Opt-in: create a Secret from this map of env variable names to values.",
+          "additionalProperties": { "type": "string" }
+        },
+        "configMountPath": {
+          "type": "string"
+        },
+        "baseDirPath": {
+          "type": "string"
+        }
+      }
+    },
+    "args": {
+      "type": "array",
+      "description": "Extra CLI arguments for the renovate binary."
+    },
+    "env": {
+      "type": "object",
+      "description": "Plain environment variables (use renovate.secrets/existingSecret for credentials).",
+      "additionalProperties": {
+        "type": ["string", "number", "boolean"]
+      }
+    },
+    "envFrom": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "persistence": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "existingClaim": {
+          "type": "string"
+        },
+        "storageClass": {
+          "type": ["string", "null"]
+        },
+        "size": {
+          "type": "string"
+        },
+        "accessModes": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "emptyDir": {
+          "type": "object",
+          "properties": {
+            "sizeLimit": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "serviceAccount": {
+      "type": "object",
+      "properties": {
+        "create": {
+          "type": "boolean"
+        },
+        "automount": {
+          "type": "boolean"
+        },
+        "name": {
+          "type": "string"
+        },
+        "annotations": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        }
+      }
+    },
+    "podSecurityContext": {
+      "type": "object"
+    },
+    "containerSecurityContext": {
+      "type": "object"
+    },
+    "resources": {
+      "type": "object",
+      "properties": {
+        "requests": { "type": "object" },
+        "limits": { "type": "object" }
+      }
+    },
+    "priorityClassName": {
+      "type": "string"
+    },
+    "podLabels": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "podAnnotations": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "nodeSelector": {
+      "type": "object"
+    },
+    "tolerations": {
+      "type": "array"
+    },
+    "affinity": {
+      "type": "object"
+    },
+    "networkPolicy": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "egress": {
+          "type": "array"
+        }
+      }
+    },
+    "extraVolumes": {
+      "type": "array"
+    },
+    "extraVolumeMounts": {
+      "type": "array"
+    }
+  }
+}
