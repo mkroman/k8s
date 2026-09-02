@@ -197,10 +197,10 @@ containerSecurityContext:
 #    repositories; raise the memory limit if runs get OOM-killed.
 resources:
   requests:
-    cpu: 100m
+    cpu: 1
     memory: 512Mi
   limits:
-    memory: 1Gi
+    memory: 2Gi
 
 # -- Priority class name for the pod.
 priorityClassName: ""
