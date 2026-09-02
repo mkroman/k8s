@@ -107,7 +107,7 @@ renovate:
   #      RENOVATE_GITHUB_COM_TOKEN - github.com PAT used for changelogs when
   #                                  hosting on another platform
   #    https://docs.renovatebot.com/examples/self-hosting/
-  existingSecret: ""
+  existingSecret: "renovate-env"
 
   # -- Opt-in alternative to `existingSecret`: create a Secret from this map.
   #    Keys are env variable names, values are raw (stringData) values.
