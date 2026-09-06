@@ -22,6 +22,8 @@ spec:
 
     extensions:
       - name: pgvector
+        image:
+          reference: ghcr.io/cloudnative-pg/pgvector:0.8.6-18-trixie
 
   bootstrap:
     recovery:
