@@ -61,6 +61,11 @@ traefik:
         respondingTimeouts:
           readTimeout: "900s"
           idleTimeout: "900s"
+    websecure:
+      transport:
+        respondingTimeouts:
+          readTimeout: "900s"
+          idleTimeout: "900s"
 
   # Configuration providers.
   providers:
