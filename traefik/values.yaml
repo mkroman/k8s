@@ -55,6 +55,13 @@ traefik:
                 summary: "Traefik Down"
                 description: "{{ $labels.pod }} on {{ $labels.nodename }} is down"
 
+  ports:
+    web:
+      transport:
+        respondingTimeouts:
+          readTimeout: "900s"
+          idleTimeout: "900s"
+
   # Configuration providers.
   providers:
     # Enable Kubernetes CRD provider.
