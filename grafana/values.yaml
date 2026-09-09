@@ -17,7 +17,7 @@ grafana:
       # renovate: datasource=docker depName=grafana/grafana-image-renderer
       repository: grafana/grafana-image-renderer
       tag: v5.12.3
-      sha: "sha256:cf36a94431662540a72d2058a43e0cbf72638334475d8216a25a77526a627be7"
+      sha: "cf36a94431662540a72d2058a43e0cbf72638334475d8216a25a77526a627be7"
 
     # Configure deployment of ServiceMonitor for the image renderer.
     serviceMonitor:
