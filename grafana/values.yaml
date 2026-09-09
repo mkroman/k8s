@@ -1,12 +1,14 @@
 grafana:
+  admin:
+    existingSecret: grafana-auth
+
+  envFromSecret: grafana-env
+
   image:
     # renovate: datasource=docker depName=grafana/grafana
     repository: grafana/grafana
     tag: 13.2.1
     sha: ""
-
-  # -- Set the number of replicas to deploy.
-  replicas: 2
 
   imageRenderer:
     image:
@@ -15,9 +17,12 @@ grafana:
       tag: 5.12.3
       sha: ""
 
-  plugins:
-    - quickwit-quickwit-datasource
-    # -- Configure the Grafana instance.
+    # Configure deployment of ServiceMonitor for the image renderer.
+    serviceMonitor:
+      # Enable service monitor for image renderer.
+      enabled: true
+      labels:
+        metrics.uplink.io/monitor: prometheus
 
   grafana.ini:
     server:
@@ -30,7 +35,18 @@ grafana:
   persistence:
     enabled: false
 
-  envFromSecret: grafana-env
+  plugins:
+    - quickwit-quickwit-datasource
+
+  # -- Set the number of replicas to deploy.
+  replicas: 2
+
+  # Configure deployment of ServiceMonitor.
+  serviceMonitor:
+    # Enable deployment of ServiceMonitor.
+    enabled: true
+    labels:
+      metrics.uplink.io/monitor: prometheus
 
   sidecar:
     # -- Enable sidecar that monitors for dashboards from ConfigMaps
@@ -42,15 +58,6 @@ grafana:
       labelValue: "true"
       # -- Only monitor ConfigMaps
       resource: configmap
-
-  admin:
-    existingSecret: grafana-auth
-
-ingressRoute:
-  enabled: true
-  hostname: grafana.infra.rwx.im
-  tls:
-    secretName: grafana.infra.rwx.im-tls
 
 certificate:
   # -- Create the Certificate resource.
@@ -65,3 +72,9 @@ certificate:
     name: letsencrypt-production
   # -- Override the name of the secret that cert-manager will use.
   secretName: ""
+
+ingressRoute:
+  enabled: true
+  hostname: grafana.infra.rwx.im
+  tls:
+    secretName: grafana.infra.rwx.im-tls
