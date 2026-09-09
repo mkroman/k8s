@@ -4,4 +4,5 @@ resources:
   - manifests/objectstore.postgres-backup-b2.yaml
   - manifests/scheduledbackup.postgres.yaml
   - manifests/cluster.postgres.yaml
+  - manifests/podmonitor.yaml
 namespace: rwx

@@ -1,4 +1,5 @@
 resources:
   - ./manifests/cnpg-1.30.0.yaml
   - ./manifests/plugin-barman-cloud-0.15.0.yaml
+  - ./manifests/podmonitor.yaml
 namespace: cnpg-system
