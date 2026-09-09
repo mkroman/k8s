@@ -12,7 +12,6 @@ spec:
   ruleSelector:
     matchLabels:
       prometheus: k8s
-      role: prometheus-rulefiles
 
   alerting:
     alertmanagers:
