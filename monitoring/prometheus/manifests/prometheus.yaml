@@ -13,6 +13,9 @@ spec:
     matchLabels:
       prometheus: k8s
 
+  ruleNamespaceSelector:
+    matchLabels: {}
+
   alerting:
     alertmanagers:
       - name: cluster
