@@ -44,6 +44,8 @@ traefik:
         jobLabel: app.kubernetes.io/instance
         prometheusRule:
           enabled: true
+          additionalLabels:
+            prometheus: k8s
           rules:
             - alert: TraefikDown
               expr: up{job="traefik"} == 0
