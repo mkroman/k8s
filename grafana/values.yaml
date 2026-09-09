@@ -11,6 +11,8 @@ grafana:
     sha: ""
 
   imageRenderer:
+    enabled: true
+
     image:
       # renovate: datasource=docker depName=grafana/grafana-image-renderer
       repository: grafana/grafana-image-renderer
