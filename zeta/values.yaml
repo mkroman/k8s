@@ -14,7 +14,7 @@ nameOverride: ""
 fullnameOverride: ""
 
 # This is for setting Kubernetes Annotations to a Pod.
-# For more information checkout: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/ 
+# For more information checkout: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/
 podAnnotations: {}
 # This is for setting Kubernetes Labels to a Pod.
 # For more information checkout: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
@@ -26,7 +26,7 @@ podSecurityContext: {}
 securityContext:
   capabilities:
     drop:
-    - ALL
+      - ALL
   readOnlyRootFilesystem: true
   runAsNonRoot: true
   runAsUser: 1000
@@ -41,33 +41,30 @@ resources:
 
 # This is to setup the liveness and readiness probes more information can be found here: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/
 # livenessProbe: {}
-  #   httpGet:
-  #     path: /
-  #     port: http
-  # readinessProbe: {}
+#   httpGet:
+#     path: /
+#     port: http
+# readinessProbe: {}
 #   httpGet:
 #     path: /
 #     port: http
 
 # Additional volumes on the output Deployment definition.
-volumes: []
-# - name: foo
-#   secret:
-#     secretName: mysecret
-#     optional: false
+volumes:
+  - name: tmp
+    emptyDir: {}
 
 # Additional volumeMounts on the output Deployment definition.
-volumeMounts: []
-# - name: foo
-#   mountPath: "/etc/foo"
-#   readOnly: true
+volumeMounts:
+  - name: tmp
+    mountPath: "/tmp"
 
 nodeSelector: {}
 
 envFrom:
-- secretRef:
-    name: zeta-env-prod
-    optional: false
+  - secretRef:
+      name: zeta-env-prod
+      optional: false
 
 tolerations: []
 
