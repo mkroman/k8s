@@ -7,7 +7,7 @@ grafana:
   image:
     # renovate: datasource=docker depName=grafana/grafana
     repository: grafana/grafana
-    tag: 13.2.1
+    tag: 13.2.2
     sha: ""
 
   imageRenderer:
