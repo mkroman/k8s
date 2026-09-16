@@ -281,6 +281,11 @@ projects:
       - namespace: zeta-dev
     sourceRepos:
       - https://github.com/mkroman/k8s
+    namespaceResourceBlacklist:
+      - group: ""
+        kind: ResourceQuota
+      - group: ""
+        kind: LimitRange
 
 # List of namespaces to create.
 namespaces:
