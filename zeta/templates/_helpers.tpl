@@ -49,3 +49,34 @@ Selector labels
 app.kubernetes.io/name: {{ include "zeta.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
+
+{{/*
+The name of the service account to use.
+*/}}
+{{- define "zeta.serviceAccountName" -}}
+{{- if .Values.serviceAccount.create }}
+{{- default (include "zeta.fullname" .) .Values.serviceAccount.name }}
+{{- else }}
+{{- default "default" .Values.serviceAccount.name }}
+{{- end }}
+{{- end }}
+
+{{/*
+Renders a scalar or array value as the right-hand side of a TOML assignment.
+Strings are rendered as TOML basic strings (JSON string escapes are a subset of TOML's),
+booleans and numbers as bare literals, arrays as inline arrays. Maps are not supported by
+any plugin setting and fail loudly.
+*/}}
+{{- define "zeta.toTomlValue" -}}
+{{- if kindIs "string" . -}}
+{{ . | toJson }}
+{{- else if kindIs "bool" . -}}
+{{ ternary "true" "false" . }}
+{{- else if kindIs "slice" . -}}
+{{ . | toJson }}
+{{- else if or (kindIs "int" .) (kindIs "int64" .) (kindIs "float64" .) -}}
+{{ . }}
+{{- else -}}
+{{ fail (printf "unsupported TOML value of kind %q (maps are not supported in plugin settings)" (kindOf .)) }}
+{{- end -}}
+{{- end }}

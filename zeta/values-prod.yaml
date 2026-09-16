@@ -1,18 +1,46 @@
+env:
+  - name: TZ
+    value: Europe/Copenhagen
+
 envFrom:
-- secretRef:
-    name: zeta-env-prod
-    optional: false
+  - secretRef:
+      name: zeta-env-prod
+      optional: false
+
+networkPolicy:
+  enabled: true
+
+  additionalEgress:
+    - to:
+        - ipBlock:
+            cidr: 169.254.25.10/32 # Node-local DNS.
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: rwx
+        - podSelector:
+            matchLabels:
+              cnpg.io/cluster: postgres
+      ports:
+        - protocol: TCP
+          port: 5432
 
 zeta:
   irc:
     nickname: zeta
     alt_nicks: ["zet4", "ze74", "zeta_"]
     hostname: irc.rwx.im
+    admin_hostmasks: ["*!mk@rwx.im"]
     tls:
       enabled: true
     channels:
-    - name: "#uplink"
-    - name: "#zeta"
+      - name: "#uplink"
+      - name: "#zeta"
 
   tracing:
-    enabled: true
+    enabled: false

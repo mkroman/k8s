@@ -1,0 +1,45 @@
+{{- if .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "zeta.fullname" . }}
+  labels:
+    {{- include "zeta.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "zeta.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    # The bot only makes outbound connections (IRC, HTTP APIs, the database); it has nothing
+    # worth protecting on the ingress side.
+    - Egress
+  egress:
+    # Cluster-internal DNS.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Everything on the internet: the IRC server, HTTP(S) APIs and media mirroring. Private
+    # and link-local ranges are excluded so the bot cannot reach in-cluster services or the
+    # cloud metadata endpoint. Note this also blocks IPv6, non-RFC1918 pod networks and
+    # link-local DNS caches (e.g. node-local DNS on 169.254.20.10) -- use `additionalEgress`
+    # (or disable the policy) if the database, an OTLP collector or such a resolver runs
+    # inside the cluster.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+              - 100.64.0.0/10
+              - 169.254.0.0/16
+    {{- with .Values.networkPolicy.additionalEgress }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+{{- end }}

@@ -1,4 +1,13 @@
 # Default values for zeta.
+#
+# The `zeta` section mirrors the bot's `config.toml` (see the repository `config.toml` and
+# `zeta/src/config.rs` for the authoritative list of keys and defaults). Every key is optional
+# unless noted; omitted keys fall back to the application's built-in defaults.
+#
+# Secrets (database URL, IRC passwords, plugin API keys, ...) may either be set here (they are
+# rendered into the `config.toml` ConfigMap, which is only Base64-free plain data) or injected as
+# environment variables through `env`/`envFrom`; the `ZETA_`-prefixed environment variables (with
+# `__` separating sections, e.g. `ZETA_IRC__NICK_PASSWORD`) always take precedence over this file.
 
 image:
   repository: ghcr.io/mkroman/zeta
@@ -7,11 +16,22 @@ image:
   # Overrides the image tag whose default is the chart appVersion.
   tag: ""
 
-# This is for the secretes for pulling an image from a private repository more information can be found here: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
+# This is for the secrets for pulling an image from a private repository. More information can be
+# found here: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
 imagePullSecrets: []
 # This is to override the chart name.
 nameOverride: ""
 fullnameOverride: ""
+
+serviceAccount:
+  # Specifies whether a service account should be created (token mounting is disabled either
+  # way -- the bot never talks to the Kubernetes API).
+  create: true
+  # Annotations to add to the service account.
+  annotations: {}
+  # The name of the service account to use. If not set and `create` is true, a name is
+  # generated using the fullname template.
+  name: ""
 
 # This is for setting Kubernetes Annotations to a Pod.
 # For more information checkout: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/
@@ -20,8 +40,10 @@ podAnnotations: {}
 # For more information checkout: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
 podLabels: {}
 
-podSecurityContext: {}
-  # fsGroup: 2000
+# Satisfies the "restricted" Pod Security Standard together with the container securityContext.
+podSecurityContext:
+  seccompProfile:
+    type: RuntimeDefault
 
 securityContext:
   capabilities:
@@ -30,6 +52,7 @@ securityContext:
   readOnlyRootFilesystem: true
   runAsNonRoot: true
   runAsUser: 1000
+  allowPrivilegeEscalation: false
 
 resources:
   limits:
@@ -39,15 +62,21 @@ resources:
     cpu: 100m
     memory: 128Mi
 
-# This is to setup the liveness and readiness probes more information can be found here: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/
-# livenessProbe: {}
-#   httpGet:
-#     path: /
-#     port: http
-# readinessProbe: {}
-#   httpGet:
-#     path: /
-#     port: http
+# Time for the bot to disconnect from the IRC server (QUIT) before the container is killed.
+terminationGracePeriodSeconds: 30
+
+# This is to set up the liveness and readiness probes. More information can be found here:
+# https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/
+#
+# The bot does not expose an HTTP endpoint, so no probes are configured by default; exec
+# probes are an option:
+#
+# livenessProbe:
+#   exec:
+#     command: ["/bin/sh", "-c", "kill -0 1"]
+# readinessProbe:
+#   exec:
+#     command: ["/bin/sh", "-c", "kill -0 1"]
 
 # Additional volumes on the output Deployment definition.
 volumes:
@@ -61,27 +90,301 @@ volumeMounts:
 
 nodeSelector: {}
 
-env:
-  - name: TZ
-    value: Europe/Copenhagen
+# Extra environment variables for the container. Use these (or `envFrom`) to pass secrets such as
+# `ZETA_DATABASE__URL`, `ZETA_IRC__PASSWORD` or plugin API keys (`ZETA_PLUGINS__YOUTUBE__API_KEY`,
+# ...) instead of putting them in the `zeta` values below.
+env: []
 
-envFrom:
-  - secretRef:
-      name: zeta-env-prod
-      optional: false
+envFrom: []
+  # - secretRef:
+  #     name: zeta-env
+  #     optional: false
 
 tolerations: []
 
 affinity: {}
 
-zeta:
-  irc:
-    nickname: zeta
-    alt_nicks: ["zet4", "ze74", "zeta_"]
-    hostname: irc.rwx.im
-    tls:
-      enabled: true
-    channels: []
+# Egress network policy: the bot only makes outbound connections (IRC, HTTP APIs, the
+# database). The policy allows cluster-internal DNS and internet egress while excluding
+# private and link-local ranges, so the bot cannot reach in-cluster services or the cloud
+# metadata endpoint. Note it also blocks IPv6 and link-local DNS caches (e.g. node-local
+# DNS); add rules here (or disable the policy) if the database, an OTLP collector or such
+# a resolver runs inside the cluster.
+networkPolicy:
+  enabled: true
+  # Additional egress rules appended to the policy, e.g. for an in-cluster postgres:
+  # additionalEgress:
+  #   - to:
+  #       - namespaceSelector:
+  #           matchLabels:
+  #             kubernetes.io/metadata.name: databases
+  #     ports:
+  #       - protocol: TCP
+  #         port: 5432
+  additionalEgress: []
 
+# Zeta application configuration, rendered into the `config.toml` ConfigMap.
+zeta:
+  # Database Configuration.
+  database:
+    # PostgreSQL connection string. Prefer overriding this with the `ZETA_DATABASE__URL`
+    # environment variable (e.g. from a Secret) in production.
+    url: "postgresql://user:changeme@localhost/zeta_development"
+    # The maximum idle duration for individual connections (humantime string).
+    # Defaults to "5s" when omitted.
+    idle_timeout: "5s"
+    # The maximum number of connections that the database pool should maintain.
+    # Defaults to 5 when omitted.
+    max_connections: 5
+
+  # IRC Configuration.
+  irc:
+    # The client's nickname.
+    nickname: zeta
+
+    # Alternative nicknames for the client, if the default is taken.
+    alt_nicks: ["zet4", "ze74", "zeta_"]
+
+    # The hostname of the server to connect to.
+    hostname: irc.rwx.im
+
+    # The port number of the server to connect to.
+    # Defaults to 6697 when TLS is enabled, 6667 otherwise.
+    # port: 6697
+
+    # The client's username.
+    # username: zeta
+
+    # The client's real name.
+    # realname: Zeta
+
+    # The password to connect to the server.
+    # password: ""
+
+    # The client's NICKSERV password.
+    # nick_password: ""
+
+    # Whether the client should use NickServ GHOST to reclaim its primary nickname if it is in
+    # use. This has no effect if `nick_password` is not set.
+    # should_ghost: true
+
+    # The encoding type used for this connection. This is typically UTF-8, but could be
+    # something else.
+    # encoding: UTF-8
+
+    # Hostmasks of admin users, in `nick!user@hostname` form where any of the three components
+    # may contain wildcards (`*` or `?`). Admins are authorized to manage URL and sender filters
+    # with the `.filter` command; when unset, nobody is an admin.
+    # admin_hostmasks: ["mk!mk@*", "*!*@example.com"]
+
+    # TLS Configuration.
+    tls:
+      # Toggle the use of TLS.
+      enabled: true
+
+    # List of channels to join.
+    channels: []
+      # - name: "#zeta"
+      #   # The key to the channel if it's password protected.
+      #   key: secret
+
+  # HTTP Configuration.
+  http:
+    # The duration before an HTTP request times out (humantime string).
+    # timeout: "30s"
+    # The `User-Agent` header sent with HTTP requests.
+    # user_agent: "Mozilla/5.0 (X11; Linux x86_64; rv:155.0) Gecko/20100101 Firefox/155.0"
+
+  # Media mirroring, shared by the plugins that mirror media (tiktok, reddit).
+  #
+  # Credentials fall back to the `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` and `S3_BUCKET_NAME`
+  # environment variables when unset; mirroring is disabled when the configuration is incomplete.
+  # Leave this section empty to disable mirroring.
+  mirror: {}
+    # The directory that downloads are buffered in. When unset, a random subdirectory of the
+    # system temporary directory is used and removed when the bot shuts down. The filesystem is
+    # mounted read-only by default, so set this to a writable volume if mirroring is used.
+    # download_dir: /var/cache/zeta/mirror
+    # The maximum size of a file to download, as passed to `yt-dlp`.
+    # max_filesize: 500M
+    # The maximum duration of a download before it gets killed (humantime string).
+    # download_timeout: 10m
+    # The maximum number of downloads that run concurrently.
+    # max_concurrent_downloads: 4
+    # The command used to run `yt-dlp`. Falls back to the `ZETA_YTDLP_COMMAND` environment
+    # variable when unset.
+    # ytdlp_command: yt-dlp
+    # s3_access_key_id: "..."
+    # s3_secret_access_key: "..."
+    # s3_bucket_name: "..."
+    # The S3 region. Falls back to the `S3_REGION` environment variable, and to "auto" when
+    # neither is set.
+    # s3_region: auto
+    # The endpoint URL for S3-compatible services. Falls back to the `S3_ENDPOINT` environment
+    # variable when unset.
+    # s3_endpoint: https://...
+
+  # Plugin Configuration.
+  #
+  # Every bundled plugin has a section keyed by its name, with an `enabled` toggle (default
+  # true). Sections that are omitted entirely leave the plugin enabled with its default
+  # settings. The chart validates section keys and settings at install time; see
+  # `values.schema.json` and the repository `config.toml` for the available settings per plugin.
+  plugins: {}
+    # alert:
+    #   enabled: true
+    #   # How long the scheduler waits before retrying after a failed tick.
+    #   retry_delay: 30s
+    #   # The maximum number of pending alerts a user may have.
+    #   max_pending_per_user: 50
+    #
+    # chaturbate:
+    #   enabled: true
+    #
+    # choices:
+    #   enabled: true
+    #   or_keywords: ["eller"]
+    #   option_separator: ", "
+    #
+    # coinmarketcap:
+    #   enabled: true
+    #   api_key: "..."
+    #   default_currency: USD
+    #   cache_ttl: 24h
+    #   max_name_typos: 2
+    #
+    # dendanskeordbog:
+    #   enabled: true
+    #   show_morphology: true
+    #   show_etymology: true
+    #   show_examples: true
+    #
+    # dig:
+    #   enabled: true
+    #   nameservers: ["1.1.1.1", "1.0.0.1", "2606:4700:4700::1111", "2606:4700:4700::1001"]
+    #
+    # filter:
+    #   enabled: true
+    #
+    # gay:
+    #   enabled: true
+    #
+    # geoip:
+    #   enabled: true
+    #   api_key: "..."
+    #
+    # github:
+    #   enabled: true
+    #   token: "..."
+    #
+    # health:
+    #   enabled: true
+    #
+    # help:
+    #   enabled: true
+    #
+    # howlongtobeat:
+    #   enabled: true
+    #
+    # imdb:
+    #   enabled: true
+    #   include_adult: true
+    #   user_country: US
+    #   user_language: en-US
+    #
+    # isitopen:
+    #   enabled: true
+    #   api_key: "..."
+    #
+    # kagi:
+    #   enabled: true
+    #   session_token: "..."
+    #   session_duration: 15m
+    #   language: en-US,en;q=0.9
+    #
+    # notification:
+    #   enabled: true
+    #   max_pending_per_target: 10
+    #
+    # ofn:
+    #   enabled: true
+    #
+    # openweathermap:
+    #   enabled: true
+    #   app_id: "..."
+    #   units: metric  # "metric", "imperial" or "standard"
+    #   language: en
+    #   default_location: Copenhagen
+    #
+    # pornhub:
+    #   enabled: true
+    #
+    # reddit:
+    #   enabled: true
+    #   client_id: "..."
+    #   client_secret: "..."
+    #   prefix: reddit
+    #   public_url_base: https://pub.rwx.im/reddit
+    #
+    # rink:
+    #   enabled: true
+    #
+    # rust_playground:
+    #   enabled: true
+    #   channel: stable  # "stable", "beta" or "nightly"
+    #   mode: debug      # "debug" or "release"
+    #   edition: "2024"  # "2015", "2018", "2021" or "2024"
+    #   max_output_length: 250
+    #
+    # spotify:
+    #   enabled: true
+    #   client_id: "..."
+    #   client_secret: "..."
+    #
+    # string_utils:
+    #   enabled: true
+    #
+    # thingiverse:
+    #   enabled: true
+    #   api_key: "..."
+    #
+    # tiktok:
+    #   enabled: true
+    #   title_length: 150
+    #   prefix: tiktok
+    #   public_url_base: https://pub.rwx.im/tiktok
+    #
+    # titles:
+    #   enabled: true
+    #   ignored_hosts: ["reddit.com", "youtube.com", ...]
+    #   max_redirects: 3
+    #   max_message_length: 400
+    #   max_description_length: 200
+    #
+    # trustpilot:
+    #   enabled: true
+    #   api_key: "..."
+    #   review_domain: dk
+    #
+    # tvmaze:
+    #   enabled: true
+    #
+    # twitch:
+    #   enabled: true
+    #   client_id: "..."
+    #   client_secret: "..."
+    #
+    # urban_dictionary:
+    #   enabled: true
+    #   max_definition_length: 400
+    #
+    # youtube:
+    #   enabled: true
+    #   api_key: "..."
+    #   region_code: US
+    #   safe_search: none  # "none", "moderate" or "strict"
+
+  # Tracing Configuration.
   tracing:
-    enabled: true
+    # Toggle tracing.
+    enabled: false

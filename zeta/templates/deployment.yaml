@@ -5,13 +5,22 @@ metadata:
   labels:
     {{- include "zeta.labels" . | nindent 4 }}
 spec:
+  {{- /*
+    The bot is a singleton: an IRC nickname can only be used by one client at a time, so
+    recreate the pod instead of a rolling update (two instances would fight over the nick).
+  */}}
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       {{- include "zeta.selectorLabels" . | nindent 6 }}
   template:
     metadata:
-      {{- with .Values.podAnnotations }}
       annotations:
+        # Restart the pod when the rendered configuration changes -- ConfigMap volumes are
+        # only updated lazily and the bot does not reload its configuration at runtime.
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+      {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
       {{- end }}
       labels:
@@ -20,6 +29,11 @@ spec:
         {{- toYaml . | nindent 8 }}
         {{- end }}
     spec:
+      serviceAccountName: {{ include "zeta.serviceAccountName" . }}
+      # The bot never talks to the Kubernetes API -- don't mount a service account token.
+      automountServiceAccountToken: false
+      # Allow time for a clean disconnect from the IRC server on shutdown.
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
@@ -43,10 +57,14 @@ spec:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- with .Values.livenessProbe }}
           livenessProbe:
-            {{- toYaml .Values.livenessProbe | nindent 12 }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.readinessProbe }}
           readinessProbe:
-            {{- toYaml .Values.readinessProbe | nindent 12 }}
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:
