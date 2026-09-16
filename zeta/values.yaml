@@ -61,6 +61,10 @@ volumeMounts:
 
 nodeSelector: {}
 
+env:
+  - name: TZ
+    value: Europe/Copenhagen
+
 envFrom:
   - secretRef:
       name: zeta-env-prod
