@@ -23,9 +23,6 @@ networkPolicy:
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: rwx
-        - podSelector:
-            matchLabels:
-              cnpg.io/cluster: postgres
       ports:
         - protocol: TCP
           port: 5432
