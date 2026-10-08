@@ -1,0 +1,493 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "immich chart values",
+  "type": "object",
+  "properties": {
+    "nameOverride": {
+      "type": "string",
+      "description": "Override the name of the chart."
+    },
+    "fullnameOverride": {
+      "type": "string",
+      "description": "Override the full release name."
+    },
+    "env": {
+      "type": "object",
+      "description": "Environment variables shared by both Immich containers (e.g. TZ).",
+      "additionalProperties": {
+        "type": ["string", "number", "boolean"]
+      }
+    },
+    "image": {
+      "type": "object",
+      "properties": {
+        "registry": {
+          "type": "string",
+          "description": "Global image registry prefix."
+        },
+        "pullPolicy": {
+          "type": "string",
+          "enum": ["Always", "IfNotPresent", "Never"],
+          "description": "Global image pull policy."
+        }
+      }
+    },
+    "imagePullSecrets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" }
+        }
+      }
+    },
+    "server": {
+      "type": "object",
+      "properties": {
+        "replicas": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "strategy": {
+          "type": "string",
+          "enum": ["Recreate", "RollingUpdate"]
+        },
+        "image": {
+          "type": "object",
+          "properties": {
+            "registry": {
+              "type": "string",
+              "description": "Overrides image.registry for the server container."
+            },
+            "repository": {
+              "type": "string"
+            },
+            "tag": {
+              "type": "string",
+              "description": "Pinned image tag; defaults to .Chart.AppVersion when empty."
+            },
+            "pullPolicy": {
+              "type": "string",
+              "description": "Overrides image.pullPolicy; empty inherits the global policy."
+            }
+          }
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "service": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["ClusterIP", "NodePort", "LoadBalancer", "ExternalName"]
+            },
+            "port": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 65535
+            },
+            "annotations": {
+              "type": "object",
+              "additionalProperties": { "type": "string" }
+            }
+          }
+        },
+        "env": {
+          "type": "object",
+          "description": "Extra server-only environment variables (use secrets for credentials).",
+          "additionalProperties": {
+            "type": ["string", "number", "boolean"]
+          }
+        },
+        "persistence": {
+          "type": "object",
+          "properties": {
+            "library": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "existingClaim": {
+                  "type": "string"
+                },
+                "storageClass": {
+                  "type": "string"
+                },
+                "size": {
+                  "type": "string"
+                },
+                "accessModes": {
+                  "type": "array",
+                  "items": { "type": "string" }
+                },
+                "annotations": {
+                  "type": "object",
+                  "additionalProperties": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "resources": {
+          "type": "object",
+          "properties": {
+            "requests": { "type": "object" },
+            "limits": { "type": "object" }
+          }
+        },
+        "podLabels": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "podAnnotations": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "nodeSelector": {
+          "type": "object"
+        },
+        "tolerations": {
+          "type": "array"
+        },
+        "affinity": {
+          "type": "object"
+        },
+        "extraVolumes": {
+          "type": "array"
+        },
+        "extraVolumeMounts": {
+          "type": "array"
+        }
+      }
+    },
+    "machineLearning": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Deploy the in-cluster machine learning deployment."
+        },
+        "url": {
+          "type": "string",
+          "description": "External ML service URL (IMMICH_MACHINE_LEARNING_URL)."
+        },
+        "replicas": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "strategy": {
+          "type": "string",
+          "enum": ["Recreate", "RollingUpdate"]
+        },
+        "image": {
+          "type": "object",
+          "properties": {
+            "registry": {
+              "type": "string",
+              "description": "Overrides image.registry for the ML container."
+            },
+            "repository": {
+              "type": "string"
+            },
+            "tag": {
+              "type": "string",
+              "description": "Pinned image tag; append -cuda/-rocm/-openvino/-armnn/-rknn for hardware acceleration."
+            },
+            "pullPolicy": {
+              "type": "string",
+              "description": "Overrides image.pullPolicy; empty inherits the global policy."
+            }
+          }
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "service": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["ClusterIP", "NodePort", "LoadBalancer", "ExternalName"]
+            },
+            "port": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 65535
+            },
+            "annotations": {
+              "type": "object",
+              "additionalProperties": { "type": "string" }
+            }
+          }
+        },
+        "env": {
+          "type": "object",
+          "description": "Extra ML-only environment variables.",
+          "additionalProperties": {
+            "type": ["string", "number", "boolean"]
+          }
+        },
+        "persistence": {
+          "type": "object",
+          "properties": {
+            "cache": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "existingClaim": {
+                  "type": "string"
+                },
+                "storageClass": {
+                  "type": "string"
+                },
+                "size": {
+                  "type": "string"
+                },
+                "accessModes": {
+                  "type": "array",
+                  "items": { "type": "string" }
+                },
+                "annotations": {
+                  "type": "object",
+                  "additionalProperties": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "resources": {
+          "type": "object",
+          "properties": {
+            "requests": { "type": "object" },
+            "limits": { "type": "object" }
+          }
+        },
+        "podLabels": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "podAnnotations": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "nodeSelector": {
+          "type": "object"
+        },
+        "tolerations": {
+          "type": "array"
+        },
+        "affinity": {
+          "type": "object"
+        },
+        "extraVolumes": {
+          "type": "array"
+        },
+        "extraVolumeMounts": {
+          "type": "array"
+        }
+      }
+    },
+    "database": {
+      "type": "object",
+      "description": "External PostgreSQL connection (VectorChord extension required).",
+      "properties": {
+        "host": {
+          "type": "string",
+          "description": "REQUIRED - PostgreSQL host."
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "databaseName": {
+          "type": "string"
+        },
+        "username": {
+          "type": "string",
+          "description": "Inline username; leave empty to read from existingSecret."
+        },
+        "existingSecret": {
+          "type": "string",
+          "description": "Secret holding the database credentials."
+        },
+        "usernameKey": {
+          "type": "string"
+        },
+        "passwordKey": {
+          "type": "string"
+        },
+        "urlKey": {
+          "type": "string",
+          "description": "Read the full connection URL (DB_URL) from this key of existingSecret."
+        },
+        "sslMode": {
+          "type": "string"
+        },
+        "vectorExtension": {
+          "type": "string",
+          "enum": ["", "vectorchord", "pgvector"],
+          "description": "Force a vector extension; empty auto-detects."
+        }
+      }
+    },
+    "redis": {
+      "type": "object",
+      "description": "External Redis/Valkey connection.",
+      "properties": {
+        "host": {
+          "type": "string",
+          "description": "REQUIRED - Redis host."
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "dbIndex": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "username": {
+          "type": "string",
+          "description": "Inline username for testing only."
+        },
+        "password": {
+          "type": "string",
+          "description": "Inline password for testing only; prefer existingSecret."
+        },
+        "existingSecret": {
+          "type": "string",
+          "description": "Secret holding the Redis username and password."
+        },
+        "usernameKey": {
+          "type": "string"
+        },
+        "passwordKey": {
+          "type": "string"
+        }
+      }
+    },
+    "ingress": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "className": {
+          "type": "string"
+        },
+        "annotations": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        },
+        "hosts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "host": { "type": "string" },
+              "paths": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "path": { "type": "string" },
+                    "pathType": {
+                      "type": "string",
+                      "enum": ["Exact", "Prefix", "ImplementationSpecific"]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tls": {
+          "type": "array"
+        }
+      }
+    },
+    "serviceAccount": {
+      "type": "object",
+      "properties": {
+        "create": {
+          "type": "boolean"
+        },
+        "automount": {
+          "type": "boolean"
+        },
+        "name": {
+          "type": "string"
+        },
+        "annotations": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        }
+      }
+    },
+    "podSecurityContext": {
+      "type": "object"
+    },
+    "containerSecurityContext": {
+      "type": "object"
+    },
+    "priorityClassName": {
+      "type": "string"
+    },
+    "podDisruptionBudget": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "minAvailable": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "networkPolicy": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "server": {
+          "type": "object",
+          "properties": {
+            "extraIngress": {
+              "type": "array"
+            },
+            "extraEgress": {
+              "type": "array"
+            }
+          }
+        },
+        "machineLearning": {
+          "type": "object",
+          "properties": {
+            "extraIngress": {
+              "type": "array"
+            },
+            "extraEgress": {
+              "type": "array"
+            }
+          }
+        }
+      }
+    },
+    "commonPodLabels": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    }
+  }
+}

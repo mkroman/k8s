@@ -1,0 +1,56 @@
+{{- if .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "immich.serverName" . }}
+  labels:
+    {{- include "immich.labels" . | nindent 4 }}
+    app.kubernetes.io/component: server
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "immich.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: server
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow ingress to the server port from any source (ingress controllers
+    # and local clients vary). Tighten to your controller's namespace/pod
+    # selectors via networkPolicy.server.extraIngress.
+    - ports:
+        - port: http
+          protocol: TCP
+    {{- with .Values.networkPolicy.server.extraIngress }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  egress:
+    # DNS resolution
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    # OIDC provider, reverse-geocoding and map tiles over HTTPS
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - port: 443
+          protocol: TCP
+    # External PostgreSQL and Redis/Valkey. 0.0.0.0/0 also matches in-cluster
+    # pod IPs; restrict with explicit CIDRs if your CNI supports `except`.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - port: {{ .Values.database.port }}
+          protocol: TCP
+        - port: {{ .Values.redis.port }}
+          protocol: TCP
+    {{- with .Values.networkPolicy.server.extraEgress }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+{{- end }}

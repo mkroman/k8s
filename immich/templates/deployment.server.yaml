@@ -1,0 +1,187 @@
+{{- /*
+The database host is a hard requirement: Immich cannot start without an
+external PostgreSQL instance (with the VectorChord extension available).
+https://immich.app/docs/install/requirements
+*/}}
+{{- $dbHost := required "database.host must be set - this chart does not bundle PostgreSQL. Run one yourself, ideally CloudNativePG with the tensorchord/cloudnative-vectorchord image (https://github.com/immich-app/immich-charts/blob/main/README.md)" .Values.database.host }}
+{{- if .Values.database.urlKey }}
+{{- if .Values.database.username }}
+{{- fail "Cannot use both database.username and database.urlKey (DB_URL overrides the discrete settings). Pick one credential source." }}
+{{- end }}
+{{- end }}
+{{- if and .Values.redis.existingSecret (or .Values.redis.username .Values.redis.password) }}
+{{- fail "Cannot use both redis.existingSecret and inline redis.username/redis.password. Pick one credential source." }}
+{{- end }}
+{{- /* The media library must live on persistent storage; a dangling claim name
+       would leave the pods stuck Pending forever. */}}
+{{- if and (not .Values.server.persistence.library.enabled) (not .Values.server.persistence.library.existingClaim) }}
+{{- fail "server.persistence.library: persistent storage is required for the media library. Enable the chart-managed PVC (enabled=true) or reference an existing one (existingClaim)." }}
+{{- end }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "immich.serverName" . }}
+  labels:
+    {{- include "immich.labels" . | nindent 4 }}
+    app.kubernetes.io/component: server
+spec:
+  replicas: {{ .Values.server.replicas }}
+  strategy:
+    type: {{ .Values.server.strategy }}
+  selector:
+    matchLabels:
+      {{- include "immich.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: server
+  template:
+    metadata:
+      labels:
+        {{- include "immich.podLabels" (dict "ctx" . "component" "server") | nindent 8 }}
+      {{- with .Values.server.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      serviceAccountName: {{ include "immich.serviceAccountName" . | quote }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automount }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.priorityClassName }}
+      priorityClassName: {{ . | quote }}
+      {{- end }}
+      {{- with .Values.server.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.server.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.server.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+        - name: library
+          persistentVolumeClaim:
+            claimName: {{ default (printf "%s-library" (include "immich.fullname" .)) .Values.server.persistence.library.existingClaim | quote }}
+        - name: tmp
+          emptyDir: {}
+        {{- with .Values.server.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      containers:
+        - name: immich-server
+          image: {{ include "immich.image" (dict "ctx" . "image" .Values.server.image) | quote }}
+          imagePullPolicy: {{ default .Values.image.pullPolicy .Values.server.image.pullPolicy }}
+          env:
+            {{- range $key, $value := .Values.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+            {{- if .Values.database.urlKey }}
+            - name: DB_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "immich.databaseSecretName" . | quote }}
+                  key: {{ .Values.database.urlKey | quote }}
+            {{- else }}
+            - name: DB_HOSTNAME
+              value: {{ .Values.database.host | quote }}
+            - name: DB_PORT
+              value: {{ .Values.database.port | quote }}
+            - name: DB_DATABASE_NAME
+              value: {{ .Values.database.databaseName | quote }}
+            - name: DB_USERNAME
+              {{- if .Values.database.username }}
+              value: {{ .Values.database.username | quote }}
+              {{- else }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "immich.databaseSecretName" . | quote }}
+                  key: {{ .Values.database.usernameKey | quote }}
+              {{- end }}
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "immich.databaseSecretName" . | quote }}
+                  key: {{ .Values.database.passwordKey | quote }}
+            {{- end }}
+            {{- with .Values.database.sslMode }}
+            - name: DB_SSL_MODE
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.database.vectorExtension }}
+            - name: DB_VECTOR_EXTENSION
+              value: {{ . | quote }}
+            {{- end }}
+            - name: REDIS_HOSTNAME
+              value: {{ .Values.redis.host | quote }}
+            - name: REDIS_PORT
+              value: {{ .Values.redis.port | quote }}
+            - name: REDIS_DBINDEX
+              value: {{ .Values.redis.dbIndex | quote }}
+            - name: REDIS_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "immich.redisSecretName" . | quote }}
+                  key: {{ .Values.redis.usernameKey | quote }}
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "immich.redisSecretName" . | quote }}
+                  key: {{ .Values.redis.passwordKey | quote }}
+            - name: IMMICH_LOG_FORMAT
+              value: json
+            {{- if or .Values.machineLearning.enabled .Values.machineLearning.url }}
+            - name: IMMICH_MACHINE_LEARNING_URL
+              value: {{ include "immich.machineLearningUrl" . | quote }}
+            {{- else }}
+            - name: IMMICH_MACHINE_LEARNING_ENABLED
+              value: "false"
+            {{- end }}
+            {{- range $key, $value := .Values.server.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.server.port }}
+              protocol: TCP
+          startupProbe:
+            httpGet:
+              path: /api/server/ping
+              port: http
+            # Database migrations can take a while on first start or after
+            # version upgrades; allow up to ~2.5 minutes.
+            periodSeconds: 5
+            failureThreshold: 30
+          readinessProbe:
+            httpGet:
+              path: /api/server/ping
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /api/server/ping
+              port: http
+            periodSeconds: 30
+            timeoutSeconds: 5
+          volumeMounts:
+            - name: library
+              mountPath: /data
+            - name: tmp
+              mountPath: /tmp
+            {{- with .Values.server.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          resources:
+            {{- toYaml .Values.server.resources | nindent 12 }}

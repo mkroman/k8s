@@ -1,0 +1,22 @@
+{{- if and .Values.server.persistence.library.enabled (not .Values.server.persistence.library.existingClaim) }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ printf "%s-library" (include "immich.fullname" .) | quote }}
+  labels:
+    {{- include "immich.labels" . | nindent 4 }}
+    app.kubernetes.io/component: server
+  {{- with .Values.server.persistence.library.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  accessModes:
+    {{- toYaml .Values.server.persistence.library.accessModes | nindent 4 }}
+  {{- with .Values.server.persistence.library.storageClass }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.server.persistence.library.size }}
+{{- end }}

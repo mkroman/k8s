@@ -1,0 +1,49 @@
+apiVersion: v2
+name: immich
+description: >-
+  Self-hosted Immich (photo and video backup solution) on Kubernetes, following
+  the official documentation at https://immich.app/docs/install/kubernetes.
+  Requires an externally provided PostgreSQL database with the VectorChord
+  extension and a Redis/Valkey instance; neither is bundled by this chart.
+type: application
+version: 0.1.0
+appVersion: "v3.3.0"
+kubeVersion: ">=1.25.0-0"
+home: https://immich.app/
+icon: https://immich.app/img/immich-logo-inline-light.png
+sources:
+  - https://github.com/immich-app/immich
+keywords:
+  - immich
+  - photos
+  - backup
+  - machine-learning
+maintainers:
+  - name: mkroman
+annotations:
+  artifacthub.io/license: AGPL-3.0-only
+  # Default images; overridden when image.tag/image.registry change. Pinned
+  # versions only, per the Helm image best practice. The machine learning image
+  # supports hardware-acceleration tag suffixes (-cuda, -rocm, -openvino,
+  # -armnn, -rknn); the annotation lists the CPU defaults.
+  # https://immich.app/docs/features/ml-hardware-acceleration
+  artifacthub.io/images: |
+    - name: immich-server
+      image: ghcr.io/immich-app/immich-server:v3.1.0
+    - name: immich-machine-learning
+      image: ghcr.io/immich-app/immich-machine-learning:v3.1.0
+  artifacthub.io/links: |-
+    - name: Kubernetes install guide
+      url: https://immich.app/docs/install/kubernetes
+    - name: Requirements (Postgres and VectorChord)
+      url: https://immich.app/docs/install/requirements
+    - name: Environment variables
+      url: https://immich.app/docs/install/environment-variables
+    - name: Machine learning hardware acceleration
+      url: https://immich.app/docs/features/ml-hardware-acceleration
+    - name: Backup and restore
+      url: https://immich.app/docs/administration/backup-and-restore
+    - name: Upgrading
+      url: https://immich.app/docs/install/upgrading
+    - name: Official Helm chart (reference)
+      url: https://github.com/immich-app/immich-charts

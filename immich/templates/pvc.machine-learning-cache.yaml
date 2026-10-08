@@ -1,0 +1,22 @@
+{{- if and .Values.machineLearning.enabled .Values.machineLearning.persistence.cache.enabled (not .Values.machineLearning.persistence.cache.existingClaim) }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ printf "%s-ml-cache" (include "immich.fullname" .) | quote }}
+  labels:
+    {{- include "immich.labels" . | nindent 4 }}
+    app.kubernetes.io/component: machine-learning
+  {{- with .Values.machineLearning.persistence.cache.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  accessModes:
+    {{- toYaml .Values.machineLearning.persistence.cache.accessModes | nindent 4 }}
+  {{- with .Values.machineLearning.persistence.cache.storageClass }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.machineLearning.persistence.cache.size }}
+{{- end }}

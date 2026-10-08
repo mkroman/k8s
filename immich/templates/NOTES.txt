@@ -1,0 +1,76 @@
+{{- $ml := "disabled (IMMICH_MACHINE_LEARNING_ENABLED=false)" }}
+{{- if .Values.machineLearning.enabled }}
+{{- $ml = printf "%s:%d" (include "immich.machineLearningName" .) (int .Values.machineLearning.service.port) }}
+{{- else if .Values.machineLearning.url }}
+{{- $ml = printf "external (%s)" .Values.machineLearning.url }}
+{{- end }}
+{{- $db := printf "%s:%d" .Values.database.host (int .Values.database.port) }}
+{{- if .Values.database.urlKey }}
+{{- $db = printf "via DB_URL (%s#%s)" (default (printf "%s-database" (include "immich.fullname" .)) .Values.database.existingSecret) .Values.database.urlKey }}
+{{- end }}
+{{- $ui := printf "kubectl -n %s port-forward svc/%s %d" .Release.Namespace (include "immich.serverName" .) (int .Values.server.service.port) }}
+{{- if .Values.ingress.enabled }}
+{{- $ui = printf "http://%s" (index .Values.ingress.hosts 0).host }}
+{{- if .Values.ingress.tls }}
+{{- $ui = printf "https://%s" (index .Values.ingress.hosts 0).host }}
+{{- end }}
+{{- end }}
+Immich {{ .Chart.AppVersion }} has been deployed.
+
+    Release:  {{ include "immich.fullname" . }} (namespace: {{ .Release.Namespace }})
+    Server:   {{ include "immich.serverName" . }}:{{ .Values.server.service.port }} ({{ .Values.server.service.type }})
+    ML:       {{ $ml }}
+    Database: {{ $db }}
+    Redis:    {{ .Values.redis.host }}:{{ .Values.redis.port }}/{{ .Values.redis.dbIndex }}
+
+{{- $redisSecret := include "immich.redisSecretName" . }}
+{{- if or .Values.redis.username .Values.redis.password }}
+
+Redis credentials are managed by this release in Secret "{{ $redisSecret }}".
+Note: values-defined credentials end up in your values files - prefer
+`redis.existingSecret` for anything beyond testing.
+{{- else if .Values.redis.existingSecret }}
+
+Redis credentials are read from the existing Secret "{{ .Values.redis.existingSecret }}".
+{{- else }}
+
+ACTION REQUIRED: no Redis credentials configured.
+
+Create the Secret "{{ $redisSecret }}" holding the Redis username and
+password (keys "{{ .Values.redis.usernameKey }}" and "{{ .Values.redis.passwordKey }}"):
+
+  kubectl -n {{ .Release.Namespace }} create secret generic {{ $redisSecret }} \
+    --from-literal={{ .Values.redis.usernameKey }}='<redis-username>' \
+    --from-literal={{ .Values.redis.passwordKey }}='<redis-password>'
+{{- end }}
+
+{{- $dbSecret := include "immich.databaseSecretName" . }}
+{{- if .Values.database.urlKey }}
+
+The database connection URL (DB_URL) is read from Secret "{{ $dbSecret }}", key "{{ .Values.database.urlKey }}".
+{{- else }}
+
+Database credentials are read from Secret "{{ $dbSecret }}"
+(keys "{{ .Values.database.usernameKey }}" / "{{ .Values.database.passwordKey }}").
+{{- if not .Values.database.existingSecret }}
+Create it if it does not exist yet:
+
+  kubectl -n {{ .Release.Namespace }} create secret generic {{ $dbSecret }} \
+    --from-literal={{ .Values.database.usernameKey }}='<db-username>' \
+    --from-literal={{ .Values.database.passwordKey }}='<db-password>'
+{{- end }}
+{{- end }}
+
+The PostgreSQL database must have the VectorChord extension available
+(pgvector is also detected). Local SSD storage is strongly recommended:
+https://immich.app/docs/install/requirements
+
+First steps:
+  * Open the web UI:
+      {{ $ui }}
+  * Register the admin account on first use (the /auth/admin-sign-up
+    endpoint can later be disabled with server.env.IMMICH_ALLOW_SETUP=false).
+  * Schedule backups - the library volume and database need separate care:
+    https://immich.app/docs/administration/backup-and-restore
+  * Keep Immich updated by bumping image tags/appVersion:
+    https://immich.app/docs/install/upgrading

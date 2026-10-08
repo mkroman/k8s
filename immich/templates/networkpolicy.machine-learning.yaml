@@ -1,0 +1,49 @@
+{{- if and .Values.networkPolicy.enabled .Values.machineLearning.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "immich.machineLearningName" . }}
+  labels:
+    {{- include "immich.labels" . | nindent 4 }}
+    app.kubernetes.io/component: machine-learning
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "immich.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: machine-learning
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Only this release's immich-server pods may reach the ML service.
+    - from:
+        - podSelector:
+            matchLabels:
+              {{- include "immich.selectorLabels" . | nindent 14 }}
+              app.kubernetes.io/component: server
+      ports:
+        - port: http
+          protocol: TCP
+    {{- with .Values.networkPolicy.machineLearning.extraIngress }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  egress:
+    # DNS resolution
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    # Model downloads from model registries over HTTPS
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - port: 443
+          protocol: TCP
+    {{- with .Values.networkPolicy.machineLearning.extraEgress }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+{{- end }}

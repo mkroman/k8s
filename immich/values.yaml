@@ -1,0 +1,360 @@
+# Default values for the immich chart.
+#
+# Official Immich documentation:
+#   Kubernetes install guide:    https://immich.app/docs/install/kubernetes
+#   Requirements:                https://immich.app/docs/install/requirements
+#   Environment variables:       https://immich.app/docs/install/environment-variables
+#   ML hardware acceleration:    https://immich.app/docs/features/ml-hardware-acceleration
+#   Backup and restore:          https://immich.app/docs/administration/backup-and-restore
+#
+# Like the official Helm chart, this chart does NOT bundle PostgreSQL or
+# Redis/Valkey. Both must be provided externally (see `database` and `redis`).
+
+# -- Override the name of the chart (used in resource names).
+nameOverride: ""
+
+# -- Override the full release name (used in resource names).
+fullnameOverride: ""
+
+# -- Time zone and other environment variables shared by both Immich
+#    containers.
+#    https://immich.app/docs/install/environment-variables
+env:
+  TZ: Etc/UTC
+  MACHINE_LEARNING_MODEL_REVISION: v2
+
+image:
+  # -- Global image registry prefix for both containers.
+  registry: ghcr.io
+  # -- Global image pull policy.
+  pullPolicy: IfNotPresent
+
+# -- List of image pull secrets for private registries.
+imagePullSecrets: []
+
+server:
+  # -- Number of immich-server replicas. The default volume support is
+  #    ReadWriteOnce; scale only with a ReadWriteMany library volume.
+  replicas: 1
+  # -- Deployment strategy. "Recreate" avoids RWO PVC re-mount deadlocks on
+  #    rolling updates. Use "RollingUpdate" with a ReadWriteMany library volume.
+  strategy: Recreate
+  image:
+    # -- Overrides image.registry for the server container.
+    registry: ""
+    repository: immich-app/immich-server
+    # -- Image tag. Defaults to .Chart.AppVersion when empty.
+    tag: ""
+    # -- Overrides image.pullPolicy for the server container.
+    pullPolicy: ""
+  # -- Server container port.
+  port: 2283
+  service:
+    # -- Service type for the immich-server Service.
+    type: ClusterIP
+    # -- Service port exposing the server container port.
+    port: 2283
+    # -- Additional annotations for the Service.
+    annotations: {}
+  # -- Extra environment variables for the server container only.
+  #    https://immich.app/docs/install/environment-variables
+  #    e.g. IMMICH_TRUSTED_PROXIES: "10.0.0.0/8" when behind a reverse proxy.
+  env: {}
+  # -- Persistence for uploaded media, thumbnails, transcoded videos and
+  #    profiles (container path /data).
+  #    https://immich.app/docs/install/requirements
+  persistence:
+    library:
+      # -- Create/use a PersistentVolumeClaim for the media library.
+      enabled: true
+      # -- Use an existing PVC instead of creating one (required for a
+      #    production library, per the official chart guidance).
+      existingClaim: ""
+      # -- Storage class name for the created PVC. Empty uses the cluster
+      #    default.
+      storageClass: "hdd-gp1x1"
+      # -- Requested PVC size.
+      size: 500Gi
+      # -- Access mode for the created PVC.
+      accessModes:
+        - ReadWriteOnce
+      # -- Additional annotations for the created PVC.
+      annotations: {}
+  # -- Container resource requests/limits. Immich requires at least 6GB RAM
+  #    across the deployment; raise the memory limit on large libraries.
+  #    https://immich.app/docs/install/requirements
+  resources:
+    requests:
+      cpu: 2
+      memory: 4Gi
+    limits:
+      memory: 8Gi
+  # -- Additional labels for the server pods.
+  podLabels: {}
+  # -- Additional annotations for the server pods.
+  podAnnotations: {}
+  # -- Node selector for the server pods.
+  nodeSelector: {}
+  # -- Tolerations for the server pods.
+  tolerations: []
+  # -- Affinity rules for the server pods.
+  affinity: {}
+  # -- Additional volumes for the server pods (e.g. custom CA certificates).
+  extraVolumes: []
+  # -- Additional volumeMounts for the server container.
+  extraVolumeMounts: []
+
+machineLearning:
+  # -- Deploy the immich-machine-learning container in this release.
+  #    - enabled: true                     -> in-cluster ML at the default URL
+  #    - enabled: false, url: "http://..." -> use an external ML service
+  #    - enabled: false, url: ""           -> disable machine learning entirely
+  #      (server sets IMMICH_MACHINE_LEARNING_ENABLED=false)
+  enabled: true
+  # -- URL the server uses to reach the machine learning service
+  #    (IMMICH_MACHINE_LEARNING_URL). Defaults to the in-cluster Service when
+  #    `enabled` is true; must be set when using an external ML service.
+  url: ""
+  replicas: 1
+  # -- Deployment strategy. "Recreate" avoids RWO PVC re-mount deadlocks on
+  #    rolling updates.
+  strategy: Recreate
+  image:
+    # -- Overrides image.registry for the machine learning container.
+    registry: ""
+    repository: immich-app/immich-machine-learning
+    # -- Image tag. Defaults to .Chart.AppVersion when empty. Append a
+    #    hardware-acceleration suffix to enable a non-CPU backend, e.g.
+    #    "v3.1.0-cuda", "-rocm", "-openvino", "-armnn" or "-rknn".
+    #    https://immich.app/docs/features/ml-hardware-acceleration
+    tag: ""
+    # -- Overrides image.pullPolicy for the machine learning container.
+    pullPolicy: ""
+  # -- Machine learning container port.
+  port: 3003
+  service:
+    # -- Service type for the machine learning Service.
+    type: ClusterIP
+    # -- Service port exposing the ML container port.
+    port: 3003
+    # -- Additional annotations for the Service.
+    annotations: {}
+  # -- Extra environment variables for the machine learning container only.
+  #    https://immich.app/docs/install/environment-variables#machine-learning
+  env: {}
+  # -- Persistence for downloaded ML models (container path /cache). Keeping
+  #    models on a persistent volume avoids re-downloading them on restart.
+  persistence:
+    cache:
+      # -- Create/use a PersistentVolumeClaim for the model cache.
+      enabled: true
+      # -- Use an existing PVC instead of creating one.
+      existingClaim: ""
+      # -- Storage class name for the created PVC. Empty uses the cluster
+      #    default.
+      storageClass: "hdd-gp1x1"
+      # -- Requested PVC size.
+      size: 10Gi
+      # -- Access mode for the created PVC.
+      accessModes:
+        - ReadWriteOnce
+      # -- Additional annotations for the created PVC.
+      annotations: {}
+  # -- Container resource requests/limits. Machine learning is the
+  #    memory-hungry component of Immich (part of the 6GB total minimum).
+  resources:
+    requests:
+      cpu: 1
+      memory: 1Gi
+    limits:
+      memory: 4Gi
+  # -- Additional labels for the machine learning pods.
+  podLabels: {}
+  # -- Additional annotations for the machine learning pods.
+  podAnnotations: {}
+  # -- Node selector for the machine learning pods, e.g. GPU nodes when using
+  #    a hardware-accelerated image tag.
+  nodeSelector: {}
+  # -- Tolerations for the machine learning pods.
+  tolerations: []
+  # -- Affinity rules for the machine learning pods.
+  affinity: {}
+  # -- Additional volumes for the machine learning pods (e.g. host devices or
+  #    driver libraries for hardware acceleration).
+  extraVolumes: []
+  # -- Additional volumeMounts for the machine learning container.
+  extraVolumeMounts: []
+
+# External PostgreSQL connection for all Immich workers.
+#
+# The database MUST have the VectorChord extension available (pgvector works
+# too and is auto-detected; set `vectorExtension` to force one). The official
+# guidance is to run PostgreSQL yourself, ideally with CloudNativePG using the
+# tensorchord/cloudnative-vectorchord image:
+#   https://immich.app/docs/install/requirements
+#   https://github.com/immich-app/immich-charts/blob/main/README.md
+# Database files must live on local SSD-class storage, never a network share.
+database:
+  # -- PostgreSQL host. REQUIRED - the chart fails to render without it.
+  host: "postgres-rw.rwx.svc.cluster.local"
+  # -- PostgreSQL port.
+  port: 5432
+  # -- Database name.
+  databaseName: immich_dev
+  # -- Inline database username. Leave empty to read it from `existingSecret`.
+  username: ""
+  # -- Name of an existing Secret holding the database credentials. Defaults
+  #    to "<fullname>-database". CloudNativePG-generated secrets work as-is
+  #    with the default key names (`username`/`password`).
+  existingSecret: "immich-creds"
+  # -- Key in `existingSecret` holding the database username
+  #    (DB_USERNAME). Ignored when `username` is set inline.
+  usernameKey: username
+  # -- Key in `existingSecret` holding the database password (DB_PASSWORD).
+  #    There is deliberately no inline password value; credentials only ever
+  #    come from a Secret.
+  passwordKey: password
+  # -- Alternative to the discrete settings: key in `existingSecret` holding
+  #    a full PostgreSQL connection URL (DB_URL), e.g. CloudNativePG's `uri`
+  #    key. When set, host/port/username/databaseName are not rendered.
+  #    https://immich.app/docs/install/environment-variables#database
+  urlKey: ""
+  # -- PostgreSQL TLS mode (DB_SSL_MODE), e.g. "require". Empty uses the
+  #    driver default.
+  sslMode: ""
+  # -- Force a vector extension (DB_VECTOR_EXTENSION): "vectorchord" or
+  #    "pgvector". Empty auto-detects from the database.
+  vectorExtension: ""
+
+# External Redis/Valkey connection used by Immich for job queueing and
+# caching (all Redis_ variables go to all Immich workers).
+# https://immich.app/docs/install/environment-variables#redis
+redis:
+  # -- Redis host. REQUIRED - the chart fails to render without it.
+  host: redis-master.rwx-redis-prod.svc.cluster.local
+  # -- Redis port.
+  port: 6379
+  # -- Redis logical database index (REDIS_DBINDEX).
+  dbIndex: 0
+  # -- Inline Redis username/password (REDIS_USERNAME / REDIS_PASSWORD).
+  #    Only for testing - prefer `existingSecret` to keep credentials out of
+  #    values files. Cannot be combined with `existingSecret`.
+  username: ""
+  password: ""
+  # -- Name of an existing Secret holding the Redis username and password.
+  #    Defaults to "<fullname>-redis". Both values live in this one Secret.
+  existingSecret: "immich-creds"
+  # -- Key in `existingSecret` holding the Redis username.
+  usernameKey: redis-username
+  # -- Key in `existingSecret` holding the Redis password.
+  passwordKey: redis-password
+
+ingress:
+  # -- Create an Ingress for the immich-server Service.
+  #    HTTPS is strongly recommended: the web app enables CSP
+  #    upgrade-insecure-requests by default and mobile uploads rely on
+  #    browser features gated behind secure contexts.
+  #    https://immich.app/docs/install/environment-variables
+  enabled: true
+  # -- Ingress class name (e.g. "nginx"). Empty omits the annotation.
+  className: ""
+  # -- Additional annotations for the Ingress.
+  annotations: {}
+  # -- Ingress hosts. Only the immich-server (web + API) is exposed.
+  hosts:
+    - host: immich.maero.dk
+      paths:
+        - path: /
+          pathType: Prefix
+  # -- TLS configuration for the Ingress.
+  tls:
+    - secretName: immich.maero.dk-tls
+      hosts:
+        - immich.maero.dk
+
+serviceAccount:
+  # -- Create a dedicated ServiceAccount. Immich needs no Kubernetes API
+  #    access, so token mounting is disabled by default.
+  create: true
+  # -- Mount the ServiceAccount token into pods. Keep false unless a feature
+  #    requires Kubernetes API access.
+  automount: false
+  # -- Name of the ServiceAccount. Defaults to the release fullname when
+  #    creating, or "default" when not creating.
+  name: ""
+  # -- Additional annotations for the ServiceAccount.
+  annotations: {}
+
+podSecurityContext:
+  # The upstream images support running as non-root; the official rootless
+  # docker-compose variant runs both containers as 1000:1000.
+  # https://github.com/immich-app/immich/releases (docker-compose.rootless.yml)
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  # fsGroup lets the kube-scheduler fix ownership of the PVCs so UID 1000
+  # can write the media library and model cache.
+  fsGroup: 1000
+  fsGroupChangePolicy: OnRootMismatch
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  # Deliberate: the Immich images are not built for a read-only root
+  # filesystem (runtime asset paths outside the mounted volumes).
+  readOnlyRootFilesystem: false
+  capabilities:
+    drop:
+      - ALL
+
+# -- Priority class name for all pods.
+priorityClassName: ""
+
+podDisruptionBudget:
+  # -- Create a PodDisruptionBudget for the immich-server pods. With the
+  #    default single replica, minAvailable 1 blocks all voluntary
+  #    disruptions - set replicas >= 2 (with a ReadWriteMany library volume)
+  #    for meaningful drain behavior.
+  enabled: false
+  # -- Minimum number of server pods that must remain available.
+  minAvailable: 1
+
+networkPolicy:
+  # -- Create per-component NetworkPolicies restricting ingress and egress.
+  #    - immich-server: ingress to the server port from any source; egress
+  #      limited to DNS, HTTPS 443 (OIDC, map tiles) and the configured
+  #      `database.port` / `redis.port`.
+  #    - immich-machine-learning: ingress only from this release's
+  #      immich-server pods; egress limited to DNS and HTTPS 443 (model
+  #      downloads).
+  enabled: false
+  # -- Additional raw NetworkPolicy rules.
+  server:
+    # -- Additional ingress rules for the immich-server policy (e.g. restrict
+    #    to your ingress controller's namespaceSelector).
+    extraIngress: []
+    # -- Additional egress rules for the immich-server policy.
+    extraEgress: []
+  machineLearning:
+    # -- Additional ingress rules for the machine learning policy.
+    extraIngress: []
+    # -- Additional egress rules for the machine learning policy.
+    extraEgress: []
+
+# -- Labels added to all pod templates.
+commonPodLabels: {}
+
+certificate:
+  # -- Create the Certificate resource.
+  enabled: true
+  # -- Override the name of the certificate
+  name: immich.maero.dk
+  # -- The domain name
+  commonName: immich.maero.dk
+  # -- Reference to the certificate issuer
+  issuer:
+    kind: ClusterIssuer
+    name: letsencrypt-production
+  # -- Override the name of the secret that cert-manager will use.
+  secretName: ""
