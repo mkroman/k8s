@@ -1,0 +1,349 @@
+# yaml-language-server: $schema=values.schema.json
+#
+# Default values for the kanidm Helm chart. Declare variables to be passed into
+# your templates.
+#
+# You must set `kanidm.domain` (placeholder below) and a working TLS certificate
+# source before deploying. Kanidm terminates TLS itself, so traffic must reach
+# the pod un-terminated (TLS-passthrough ingress or LoadBalancer). The `kanidm`
+# section mirrors the server's `server.toml`; every option can also be set via
+# `KANIDM_`-prefixed environment variables, which take precedence:
+# https://kanidm.github.io/kanidm/stable/server_configuration.html
+
+image:
+  # Repository of the kanidmd server image.
+  repository: kanidm/server
+  # Image pull policy.
+  pullPolicy: IfNotPresent
+  # Overrides the image tag, whose default is the chart appVersion.
+  tag: ""
+  # Pin the image by digest; replaces the tag when set.
+  digest: ""
+
+# Pull secrets for private image registries.
+imagePullSecrets: []
+
+# Override the chart name in resource names and labels.
+nameOverride: ""
+
+# Override the release fullname, normally "<release>-kanidm".
+fullnameOverride: ""
+
+serviceAccount:
+  # Create a dedicated service account (token mounting is always disabled; Kanidm
+  # never talks to the Kubernetes API).
+  create: false
+  # Annotations for the service account.
+  annotations: {}
+  # If not set and `create` is true, a name is generated from the fullname template.
+  name: ""
+
+# Annotations for the server pod.
+podAnnotations: {}
+
+# Additional labels for the server pod.
+podLabels: {}
+
+# Pod-level security context; with `securityContext` this satisfies the
+# "restricted" Pod Security Standard.
+podSecurityContext:
+  # Forbid running as root.
+  runAsNonRoot: true
+  # Kanidm runs as this uid/gid and writes /data with it.
+  runAsUser: 1000
+  runAsGroup: 1000
+  # Group ownership applied to the database volume so the server can write /data.
+  fsGroup: 1000
+  # Skip the recursive chown when the volume root already matches.
+  fsGroupChangePolicy: OnRootMismatch
+  seccompProfile:
+    # Seccomp filter provided by the container runtime.
+    type: RuntimeDefault
+
+# Container-level security context: kanidmd only writes to /data and binds
+# 8443/3636 (never ports < 1024), so no capabilities and a read-only root
+# filesystem are needed.
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: true
+
+# Budget roughly 64KB of RAM per database entry (see `kanidm.db.arcSize`) plus
+# headroom, and ~8KB of disk per entry.
+resources:
+  # Guaranteed resources.
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  # Maximum resources.
+  limits:
+    memory: 512Mi
+
+# All probes target the /status endpoint (HTTPS on container port 8443; the
+# kubelet does not verify the certificate). Set a probe to null to remove it.
+startupProbe:
+  # failureThreshold x periodSeconds = ~5 minutes of startup budget for database
+  # checks and recovery on large databases.
+  httpGet:
+    scheme: HTTPS
+    path: /status
+    port: https
+  periodSeconds: 10
+  failureThreshold: 30
+
+# Restart the container when /status stops responding.
+livenessProbe:
+  httpGet:
+    scheme: HTTPS
+    path: /status
+    port: https
+  periodSeconds: 30
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+# Remove the pod from the Service endpoints while /status is failing.
+readinessProbe:
+  httpGet:
+    scheme: HTTPS
+    path: /status
+    port: https
+  periodSeconds: 10
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+# Time for in-flight requests and a running online backup to finish on shutdown.
+terminationGracePeriodSeconds: 60
+
+# Priority class for the server pod.
+priorityClassName: ""
+
+# Extra environment variables for the server container; use these (or envFrom)
+# to inject secrets from your own Secret sources.
+env: []
+
+# Environment variables from ConfigMaps or Secrets.
+envFrom: []
+
+# Additional volumes for the server pod.
+extraVolumes: []
+
+# Matching mounts for extraVolumes.
+extraVolumeMounts: []
+
+# Constrain the pod to nodes with matching labels.
+nodeSelector: {}
+
+# Tolerate node taints.
+tolerations: []
+
+# Node/pod affinity and anti-affinity rules.
+affinity: {}
+
+# A PDB cannot preserve availability for a single-instance service; disabled by
+# default.
+podDisruptionBudget:
+  # Create a PodDisruptionBudget for the server pod.
+  enabled: false
+  # With one replica use 0 (or maxUnavailable) so node drains stay possible.
+  minAvailable: 0
+  maxUnavailable: 1
+
+# Ingress is allowed from any source on the service ports; egress is denied
+# except cluster DNS (kanidmd makes no outbound connections of its own).
+networkPolicy:
+  # Create the NetworkPolicy.
+  enabled: true
+  # Extra egress rules, e.g. for an OpenTelemetry collector.
+  additionalEgress: []
+
+# /data holds the database, its admin socket and the online backups. Flash
+# storage (NVMe) is strongly recommended.
+persistence:
+  # Create a persistent volume claim for /data; if disabled, data is lost on pod
+  # removal (emptyDir) -- only sensible for testing.
+  enabled: true
+  # Use an existing claim instead; must be writable by the fsGroup.
+  existingClaim: ""
+  # Leave empty for the cluster default.
+  storageClass: ""
+  # Access modes of the claim.
+  accessModes:
+    - ReadWriteOnce
+  # Size of the claim.
+  size: 2Gi
+  # Annotations for the claim.
+  annotations: {}
+
+service:
+  # Kanidm terminates TLS itself: use a TLS-passthrough ingress (see `ingress`)
+  # or expose the Service directly.
+  type: ClusterIP
+  # Annotations for the Service (e.g. MetalLB/cloud LB configuration).
+  annotations: {}
+  # For NodePort/LoadBalancer; "Local" preserves the client source IP.
+  externalTrafficPolicy: Local
+  # HTTPS service port, forwarding to container port 8443.
+  httpsPort: 443
+  # LDAPS service port, forwarding to container port 3636; only created when
+  # `kanidm.ldap.enabled` is true.
+  ldapsPort: 636
+
+# TLS-passthrough ingress; the nginx defaults require --enable-ssl-passthrough
+# cluster-wide. With Traefik, enable the `ingressRouteTCP` section below instead.
+ingress:
+  # Create the Ingress resource.
+  enabled: false
+  # Ingress class name.
+  className: nginx
+  # Defaults assume ingress-nginx with ssl-passthrough enabled.
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-passthrough: "true"
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+  # Host to route; defaults to `kanidm.domain`, which the certificate is issued for.
+  host: ""
+  # Path to route.
+  path: /
+  # Path matching mode.
+  pathType: Prefix
+
+# Traefik TCP routing (IngressRouteTCP, traefik.io/v1alpha1; requires the Traefik
+# Kubernetes CRDs). Like the nginx ingress above, Traefik must pass TLS through to
+# the pod un-terminated.
+ingressRouteTCP:
+  # Create an IngressRouteTCP for the HTTPS interface.
+  enabled: true
+  # Additional labels for the IngressRouteTCP resource.
+  labels: {}
+  # Additional annotations for the IngressRouteTCP resource.
+  annotations: {}
+  # Traefik entry points receiving the HTTP traffic.
+  entryPoints:
+    - websecure
+  # TCP match rule; HostSNI(`*`) passes every TLS connection on the entry points
+  # through. Restrict it (e.g. HostSNI(`idm.example.com`)) on shared entry points.
+  match: HostSNI(`idm.rwx.im`)
+  # Delegate TLS termination to the backend (Kanidm); keep true.
+  tlsPassthrough: true
+  # TCP middlewares, e.g. [{name: my-ip-allow-list, namespace: traefik}].
+  middlewares: []
+  # Route the LDAPS interface as well (requires `kanidm.ldap.enabled`).
+  ldaps:
+    # Create an IngressRouteTCP for the LDAPS interface.
+    enabled: false
+    # Traefik entry points receiving the LDAPS traffic.
+    entryPoints:
+      - ldaps
+    # TCP match rule for the LDAPS route.
+    match: HostSNI(`*`)
+    # TCP middlewares for the LDAPS route.
+    middlewares: []
+
+# cert-manager Certificate for the server's TLS certificate. The issued secret
+# (tls.crt chain leaf-first, tls.key) is mounted read-only at /certs.
+certificate:
+  # Disable to bring your own secret via `kanidm.tls.existingSecret`.
+  enabled: true
+  # Additional labels for the Certificate resource.
+  labels: {}
+  # Additional annotations for the Certificate resource.
+  annotations: {}
+  # Name of the issued secret; defaults to "<fullname>-tls".
+  secretName: ""
+  # Common name; defaults to `kanidm.domain`, which the certificate MUST cover.
+  commonName: ""
+  # Subject alternative names; defaults to `kanidm.domain`.
+  dnsNames: []
+  # Certificate duration (e.g. 2160h for 90 days); empty uses the issuer default.
+  duration: ""
+  # How long before expiry renewal should happen.
+  renewBefore: ""
+  privateKey:
+    # Key algorithm.
+    algorithm: ECDSA
+    # PEM encoding; Kanidm accepts unencrypted PKCS1 or PKCS8.
+    encoding: PKCS8
+    # Kanidm requires at least 2048-bit RSA or 224-bit ECDSA keys.
+    size: 256
+    # "Always" generates a new key on renewal; "Never" reuses the key.
+    rotationPolicy: Always
+  # Extended key usages; Kanidm only needs "server auth".
+  usages:
+    - server auth
+  # Labels/annotations propagated onto the managed TLS secret.
+  secretTemplate:
+    annotations: {}
+    labels: {}
+  # cert-manager issuer that must be able to issue for `kanidm.domain`.
+  issuerRef:
+    # Name of the Issuer or ClusterIssuer.
+    name: letsencrypt-production
+    # Kind of the issuer.
+    kind: ClusterIssuer
+    # API group of the issuer resource.
+    group: cert-manager.io
+
+# Kanidm server configuration, rendered into the server.toml ConfigMap. See
+# https://kanidm.github.io/kanidm/stable/server_configuration.html for the full
+# option reference.
+kanidm:
+  # The DNS domain of the server: must match the hostname users visit and the
+  # TLS certificate. Changing it later breaks registered credentials (WebAuthn,
+  # OAuth2) and requires `kanidmd domain rename`.
+  domain: idm.rwx.im
+
+  # WebAuthn/OAuth2 origin URL; defaults to https://<kanidm.domain>.
+  origin: ""
+
+  # Log level: info, debug or trace.
+  logLevel: info
+
+  # HTTPS bind address inside the pod; the container port is 8443.
+  bindAddress: 0.0.0.0:8443
+
+  ldap:
+    # Read-only LDAP-over-TLS interface.
+    enabled: false
+    # LDAPS bind address inside the pod; the container port is 3636.
+    bindAddress: 0.0.0.0:3636
+
+  db:
+    # Database page size for the backing filesystem: "zfs" (recordsize=64k) or
+    # "other" (4K). Changing it requires running a vacuum task.
+    fsType: ""
+    # In-memory entry cache; null uses the automatic heuristic.
+    arcSize: null
+
+  # How client IPs are discovered behind a proxy/LB. Exactly one method per
+  # listener; leave empty when exposing the service directly. Restrict entries
+  # to your own proxies -- anyone listed can spoof client IPs.
+  clientAddressInfo:
+    http:
+      # Trusted PROXY protocol v2 sources for HTTPS.
+      proxyProtocolV2: []
+      # Trusted X-Forwarded-For sources; upstream prefers PROXY protocol v2.
+      xForwardedFor: []
+    ldap:
+      # Trusted PROXY protocol v2 sources for LDAPS.
+      proxyProtocolV2: []
+
+  onlineBackup:
+    # Cron schedule; backups land on the data volume. Set to "" to disable.
+    schedule: "00 22 * * *"
+    # Number of backups to keep.
+    versions: 7
+    # Backup output directory, on the data volume.
+    path: /data/kanidm/backups/
+
+  # OTLP/gRPC endpoint for traces; needs a NetworkPolicy egress exception.
+  otelGrpcUrl: ""
+
+  # Raw TOML appended to server.toml; use [tables] -- bare keys would be claimed
+  # by the chart's tables.
+  extraConfig: ""
+
+  tls:
+    # Existing TLS secret (tls.crt/tls.key) mounted instead of the issued one.
+    # Required when `certificate.enabled` is false.
+    existingSecret: ""

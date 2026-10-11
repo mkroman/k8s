@@ -1,0 +1,64 @@
+{{- if .Values.ingressRouteTCP.enabled }}
+{{- if and .Values.ingressRouteTCP.ldaps.enabled (not .Values.kanidm.ldap.enabled) }}
+{{- fail "ingressRouteTCP.ldaps.enabled requires kanidm.ldap.enabled" }}
+{{- end }}
+---
+# Kanidm terminates TLS itself, so the route must pass TLS through to the pod.
+apiVersion: traefik.io/v1alpha1
+kind: IngressRouteTCP
+metadata:
+  name: {{ include "kanidm.fullname" . }}
+  labels:
+    {{- include "kanidm.labels" . | nindent 4 }}
+    {{- with .Values.ingressRouteTCP.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with .Values.ingressRouteTCP.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  entryPoints:
+    {{- toYaml .Values.ingressRouteTCP.entryPoints | nindent 4 }}
+  routes:
+    - match: {{ .Values.ingressRouteTCP.match | quote }}
+      {{- with .Values.ingressRouteTCP.middlewares }}
+      middlewares:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      services:
+        - name: {{ include "kanidm.fullname" . }}
+          port: https
+  tls:
+    passthrough: {{ .Values.ingressRouteTCP.tlsPassthrough }}
+{{- if and .Values.ingressRouteTCP.ldaps.enabled .Values.kanidm.ldap.enabled }}
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRouteTCP
+metadata:
+  name: {{ include "kanidm.fullname" . }}-ldaps
+  labels:
+    {{- include "kanidm.labels" . | nindent 4 }}
+    {{- with .Values.ingressRouteTCP.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- with .Values.ingressRouteTCP.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  entryPoints:
+    {{- toYaml .Values.ingressRouteTCP.ldaps.entryPoints | nindent 4 }}
+  routes:
+    - match: {{ .Values.ingressRouteTCP.ldaps.match | quote }}
+      {{- with .Values.ingressRouteTCP.ldaps.middlewares }}
+      middlewares:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      services:
+        - name: {{ include "kanidm.fullname" . }}
+          port: ldaps
+  tls:
+    passthrough: {{ .Values.ingressRouteTCP.tlsPassthrough }}
+{{- end }}
+{{- end }}

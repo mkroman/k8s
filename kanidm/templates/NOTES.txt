@@ -1,0 +1,64 @@
+Kanidm {{ .Chart.AppVersion }} has been deployed as "{{ include "kanidm.fullname" . }}".
+
+{{- if .Values.ingress.enabled }}
+
+1. The server is exposed through the ingress at:
+
+    https://{{ .Values.ingress.host | default .Values.kanidm.domain }}
+
+   Note that the ingress must pass TLS through to the pod -- Kanidm terminates TLS itself.
+{{- else if .Values.ingressRouteTCP.enabled }}
+
+1. The server is exposed through Traefik TCP routing (IngressRouteTCP). It is
+   reachable at:
+
+    https://{{ .Values.kanidm.domain }}
+{{- else if contains "LoadBalancer" .Values.service.type }}
+
+1. Get the server URL. NOTE: It may take a few minutes for the LoadBalancer IP to be
+   available. You can watch the status by running:
+
+    kubectl get --namespace {{ .Release.Namespace }} svc -w {{ include "kanidm.fullname" . }}
+
+   The server is then reachable at:
+
+    https://<LOADBALANCER-IP-or-HOSTNAME>:{{ .Values.service.httpsPort }}
+{{- else }}
+
+1. Get the server URL by running these commands:
+
+    kubectl --namespace {{ .Release.Namespace }} port-forward svc/{{ include "kanidm.fullname" . }} 8443:{{ .Values.service.httpsPort }}
+
+   The server is then reachable at:
+
+    https://127.0.0.1:8443
+{{- end }}
+
+2. Verify that the server is responding:
+
+    kubectl --namespace {{ .Release.Namespace }} exec deployment/{{ include "kanidm.fullname" . }} -- \
+      /sbin/kanidmd scripting healthcheck
+
+3. Initialise the break-glass admin accounts (each prints a new random password; store
+   them safely):
+
+    kubectl --namespace {{ .Release.Namespace }} exec -it deployment/{{ include "kanidm.fullname" . }} -- \
+      /sbin/kanidmd scripting recover-account admin
+    kubectl --namespace {{ .Release.Namespace }} exec -it deployment/{{ include "kanidm.fullname" . }} -- \
+      /sbin/kanidmd scripting recover-account idm_admin
+
+   Then change the passwords and disable the accounts for day-to-day use:
+   https://kanidm.github.io/kanidm/stable/accounts/intro.html
+
+{{- if contains "idm.example.com" .Values.kanidm.domain }}
+
+⚠️  WARNING: `kanidm.domain` is still the placeholder "idm.example.com". Set it to the
+   real domain BEFORE accepting any credentials -- it is used in security-critical
+   contexts (WebAuthn, OAuth2) and changing it later breaks registered credentials.
+{{- end }}
+
+Upgrades: before upgrading to a newer Kanidm version, review the release notes and run a
+pre-upgrade check against the running server:
+
+    kubectl --namespace {{ .Release.Namespace }} exec deployment/{{ include "kanidm.fullname" . }} -- \
+      /sbin/kanidmd domain upgrade-check

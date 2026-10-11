@@ -1,0 +1,1226 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "properties": {
+    "affinity": {
+      "additionalProperties": true,
+      "required": [],
+      "title": "affinity",
+      "type": "object"
+    },
+    "certificate": {
+      "additionalProperties": false,
+      "description": "TLS certificate for the server, issued by cert-manager. Kanidm REQUIRES TLS: it\nterminates TLS itself for both HTTPS and LDAPS, so the certificate cannot be terminated\nat an ingress or load balancer. The issued secret is mounted read-only into the pod at\n/certs (tls.crt as the chain, tls.key as the key). cert-manager's tls.crt already has\nthe leaf certificate first, matching Kanidm's chain.pem format.",
+      "properties": {
+        "annotations": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Additional annotations for the Certificate resource.",
+          "required": [],
+          "title": "annotations",
+          "type": "object"
+        },
+        "commonName": {
+          "default": "",
+          "description": "The common name of the certificate. Defaults to the Kanidm domain.",
+          "title": "commonName",
+          "type": "string"
+        },
+        "dnsNames": {
+          "description": "Subject alternative names of the certificate. Defaults to the Kanidm domain, which\nMUST be covered by the certificate.",
+          "items": {
+            "type": "string"
+          },
+          "title": "dnsNames",
+          "type": "array"
+        },
+        "duration": {
+          "default": "",
+          "description": "Certificate duration (e.g. 2160h for 90 days).",
+          "title": "duration",
+          "type": "string"
+        },
+        "enabled": {
+          "default": true,
+          "description": "Create a cert-manager Certificate resource. Disable to bring your own secret via\n`kanidm.tls.existingSecret`.",
+          "title": "enabled",
+          "type": "boolean"
+        },
+        "issuerRef": {
+          "additionalProperties": true,
+          "description": "Reference to the cert-manager issuer.",
+          "properties": {
+            "group": {
+              "default": "cert-manager.io",
+              "description": "API group of the issuer resource.",
+              "title": "group",
+              "type": "string"
+            },
+            "kind": {
+              "default": "ClusterIssuer",
+              "description": "Kind of the issuer.",
+              "enum": [
+                "Issuer",
+                "ClusterIssuer"
+              ],
+              "required": [],
+              "title": "kind"
+            },
+            "name": {
+              "default": "letsencrypt-production",
+              "description": "Name of the cert-manager Issuer or ClusterIssuer (required when certificate.enabled).",
+              "title": "name",
+              "type": "string"
+            }
+          },
+          "required": [],
+          "title": "issuerRef",
+          "type": "object"
+        },
+        "labels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Additional labels for the Certificate resource.",
+          "required": [],
+          "title": "labels",
+          "type": "object"
+        },
+        "privateKey": {
+          "additionalProperties": false,
+          "properties": {
+            "algorithm": {
+              "default": "ECDSA",
+              "description": "Key algorithm.",
+              "enum": [
+                "RSA",
+                "ECDSA",
+                "Ed25519"
+              ],
+              "required": [],
+              "title": "algorithm"
+            },
+            "encoding": {
+              "default": "PKCS8",
+              "description": "Key encoding; Kanidm accepts an unencrypted PKCS1 or PKCS8 PEM key.",
+              "enum": [
+                "PKCS1",
+                "PKCS8"
+              ],
+              "required": [],
+              "title": "encoding"
+            },
+            "rotationPolicy": {
+              "default": "Always",
+              "description": "\"Always\" generates a new key on every renewal; \"Never\" reuses the key.",
+              "enum": [
+                "Always",
+                "Never"
+              ],
+              "required": [],
+              "title": "rotationPolicy"
+            },
+            "size": {
+              "default": 256,
+              "description": "Key size in bits: 2048/4096 for RSA, 256/384/521 for ECDSA. Kanidm requires at\nleast 2048-bit RSA or 224-bit ECDSA keys.",
+              "title": "size",
+              "type": "integer"
+            }
+          },
+          "required": [],
+          "title": "privateKey",
+          "type": "object"
+        },
+        "renewBefore": {
+          "default": "",
+          "description": "How long before expiry the certificate should be renewed.",
+          "title": "renewBefore",
+          "type": "string"
+        },
+        "secretName": {
+          "default": "",
+          "description": "The name of the secret to create. Defaults to \"{{ include \"kanidm.fullname\" . }}-tls\".",
+          "title": "secretName",
+          "type": "string"
+        },
+        "secretTemplate": {
+          "additionalProperties": true,
+          "description": "Labels and annotations propagated onto the managed TLS secret.",
+          "properties": {
+            "annotations": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "Annotations to add to the managed TLS secret.",
+              "required": [],
+              "title": "annotations",
+              "type": "object"
+            },
+            "labels": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "Labels to add to the managed TLS secret.",
+              "required": [],
+              "title": "labels",
+              "type": "object"
+            }
+          },
+          "required": [],
+          "title": "secretTemplate",
+          "type": "object"
+        },
+        "usages": {
+          "description": "Extended key usages for the certificate. Kanidm only needs \"server auth\".",
+          "items": {
+            "enum": [
+              "signing",
+              "digital signature",
+              "content commitment",
+              "key encipherment",
+              "key agreement",
+              "data encipherment",
+              "cert sign",
+              "crl sign",
+              "encipher only",
+              "decipher only",
+              "any",
+              "server auth",
+              "client auth",
+              "code signing",
+              "email protection",
+              "s/mime",
+              "ipsec end system",
+              "ipsec tunnel",
+              "ipsec user",
+              "timestamping",
+              "ocsp signing",
+              "microsoft sgc",
+              "netscape sgc"
+            ],
+            "required": []
+          },
+          "title": "usages",
+          "type": "array"
+        }
+      },
+      "required": [
+        "privateKey"
+      ],
+      "title": "certificate",
+      "type": "object"
+    },
+    "env": {
+      "description": "Extra environment variables for the server container. Use these (or `envFrom`) to\ninject secrets as `KANIDM_`-prefixed environment variables, which take precedence over\nthe server.toml rendered from the `kanidm` values below.",
+      "items": {
+        "additionalProperties": true,
+        "required": [],
+        "type": "object"
+      },
+      "required": [],
+      "title": "env"
+    },
+    "envFrom": {
+      "items": {
+        "additionalProperties": true,
+        "required": [],
+        "type": "object"
+      },
+      "required": [],
+      "title": "envFrom"
+    },
+    "extraVolumeMounts": {
+      "description": "Additional volume mounts for the server container.",
+      "items": {
+        "additionalProperties": true,
+        "required": [],
+        "type": "object"
+      },
+      "required": [],
+      "title": "extraVolumeMounts"
+    },
+    "extraVolumes": {
+      "description": "Additional volumes mounted into the server container.",
+      "items": {
+        "additionalProperties": true,
+        "required": [],
+        "type": "object"
+      },
+      "required": [],
+      "title": "extraVolumes"
+    },
+    "fullnameOverride": {
+      "default": "",
+      "description": "This is to override the release fullname.",
+      "title": "fullnameOverride",
+      "type": "string"
+    },
+    "global": {
+      "description": "Global values are values that can be accessed from any chart or subchart by exactly the same name.",
+      "required": [],
+      "title": "global",
+      "type": "object"
+    },
+    "image": {
+      "additionalProperties": false,
+      "properties": {
+        "digest": {
+          "default": "",
+          "description": "Optional image digest. When set, it is used instead of the tag and pins the image\ncontent immutably (recommended for production deployments).",
+          "pattern": "^(sha256:[a-f0-9]{64})?$",
+          "title": "digest",
+          "type": "string"
+        },
+        "pullPolicy": {
+          "default": "IfNotPresent",
+          "description": "Image pull policy.",
+          "enum": [
+            "Always",
+            "IfNotPresent",
+            "Never"
+          ],
+          "required": [],
+          "title": "pullPolicy"
+        },
+        "repository": {
+          "default": "kanidm/server",
+          "description": "Repository of the server image.",
+          "minLength": 1,
+          "title": "repository",
+          "type": "string"
+        },
+        "tag": {
+          "default": "",
+          "description": "Overrides the image tag whose default is the chart appVersion.",
+          "title": "tag",
+          "type": "string"
+        }
+      },
+      "required": [],
+      "title": "image",
+      "type": "object"
+    },
+    "imagePullSecrets": {
+      "description": "Secrets for pulling the image from a private repository, see\nhttps://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/",
+      "items": {
+        "additionalProperties": true,
+        "required": [],
+        "type": "object"
+      },
+      "required": [],
+      "title": "imagePullSecrets"
+    },
+    "ingress": {
+      "additionalProperties": false,
+      "description": "Kanidm terminates TLS itself (it is required for both HTTPS and LDAPS), so the ingress\nmust pass TLS through to the pod instead of terminating it. For ingress-nginx, enable\nssl-passthrough cluster-wide (--enable-ssl-passthrough) and keep the default\nannotations below. For Traefik, use the `ingressRouteTCP` section instead.",
+      "properties": {
+        "annotations": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Annotations for the ingress. The defaults assume ingress-nginx with ssl-passthrough\nenabled; adjust for other controllers.",
+          "properties": {
+            "nginx.ingress.kubernetes.io/backend-protocol": {
+              "default": "HTTPS",
+              "required": [],
+              "title": "nginx.ingress.kubernetes.io/backend-protocol"
+            },
+            "nginx.ingress.kubernetes.io/ssl-passthrough": {
+              "default": "true",
+              "required": [],
+              "title": "nginx.ingress.kubernetes.io/ssl-passthrough"
+            }
+          },
+          "required": [],
+          "title": "annotations",
+          "type": "object"
+        },
+        "className": {
+          "default": "nginx",
+          "description": "Ingress class name.",
+          "title": "className",
+          "type": "string"
+        },
+        "enabled": {
+          "default": false,
+          "description": "Create an Ingress resource.",
+          "title": "enabled",
+          "type": "boolean"
+        },
+        "host": {
+          "default": "",
+          "description": "Host to route. Defaults to the Kanidm domain.",
+          "title": "host",
+          "type": "string"
+        },
+        "path": {
+          "default": "/",
+          "description": "Path to route.",
+          "title": "path",
+          "type": "string"
+        },
+        "pathType": {
+          "default": "Prefix",
+          "enum": [
+            "Exact",
+            "Prefix",
+            "ImplementationSpecific"
+          ],
+          "required": [],
+          "title": "pathType"
+        }
+      },
+      "required": [],
+      "title": "ingress",
+      "type": "object"
+    },
+    "ingressRouteTCP": {
+      "additionalProperties": false,
+      "description": "Traefik TCP routing (IngressRouteTCP, traefik.io/v1alpha1; requires the Traefik Kubernetes CRDs). Like the nginx ingress, Traefik must pass TLS through to the pod un-terminated.",
+      "properties": {
+        "enabled": {
+          "default": false,
+          "description": "Create an IngressRouteTCP for the HTTPS interface.",
+          "required": [],
+          "title": "enabled",
+          "type": "boolean"
+        },
+        "labels": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Additional labels for the IngressRouteTCP resource.",
+          "required": [],
+          "title": "labels"
+        },
+        "annotations": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Additional annotations for the IngressRouteTCP resource.",
+          "required": [],
+          "title": "annotations"
+        },
+        "entryPoints": {
+          "description": "Traefik entry points receiving the HTTPS traffic.",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "required": [],
+          "title": "entryPoints",
+          "type": "array"
+        },
+        "match": {
+          "default": "HostSNI(`*`)",
+          "description": "TCP match rule; HostSNI(`*`) passes every TLS connection on the entry points through. Restrict it (e.g. HostSNI(`idm.example.com`)) on shared entry points.",
+          "required": [],
+          "title": "match",
+          "type": "string"
+        },
+        "tlsPassthrough": {
+          "default": true,
+          "description": "Delegate TLS termination to the backend (Kanidm); keep true.",
+          "required": [],
+          "title": "tlsPassthrough",
+          "type": "boolean"
+        },
+        "middlewares": {
+          "description": "TCP middlewares, e.g. [{name: my-ip-allow-list, namespace: traefik}].",
+          "items": {
+            "additionalProperties": true,
+            "required": [],
+            "type": "object"
+          },
+          "required": [],
+          "title": "middlewares",
+          "type": "array"
+        },
+        "ldaps": {
+          "additionalProperties": false,
+          "description": "Route the LDAPS interface as well (requires `kanidm.ldap.enabled`).",
+          "properties": {
+            "enabled": {
+              "default": false,
+              "description": "Create an IngressRouteTCP for the LDAPS interface.",
+              "required": [],
+              "title": "enabled",
+              "type": "boolean"
+            },
+            "entryPoints": {
+              "description": "Traefik entry points receiving the LDAPS traffic.",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1,
+              "required": [],
+              "title": "entryPoints",
+              "type": "array"
+            },
+            "match": {
+              "default": "HostSNI(`*`)",
+              "description": "TCP match rule for the LDAPS route.",
+              "required": [],
+              "title": "match",
+              "type": "string"
+            },
+            "middlewares": {
+              "description": "TCP middlewares for the LDAPS route.",
+              "items": {
+                "additionalProperties": true,
+                "required": [],
+                "type": "object"
+              },
+              "required": [],
+              "title": "middlewares",
+              "type": "array"
+            }
+          },
+          "required": [],
+          "title": "ldaps",
+          "type": "object"
+        }
+      },
+      "required": [],
+      "title": "ingressRouteTCP",
+      "type": "object"
+    },
+    "kanidm": {
+      "additionalProperties": false,
+      "description": "Kanidm server configuration, rendered into the server.toml ConfigMap. Only the most\ncommon options are exposed; append anything else verbatim via `kanidm.extraConfig`.",
+      "properties": {
+        "bindAddress": {
+          "default": "0.0.0.0:8443",
+          "description": "The HTTPS bind address inside the pod; the container port is 8443.",
+          "pattern": "^.+:([0-9]{1,5})$",
+          "title": "bindAddress",
+          "type": "string"
+        },
+        "clientAddressInfo": {
+          "additionalProperties": false,
+          "description": "How client IP addresses are discovered when traffic is reverse proxied. Only one\nmethod may be configured per listener. Leave everything empty when the service is\nexposed directly (LoadBalancer / NodePort).",
+          "properties": {
+            "http": {
+              "additionalProperties": false,
+              "properties": {
+                "proxyProtocolV2": {
+                  "description": "IPs or CIDRs allowed to supply the PROXY protocol v2 header to the HTTPS\nlistener.",
+                  "items": {
+                    "type": "string"
+                  },
+                  "title": "proxyProtocolV2",
+                  "type": "array"
+                },
+                "xForwardedFor": {
+                  "description": "IPs or CIDRs allowed to supply X-Forwarded-For to the HTTPS listener. Upstream\ndiscourages this: prefer PROXY protocol v2.",
+                  "items": {
+                    "type": "string"
+                  },
+                  "title": "xForwardedFor",
+                  "type": "array"
+                }
+              },
+              "required": [],
+              "title": "http",
+              "type": "object"
+            },
+            "ldap": {
+              "additionalProperties": false,
+              "properties": {
+                "proxyProtocolV2": {
+                  "description": "IPs or CIDRs allowed to supply the PROXY protocol v2 header to the LDAPS\nlistener.",
+                  "items": {
+                    "type": "string"
+                  },
+                  "title": "proxyProtocolV2",
+                  "type": "array"
+                }
+              },
+              "required": [],
+              "title": "ldap",
+              "type": "object"
+            }
+          },
+          "required": [],
+          "title": "clientAddressInfo",
+          "type": "object"
+        },
+        "db": {
+          "additionalProperties": false,
+          "properties": {
+            "arcSize": {
+              "default": null,
+              "description": "Number of entries to store in the in-memory cache (minimum 256). Unset uses an\nautomatic heuristic; only tune this if you experience memory pressure.",
+              "minimum": 256,
+              "required": [],
+              "title": "arcSize",
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "fsType": {
+              "default": "",
+              "description": "Tune the database page size to the backing filesystem: \"zfs\" sets a 64K page size\n(requires recordsize=64k on the dataset), \"other\" uses 4K. Leave empty for the\ndefault; changing it requires running a vacuum task.",
+              "enum": [
+                "",
+                "zfs",
+                "other"
+              ],
+              "required": [],
+              "title": "fsType"
+            }
+          },
+          "required": [],
+          "title": "db",
+          "type": "object"
+        },
+        "domain": {
+          "default": "idm.example.com",
+          "description": "The DNS domain name of the server. Used in security-critical contexts (WebAuthn,\nOAuth2, SPNs), so it MUST match the hostname users reach the server on, and the TLS\ncertificate must be issued for it. Changing it later breaks registered credentials\nand requires `kanidmd domain rename`.",
+          "minLength": 1,
+          "title": "domain",
+          "type": "string"
+        },
+        "extraConfig": {
+          "default": "",
+          "description": "Raw TOML appended to the generated server.toml, for options the chart does not model.\nNote that top-level keys must come before any [table] header, so use tables here.",
+          "title": "extraConfig",
+          "type": "string"
+        },
+        "ldap": {
+          "additionalProperties": false,
+          "properties": {
+            "bindAddress": {
+              "default": "0.0.0.0:3636",
+              "description": "The LDAPS bind address inside the pod.",
+              "pattern": "^.+:([0-9]{1,5})$",
+              "title": "bindAddress",
+              "type": "string"
+            },
+            "enabled": {
+              "default": false,
+              "description": "Enable the read-only LDAP-over-TLS interface; the container port is 3636.",
+              "title": "enabled",
+              "type": "boolean"
+            }
+          },
+          "required": [],
+          "title": "ldap",
+          "type": "object"
+        },
+        "logLevel": {
+          "default": "info",
+          "description": "Log level.",
+          "enum": [
+            "info",
+            "debug",
+            "trace"
+          ],
+          "required": [],
+          "title": "logLevel"
+        },
+        "onlineBackup": {
+          "additionalProperties": false,
+          "properties": {
+            "path": {
+              "default": "/data/kanidm/backups/",
+              "description": "Output directory of the online backups, on the data volume.",
+              "title": "path",
+              "type": "string"
+            },
+            "schedule": {
+              "default": "00 22 * * *",
+              "description": "Cron schedule of the online database backup task (see https://crontab.guru/).\nBackups are written below `kanidm.onlineBackup.path` on the data volume. Set to \"\"\nto disable the task.",
+              "title": "schedule",
+              "type": "string"
+            },
+            "versions": {
+              "default": 7,
+              "description": "Number of online backups to keep.",
+              "minimum": 1,
+              "title": "versions",
+              "type": "integer"
+            }
+          },
+          "required": [],
+          "title": "onlineBackup",
+          "type": "object"
+        },
+        "origin": {
+          "default": "",
+          "description": "The origin for WebAuthn and OAuth2: the URL users visit, with the port included only\nwhen it is non-standard (anything except 443). Must match or be a descendant of\n`domain`. Defaults to https://\u003ckanidm.domain\u003e.",
+          "title": "origin",
+          "type": "string"
+        },
+        "otelGrpcUrl": {
+          "default": "",
+          "description": "OpenTelemetry OTLP/gRPC endpoint for trace exports, e.g.\nhttp://otel-collector.observability:4317. Allow egress to the collector through\n`networkPolicy.additionalEgress`.",
+          "title": "otelGrpcUrl",
+          "type": "string"
+        },
+        "tls": {
+          "additionalProperties": false,
+          "properties": {
+            "existingSecret": {
+              "default": "",
+              "description": "Name of an existing TLS secret (with tls.crt and tls.key entries) to mount instead\nof the one issued by `certificate`. Required when `certificate.enabled` is false.",
+              "title": "existingSecret",
+              "type": "string"
+            }
+          },
+          "required": [],
+          "title": "tls",
+          "type": "object"
+        }
+      },
+      "required": [],
+      "title": "kanidm",
+      "type": "object"
+    },
+    "livenessProbe": {
+      "additionalProperties": true,
+      "description": "Restarts the container when /status stops responding. Set to null to remove.",
+      "properties": {
+        "failureThreshold": {
+          "default": 3,
+          "title": "failureThreshold",
+          "type": "integer"
+        },
+        "httpGet": {
+          "additionalProperties": true,
+          "properties": {
+            "path": {
+              "default": "/status",
+              "title": "path",
+              "type": "string"
+            },
+            "port": {
+              "default": "https",
+              "required": [],
+              "title": "port",
+              "type": [
+                "string",
+                "integer"
+              ]
+            },
+            "scheme": {
+              "default": "HTTPS",
+              "title": "scheme",
+              "type": "string"
+            }
+          },
+          "required": [],
+          "title": "httpGet",
+          "type": "object"
+        },
+        "periodSeconds": {
+          "default": 30,
+          "title": "periodSeconds",
+          "type": "integer"
+        },
+        "timeoutSeconds": {
+          "default": 5,
+          "title": "timeoutSeconds",
+          "type": "integer"
+        }
+      },
+      "required": [],
+      "title": "livenessProbe",
+      "type": "object"
+    },
+    "nameOverride": {
+      "default": "",
+      "description": "This is to override the chart name.",
+      "title": "nameOverride",
+      "type": "string"
+    },
+    "networkPolicy": {
+      "additionalProperties": false,
+      "description": "Network policy. Kanidm is the root of trust for the whole network (\"game over\" if it is\ncompromised), so the default policy allows ingress from any source on the service ports\nand denies all egress except cluster DNS. Use `additionalEgress` to reach an in-cluster\nOpenTelemetry collector or other dependencies.",
+      "properties": {
+        "additionalEgress": {
+          "description": "Additional egress rules appended to the policy, e.g. for an OpenTelemetry collector:\n\n  additionalEgress:\n    - to:\n        - namespaceSelector:\n            matchLabels:\n              kubernetes.io/metadata.name: observability\n      ports:\n        - protocol: TCP\n          port: 4317",
+          "items": {
+            "additionalProperties": true,
+            "required": [],
+            "type": "object"
+          },
+          "title": "additionalEgress",
+          "type": "array"
+        },
+        "enabled": {
+          "default": true,
+          "description": "Create a NetworkPolicy for the server pod.",
+          "title": "enabled",
+          "type": "boolean"
+        }
+      },
+      "required": [],
+      "title": "networkPolicy",
+      "type": "object"
+    },
+    "nodeSelector": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "required": [],
+      "title": "nodeSelector",
+      "type": "object"
+    },
+    "persistence": {
+      "additionalProperties": false,
+      "description": "Persistence for the Kanidm database (and its online backups). Expect up to 8KB of disk\nper database entry.",
+      "properties": {
+        "accessModes": {
+          "items": {
+            "enum": [
+              "ReadWriteOnce",
+              "ReadOnlyMany",
+              "ReadWriteMany",
+              "ReadWriteOncePod"
+            ],
+            "required": []
+          },
+          "title": "accessModes",
+          "type": "array"
+        },
+        "annotations": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Annotations to add to the claim.",
+          "required": [],
+          "title": "annotations",
+          "type": "object"
+        },
+        "enabled": {
+          "default": true,
+          "description": "Create a persistent volume claim for /data.",
+          "title": "enabled",
+          "type": "boolean"
+        },
+        "existingClaim": {
+          "default": "",
+          "description": "Use an existing claim instead of creating one. Must be writable by fsGroup.",
+          "title": "existingClaim",
+          "type": "string"
+        },
+        "size": {
+          "default": "2Gi",
+          "description": "Size of the claim.",
+          "title": "size",
+          "type": "string"
+        },
+        "storageClass": {
+          "default": "",
+          "description": "Storage class of the claim; leave empty to use the cluster default. Flash storage\n(NVMe) is strongly recommended.",
+          "title": "storageClass",
+          "type": "string"
+        }
+      },
+      "required": [],
+      "title": "persistence",
+      "type": "object"
+    },
+    "podAnnotations": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "description": "Annotations to set on the pod.",
+      "required": [],
+      "title": "podAnnotations",
+      "type": "object"
+    },
+    "podDisruptionBudget": {
+      "additionalProperties": false,
+      "description": "Pod disruption budget. Kanidm is a single-instance service, so a PDB cannot preserve\navailability; it is disabled by default.",
+      "properties": {
+        "enabled": {
+          "default": false,
+          "description": "Create a PodDisruptionBudget for the server pod.",
+          "title": "enabled",
+          "type": "boolean"
+        },
+        "maxUnavailable": {
+          "default": 1,
+          "description": "Maximum number of pods that may be unavailable after a voluntary disruption.",
+          "required": [],
+          "title": "maxUnavailable",
+          "type": [
+            "integer",
+            "string"
+          ]
+        },
+        "minAvailable": {
+          "default": 0,
+          "description": "Minimum number of pods that must be available after a voluntary disruption. With a\nsingle replica use 0, or use `maxUnavailable` instead.",
+          "required": [],
+          "title": "minAvailable",
+          "type": [
+            "integer",
+            "string"
+          ]
+        }
+      },
+      "required": [],
+      "title": "podDisruptionBudget",
+      "type": "object"
+    },
+    "podLabels": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "description": "Labels to set on the pod.",
+      "required": [],
+      "title": "podLabels",
+      "type": "object"
+    },
+    "podSecurityContext": {
+      "additionalProperties": true,
+      "description": "Satisfies the \"restricted\" Pod Security Standard together with the container\nsecurityContext. The fsGroup must own the database volume so the server (uid 1000) can\nmanage its files in /data.",
+      "properties": {
+        "fsGroup": {
+          "default": 1000,
+          "title": "fsGroup",
+          "type": "integer"
+        },
+        "fsGroupChangePolicy": {
+          "default": "OnRootMismatch",
+          "title": "fsGroupChangePolicy",
+          "type": "string"
+        },
+        "runAsGroup": {
+          "default": 1000,
+          "title": "runAsGroup",
+          "type": "integer"
+        },
+        "runAsNonRoot": {
+          "default": true,
+          "title": "runAsNonRoot",
+          "type": "boolean"
+        },
+        "runAsUser": {
+          "default": 1000,
+          "title": "runAsUser",
+          "type": "integer"
+        },
+        "seccompProfile": {
+          "additionalProperties": true,
+          "properties": {
+            "type": {
+              "default": "RuntimeDefault",
+              "title": "type",
+              "type": "string"
+            }
+          },
+          "required": [],
+          "title": "seccompProfile",
+          "type": "object"
+        }
+      },
+      "required": [],
+      "title": "podSecurityContext",
+      "type": "object"
+    },
+    "priorityClassName": {
+      "default": "",
+      "description": "Priority class name for the pod.",
+      "title": "priorityClassName",
+      "type": "string"
+    },
+    "readinessProbe": {
+      "additionalProperties": true,
+      "description": "Removes the pod from the Service endpoints while /status is failing, so clients are not routed to a wedged instance. Set to null to remove.",
+      "properties": {
+        "failureThreshold": {
+          "default": 3,
+          "title": "failureThreshold",
+          "type": "integer"
+        },
+        "httpGet": {
+          "additionalProperties": true,
+          "properties": {
+            "path": {
+              "default": "/status",
+              "title": "path",
+              "type": "string"
+            },
+            "port": {
+              "default": "https",
+              "required": [],
+              "title": "port",
+              "type": [
+                "string",
+                "integer"
+              ]
+            },
+            "scheme": {
+              "default": "HTTPS",
+              "title": "scheme",
+              "type": "string"
+            }
+          },
+          "required": [],
+          "title": "httpGet",
+          "type": "object"
+        },
+        "periodSeconds": {
+          "default": 10,
+          "title": "periodSeconds",
+          "type": "integer"
+        },
+        "timeoutSeconds": {
+          "default": 3,
+          "title": "timeoutSeconds",
+          "type": "integer"
+        }
+      },
+      "required": [],
+      "title": "readinessProbe",
+      "type": "object"
+    },
+    "resources": {
+      "additionalProperties": true,
+      "description": "Container resource requirements. Kanidm trades memory for throughput: budget roughly\n64KB of RAM per database entry plus headroom.",
+      "properties": {
+        "limits": {
+          "additionalProperties": true,
+          "properties": {
+            "memory": {
+              "default": "512Mi",
+              "title": "memory",
+              "type": "string"
+            }
+          },
+          "required": [
+            "memory"
+          ],
+          "title": "limits",
+          "type": "object"
+        },
+        "requests": {
+          "additionalProperties": true,
+          "properties": {
+            "cpu": {
+              "default": "100m",
+              "title": "cpu",
+              "type": "string"
+            },
+            "memory": {
+              "default": "256Mi",
+              "title": "memory",
+              "type": "string"
+            }
+          },
+          "required": [
+            "cpu",
+            "memory"
+          ],
+          "title": "requests",
+          "type": "object"
+        }
+      },
+      "required": [],
+      "title": "resources",
+      "type": "object"
+    },
+    "securityContext": {
+      "additionalProperties": true,
+      "description": "Hardened container context. Kanidm only ever writes to /data (the database volume), so\nthe root filesystem can stay read-only and no privileges are required: the server binds\n8443/3636 inside the pod, never ports below 1024.",
+      "properties": {
+        "allowPrivilegeEscalation": {
+          "default": false,
+          "title": "allowPrivilegeEscalation",
+          "type": "boolean"
+        },
+        "capabilities": {
+          "additionalProperties": true,
+          "properties": {
+            "drop": {
+              "items": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  }
+                ],
+                "required": []
+              },
+              "title": "drop",
+              "type": "array"
+            }
+          },
+          "required": [],
+          "title": "capabilities",
+          "type": "object"
+        },
+        "readOnlyRootFilesystem": {
+          "default": true,
+          "title": "readOnlyRootFilesystem",
+          "type": "boolean"
+        }
+      },
+      "required": [],
+      "title": "securityContext",
+      "type": "object"
+    },
+    "service": {
+      "additionalProperties": false,
+      "properties": {
+        "annotations": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Annotations for the service (e.g. cloud provider or MetalLB configuration).",
+          "required": [],
+          "title": "annotations",
+          "type": "object"
+        },
+        "externalTrafficPolicy": {
+          "default": "Local",
+          "description": "External traffic policy for NodePort and LoadBalancer services. \"Local\" preserves the\nclient source IP.",
+          "enum": [
+            "Cluster",
+            "Local"
+          ],
+          "required": [],
+          "title": "externalTrafficPolicy"
+        },
+        "httpsPort": {
+          "default": 443,
+          "description": "Service port for the HTTPS interface (web UI, APIs, OIDC); the container listens on\n8443.",
+          "maximum": 65535,
+          "minimum": 1,
+          "title": "httpsPort",
+          "type": "integer"
+        },
+        "ldapsPort": {
+          "default": 636,
+          "description": "Service port for the LDAPS interface; the container listens on 3636. Only used when\n`kanidm.ldap.enabled` is true.",
+          "maximum": 65535,
+          "minimum": 1,
+          "title": "ldapsPort",
+          "type": "integer"
+        },
+        "type": {
+          "default": "ClusterIP",
+          "description": "Service type. ClusterIP suits an ingress doing TLS passthrough; use LoadBalancer to\nexpose the server directly.",
+          "enum": [
+            "ClusterIP",
+            "NodePort",
+            "LoadBalancer"
+          ],
+          "required": [],
+          "title": "type"
+        }
+      },
+      "required": [],
+      "title": "service",
+      "type": "object"
+    },
+    "serviceAccount": {
+      "additionalProperties": false,
+      "properties": {
+        "annotations": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Annotations to add to the service account.",
+          "required": [],
+          "title": "annotations",
+          "type": "object"
+        },
+        "create": {
+          "default": true,
+          "description": "Specifies whether a service account should be created. Kanidm never talks to the\nKubernetes API; token mounting is disabled either way.",
+          "title": "create",
+          "type": "boolean"
+        },
+        "name": {
+          "default": "",
+          "description": "The name of the service account to use. If not set and `create` is true, a name is\ngenerated using the fullname template.",
+          "title": "name",
+          "type": "string"
+        }
+      },
+      "required": [],
+      "title": "serviceAccount",
+      "type": "object"
+    },
+    "startupProbe": {
+      "additionalProperties": true,
+      "description": "Startup probe. Grants up to failureThreshold * periodSeconds (5 minutes by default) for database checks and recovery on large databases before the liveness probe takes over. Set to null to remove.",
+      "properties": {
+        "failureThreshold": {
+          "default": 30,
+          "title": "failureThreshold",
+          "type": "integer"
+        },
+        "httpGet": {
+          "additionalProperties": true,
+          "properties": {
+            "path": {
+              "default": "/status",
+              "title": "path",
+              "type": "string"
+            },
+            "port": {
+              "default": "https",
+              "required": [],
+              "title": "port",
+              "type": [
+                "string",
+                "integer"
+              ]
+            },
+            "scheme": {
+              "default": "HTTPS",
+              "title": "scheme",
+              "type": "string"
+            }
+          },
+          "required": [],
+          "title": "httpGet",
+          "type": "object"
+        },
+        "periodSeconds": {
+          "default": 10,
+          "title": "periodSeconds",
+          "type": "integer"
+        }
+      },
+      "required": [],
+      "title": "startupProbe",
+      "type": "object"
+    },
+    "terminationGracePeriodSeconds": {
+      "default": 60,
+      "description": "Time for in-flight requests and the online backup to finish on shutdown.",
+      "title": "terminationGracePeriodSeconds",
+      "type": "integer"
+    },
+    "tolerations": {
+      "items": {
+        "additionalProperties": true,
+        "required": [],
+        "type": "object"
+      },
+      "required": [],
+      "title": "tolerations"
+    }
+  },
+  "required": [
+    "image",
+    "serviceAccount",
+    "podDisruptionBudget",
+    "networkPolicy",
+    "persistence",
+    "service",
+    "ingress",
+    "ingressRouteTCP",
+    "certificate",
+    "kanidm"
+  ],
+  "type": "object"
+}

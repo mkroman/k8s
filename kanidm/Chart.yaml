@@ -1,0 +1,20 @@
+apiVersion: v2
+name: kanidm
+description: Kanidm is a simple, secure and fast identity management platform
+type: application
+version: 0.1.0
+appVersion: "1.11.2"
+kubeVersion: ">=1.25.0-0"
+home: https://kanidm.com
+sources:
+  - https://github.com/kanidm/kanidm
+keywords:
+  - identity
+  - authentication
+  - authorization
+  - ldap
+  - oauth2
+  - oidc
+maintainers:
+  - name: Mikkel Kroman
+    email: mk@maero.dk

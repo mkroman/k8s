@@ -1,0 +1,44 @@
+{{- if .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "kanidm.fullname" . }}
+  labels:
+    {{- include "kanidm.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "kanidm.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    # Kanidm serves clients from anywhere (web UI, OIDC clients, LDAP), so ingress is
+    # allowed from all sources on the service ports. Restrict `ingress` below if your
+    # environment allows, e.g. to the ingress controller only.
+    - Ingress
+    # Kanidm is self-contained: it makes no outbound connections of its own. Deny all
+    # egress except cluster DNS to contain a would-be compromise; add exceptions via
+    # `networkPolicy.additionalEgress` (e.g. for an OpenTelemetry collector).
+    - Egress
+  ingress:
+    - from: []
+      ports:
+        - protocol: TCP
+          port: 8443
+        {{- if .Values.kanidm.ldap.enabled }}
+        - protocol: TCP
+          port: 3636
+        {{- end }}
+  egress:
+    # Cluster-internal DNS.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    {{- with .Values.networkPolicy.additionalEgress }}
+      {{- toYaml . | nindent 4 }}
+    {{- end }}
+{{- end }}
