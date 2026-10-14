@@ -12,7 +12,7 @@ irc:
   channels:
     - "#magistr"
     # List of nicknames to ignore messages from.
-  ignored_nicks: ["arenamusen*", "robutler*", "hactar*", "schrute*", "chad*"]
+  ignored_nicks: ["arenamusen*", "robutler*", "hactar*", "schrute*", "chad*", "secret*"]
   message_max_length: 420
 
 llm:
