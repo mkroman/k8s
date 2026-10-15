@@ -3,4 +3,5 @@ name: mumble
 description: A Helm chart for the Mumble server, murmur.
 type: application
 version: 0.2.0
+# renovate: datasource=github-releases depName=mumble-voip/mumble
 appVersion: "v1.5.857"
