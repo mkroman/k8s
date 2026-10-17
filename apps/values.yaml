@@ -277,8 +277,9 @@ projects:
   - name: zeta
     description: "Zeta IRC bot with plugins"
     destinations:
-      - namespace: zeta-prod
       - namespace: zeta-dev
+      - namespace: zeta-magistr
+      - namespace: zeta-prod
     sourceRepos:
       - https://github.com/mkroman/k8s
     namespaceResourceBlacklist:
