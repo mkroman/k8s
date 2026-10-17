@@ -305,8 +305,9 @@ namespaces:
   - name: rwx-openwebui-prod
   - name: traefik
   - name: vector
-  - name: zeta-prod
   - name: zeta-dev
+  - name: zeta-magistr
+  - name: zeta-prod
 
 newApplications:
   - name: cert-manager
@@ -526,3 +527,16 @@ newApplications:
       helm:
         valueFiles:
           - values-prod.yaml
+
+  - name: zeta-magistr
+    annotations:
+      argocd.argoproj.io/sync-wave: "2"
+    project: zeta
+    destination:
+      namespace: zeta-magistr
+    source:
+      repoURL: https://github.com/mkroman/k8s
+      path: zeta
+      helm:
+        valueFiles:
+          - values-magistr.yaml
