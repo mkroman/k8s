@@ -17,6 +17,15 @@ networkPolicy:
   #         port: 5432
   additionalEgress: []
 
+env:
+  - name: TZ
+    value: Europe/Copenhagen
+
+envFrom:
+  - secretRef:
+      name: zeta-env
+      optional: false
+
 # Zeta application configuration, rendered into the `config.toml` ConfigMap.
 zeta:
   # Database Configuration.
