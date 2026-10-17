@@ -16,7 +16,7 @@ image:
   # Overrides the image tag whose default is the chart appVersion.
   tag: ""
   # Pin the image by digest; replaces the tag when set.
-  digest: ""
+  digest: "sha256:458d19d86a6b9972506d1dc582fc4159e8bde45220d2292a69383742d4511e27"
 
 # This is for the secrets for pulling an image from a private repository. More information can be
 # found here: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
