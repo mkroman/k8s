@@ -34,6 +34,12 @@
         "tag": {
           "type": "string",
           "description": "Overrides the image tag whose default is the chart appVersion."
+        },
+        "digest": {
+          "type": "string",
+          "default": "",
+          "pattern": "^(sha256:[a-f0-9]{64})?$",
+          "description": "Pin the image by digest; replaces the tag when set, e.g. \"sha256:0123...\"."
         }
       }
     },
@@ -169,12 +175,21 @@
             },
             "idle_timeout": {
               "type": "string",
-              "description": "The maximum idle duration for individual connections. Defaults to \"5s\"."
+              "description": "The maximum idle duration for individual connections. Defaults to \"5m\"."
+            },
+            "min_connections": {
+              "type": "integer",
+              "minimum": 0,
+              "description": "The minimum number of connections to maintain at all times in the database pool. Defaults to 1."
             },
             "max_connections": {
               "type": "integer",
               "minimum": 1,
               "description": "The maximum number of connections that the database pool should maintain. Defaults to 5."
+            },
+            "max_lifetime": {
+              "type": "string",
+              "description": "The maximum lifetime of individual connections before they are reaped. Defaults to \"24h\"."
             }
           }
         },
@@ -232,6 +247,10 @@
             "should_ghost": {
               "type": "boolean",
               "description": "Whether the client should use NickServ GHOST to reclaim its primary nickname if it is in use. Has no effect if `nick_password` is not set."
+            },
+            "quit_message": {
+              "type": "string",
+              "description": "The message sent in the QUIT when the bot shuts down gracefully (SIGINT/SIGTERM), e.g. when the pod running the bot is deleted. Defaults to \"shutting down\"."
             },
             "encoding": {
               "type": "string",
@@ -351,6 +370,11 @@
           "additionalProperties": false,
           "description": "Per-plugin configuration. Sections that are omitted leave the plugin enabled with its default settings.",
           "properties": {
+            "enabled_by_default": {
+              "type": "boolean",
+              "default": true,
+              "description": "Whether plugins without an explicit `enabled` toggle are enabled (true, opt-out) or disabled (false, opt-in)."
+            },
             "chaturbate": {
               "type": "object",
               "additionalProperties": false,
@@ -447,6 +471,26 @@
                   "type": "boolean",
                   "default": true,
                   "description": "Enable the plugin."
+                },
+                "currency": {
+                  "type": "boolean",
+                  "default": true,
+                  "description": "Whether to fetch live currency (fiat and Bitcoin) data."
+                },
+                "currency_ttl": {
+                  "type": "string",
+                  "default": "1h",
+                  "description": "How long the fetched currency data stays valid before being refreshed. Defaults to \"1h\"."
+                },
+                "currency_url": {
+                  "type": "string",
+                  "default": "https://rinkcalc.app/data/currency.json",
+                  "description": "The URL the live currency dataset is fetched from."
+                },
+                "crypto": {
+                  "type": "boolean",
+                  "default": true,
+                  "description": "Whether to load live cryptocurrency units through the coinmarketcap plugin. Effective only when the coinmarketcap plugin is loaded."
                 }
               }
             },
@@ -486,10 +530,15 @@
                   "description": "How long the scheduler waits before retrying after a failed tick. Defaults to \"30s\".",
                   "default": "30s"
                 },
-                "max_pending_per_user": {
-                  "type": "integer",
-                  "default": 50,
-                  "description": "The maximum number of pending alerts a user may have. Defaults to 50."
+                "sync_interval": {
+                  "type": "string",
+                  "description": "How often the window of upcoming alerts is synced from the database. Alerts are only delivered on time if the window is at least as large as this interval. Defaults to \"5m\".",
+                  "default": "5m"
+                },
+                "window": {
+                  "type": "string",
+                  "description": "How far ahead of their due time alerts are kept in memory. Should be at least `sync_interval`, so every alert is cached before it is due. Defaults to \"15m\".",
+                  "default": "15m"
                 }
               }
             },
@@ -657,6 +706,39 @@
                   "type": "string",
                   "default": "en-US",
                   "description": "The language the IMDb API localises results for. Defaults to \"en-US\"."
+                }
+              }
+            },
+            "instagram": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": {
+                  "type": "boolean",
+                  "default": true,
+                  "description": "Enable the plugin."
+                },
+                "title_length": {
+                  "type": "integer",
+                  "default": 150,
+                  "description": "The maximum length of a media caption before it gets truncated. Defaults to 150."
+                },
+                "prefix": {
+                  "type": "string",
+                  "description": "The key prefix that mirrored media are uploaded under. Falls back to the INSTAGRAM_S3_PREFIX environment variable, and to \"instagram\" when neither is set."
+                },
+                "public_url_base": {
+                  "type": "string",
+                  "description": "The base URL used when linking to mirrored media. Falls back to the INSTAGRAM_PUBLIC_URL_BASE environment variable when unset."
+                },
+                "session_cookie": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "An authenticated Instagram session cookie (the `sessionid` cookie value of a logged-in browser session). Lifts the login wall for media that would otherwise not be readable anonymously, including stories. Falls back to the INSTAGRAM_SESSION_COOKIE environment variable when unset."
+                },
+                "metadata_proxy": {
+                  "type": "string",
+                  "description": "The base URL of a proxy serving the OpenGraph metadata of Instagram media — e.g. a self-hosted InstaFix instance — used as a last resort when the other metadata sources fail. Falls back to the INSTAGRAM_METADATA_PROXY environment variable when unset."
                 }
               }
             },
@@ -878,6 +960,16 @@
                   "default": 150,
                   "description": "The maximum length of a video title before it gets truncated. Defaults to 150."
                 },
+                "mirror": {
+                  "type": "boolean",
+                  "default": true,
+                  "description": "Whether to mirror videos to the S3 bucket configured in the `mirror` section. Mirroring additionally requires the shared `mirror` configuration (or the S3_* environment variables); without it, videos are not mirrored regardless of this setting."
+                },
+                "post_summary": {
+                  "type": "boolean",
+                  "default": true,
+                  "description": "Whether to post a summary of the video's oEmbed metadata."
+                },
                 "prefix": {
                   "type": "string",
                   "description": "The key prefix that mirrored videos are uploaded under. Falls back to the TIKTOK_S3_PREFIX environment variable, and to \"tiktok\" when neither is set."
@@ -902,7 +994,7 @@
                   "items": {
                     "type": "string"
                   },
-                  "description": "Hosts whose URLs are left to dedicated plugins. Defaults to every host matched by a bundled plugin; the hosts advertised by loaded plugins through the plugin catalog are skipped as well."
+                  "description": "Hosts whose URLs are left to dedicated plugins. Empty by default: the hosts advertised by loaded plugins through the plugin catalog are skipped without any configuration."
                 },
                 "max_redirects": {
                   "type": "integer",
@@ -979,6 +1071,32 @@
                 }
               }
             },
+            "unwall": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": {
+                  "type": "boolean",
+                  "default": true,
+                  "description": "Enable the plugin."
+                },
+                "api_base": {
+                  "type": "string",
+                  "default": "https://api.unwall.app/",
+                  "description": "The base URL of the unwall API."
+                },
+                "reader_base": {
+                  "type": "string",
+                  "default": "https://unwall.app/",
+                  "description": "The base URL of the unwall reader, linked in the replies."
+                },
+                "submit_timeout": {
+                  "type": "string",
+                  "default": "5m",
+                  "description": "How long an article submission may take: the first submission of an article is mirrored server-side and can take tens of seconds. Defaults to \"5m\"."
+                }
+              }
+            },
             "youtube": {
               "type": "object",
               "additionalProperties": false,
@@ -1007,6 +1125,11 @@
                   ],
                   "default": "none",
                   "description": "The safe search filter applied to search requests."
+                },
+                "enable_command": {
+                  "type": "boolean",
+                  "default": true,
+                  "description": "Enable the `.yt` command."
                 }
               }
             }

@@ -55,7 +55,8 @@ spec:
           - /config/config.toml
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          {{- $digest := .Values.image.digest }}
+          image: "{{ .Values.image.repository }}{{- if $digest }}@{{ $digest }}{{- else }}:{{ .Values.image.tag | default .Chart.AppVersion }}{{- end }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           {{- with .Values.livenessProbe }}
           livenessProbe:

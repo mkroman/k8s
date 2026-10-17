@@ -15,6 +15,8 @@ image:
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
   tag: ""
+  # Pin the image by digest; replaces the tag when set.
+  digest: ""
 
 # This is for the secrets for pulling an image from a private repository. More information can be
 # found here: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
@@ -131,11 +133,17 @@ zeta:
     # environment variable (e.g. from a Secret) in production.
     url: "postgresql://user:changeme@localhost/zeta_development"
     # The maximum idle duration for individual connections (humantime string).
-    # Defaults to "5s" when omitted.
-    idle_timeout: "5s"
+    # Defaults to "5m" when omitted.
+    idle_timeout: "5m"
+    # The minimum number of connections to maintain at all times in the database pool.
+    # Defaults to 1 when omitted.
+    # min_connections: 1
     # The maximum number of connections that the database pool should maintain.
     # Defaults to 5 when omitted.
     max_connections: 5
+    # The maximum lifetime of individual connections before they are reaped (humantime string).
+    # Defaults to "24h" when omitted.
+    # max_lifetime: 24h
 
   # IRC Configuration.
   irc:
@@ -143,7 +151,7 @@ zeta:
     nickname: zeta
 
     # Alternative nicknames for the client, if the default is taken.
-    alt_nicks: ["zet4", "ze74", "zeta_"]
+    alt_nicks: ["zet4", "z3ta", "z3t4", "zet_"]
 
     # The hostname of the server to connect to.
     hostname: irc.rwx.im
@@ -168,6 +176,11 @@ zeta:
     # use. This has no effect if `nick_password` is not set.
     # should_ghost: true
 
+    # The message sent in the QUIT when the bot shuts down gracefully (SIGINT/SIGTERM), e.g.
+    # when the pod running the bot is deleted.
+    # Defaults to "shutting down" when omitted.
+    # quit_message: shutting down
+
     # The encoding type used for this connection. This is typically UTF-8, but could be
     # something else.
     # encoding: UTF-8
@@ -189,7 +202,7 @@ zeta:
       #   key: secret
 
   # HTTP Configuration.
-  http:
+  http: {}
     # The duration before an HTTP request times out (humantime string).
     # timeout: "30s"
     # The `User-Agent` header sent with HTTP requests.
@@ -226,17 +239,27 @@ zeta:
 
   # Plugin Configuration.
   #
-  # Every bundled plugin has a section keyed by its name, with an `enabled` toggle (default
-  # true). Sections that are omitted entirely leave the plugin enabled with its default
-  # settings. The chart validates section keys and settings at install time; see
-  # `values.schema.json` and the repository `config.toml` for the available settings per plugin.
+  # Every bundled plugin has a section keyed by its name, with an `enabled` toggle. Plugins that
+  # do not set one, or that have no section at all, follow the `enabled_by_default` toggle: with
+  # the default `true` they are opt-out, with `false` they are opt-in. Sections that are omitted
+  # entirely leave the plugin enabled with its default settings. The chart validates section keys
+  # and settings at install time; see `values.schema.json` and the repository `config.toml` for
+  # the available settings per plugin.
   plugins: {}
+    # Whether plugins without an explicit `enabled` toggle are enabled (true, opt-out) or
+    # disabled (false, opt-in). Defaults to true.
+    # enabled_by_default: true
+    #
     # alert:
     #   enabled: true
     #   # How long the scheduler waits before retrying after a failed tick.
     #   retry_delay: 30s
-    #   # The maximum number of pending alerts a user may have.
-    #   max_pending_per_user: 50
+    #   # How often the window of upcoming alerts is synced from the database. Alerts are only
+    #   # delivered on time if the window is at least as large as this interval.
+    #   sync_interval: 5m
+    #   # How far ahead of their due time alerts are kept in memory. Should be at least
+    #   # sync_interval, so every alert is cached before it is due.
+    #   window: 15m
     #
     # chaturbate:
     #   enabled: true
@@ -292,6 +315,21 @@ zeta:
     #   user_country: US
     #   user_language: en-US
     #
+    # instagram:
+    #   enabled: true
+    #   title_length: 150
+    #   prefix: instagram
+    #   public_url_base: https://pub.rwx.im/instagram
+    #   # An authenticated Instagram session cookie (the `sessionid` cookie value of a logged-in
+    #   # browser session). Lifts the login wall for media that would otherwise not be readable
+    #   # anonymously, including stories. Falls back to the `INSTAGRAM_SESSION_COOKIE` environment
+    #   # variable when unset.
+    #   session_cookie: "..."
+    #   # The base URL of a proxy serving the OpenGraph metadata of Instagram media — e.g. a
+    #   # self-hosted InstaFix instance — used as a last resort when the other metadata sources
+    #   # fail. Falls back to the `INSTAGRAM_METADATA_PROXY` environment variable when unset.
+    #   metadata_proxy: https://d.example.com
+    #
     # isitopen:
     #   enabled: true
     #   api_key: "..."
@@ -328,6 +366,14 @@ zeta:
     #
     # rink:
     #   enabled: true
+    #   # Whether to fetch live currency (fiat and Bitcoin) data.
+    #   currency: true
+    #   # How long the fetched currency data stays valid before being refreshed.
+    #   currency_ttl: 1h
+    #   # The URL the live currency dataset is fetched from.
+    #   currency_url: https://rinkcalc.app/data/currency.json
+    #   # Whether to load live cryptocurrency units through the coinmarketcap plugin.
+    #   crypto: true
     #
     # rust_playground:
     #   enabled: true
@@ -350,7 +396,11 @@ zeta:
     #
     # tiktok:
     #   enabled: true
+    #   # Whether to post a summary of the video's oEmbed metadata.
+    #   post_summary: true
     #   title_length: 150
+    #   # Whether to mirror videos to the S3 bucket configured in the `mirror` section.
+    #   mirror: true
     #   prefix: tiktok
     #   public_url_base: https://pub.rwx.im/tiktok
     #
@@ -378,11 +428,23 @@ zeta:
     #   enabled: true
     #   max_definition_length: 400
     #
+    # unwall:
+    #   enabled: true
+    #   # The base URL of the unwall API.
+    #   api_base: https://api.unwall.app/
+    #   # The base URL of the unwall reader, linked in the replies.
+    #   reader_base: https://unwall.app/
+    #   # How long an article submission may take: the first submission of an article is mirrored
+    #   # server-side and can take tens of seconds.
+    #   submit_timeout: 5m
+    #
     # youtube:
     #   enabled: true
     #   api_key: "..."
     #   region_code: US
     #   safe_search: none  # "none", "moderate" or "strict"
+    #   # Enable the `.yt` command.
+    #   enable_command: true
 
   # Tracing Configuration.
   tracing:

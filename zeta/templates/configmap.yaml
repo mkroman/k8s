@@ -17,8 +17,14 @@ data:
     {{- with .idle_timeout }}
     idle_timeout = {{ . | toJson }}
     {{- end }}
+    {{- with .min_connections }}
+    min_connections = {{ . }}
+    {{- end }}
     {{- with .max_connections }}
     max_connections = {{ . }}
+    {{- end }}
+    {{- with .max_lifetime }}
+    max_lifetime = {{ . | toJson }}
     {{- end }}
     {{- end }}
 
@@ -44,6 +50,9 @@ data:
     {{- end }}
     {{- if hasKey . "should_ghost" }}
     should_ghost = {{ ternary "true" "false" .should_ghost }}
+    {{- end }}
+    {{- with .quit_message }}
+    quit_message = {{ . | toJson }}
     {{- end }}
     {{- with .encoding }}
     encoding = {{ . | toJson }}
@@ -109,6 +118,10 @@ data:
     {{- end }}
 
     {{- with .Values.zeta.plugins }}
+    {{- if hasKey . "enabled_by_default" }}
+    [plugins]
+    enabled_by_default = {{ ternary "true" "false" .enabled_by_default }}
+    {{- end }}
     {{- range $name, $section := . }}
     {{- if kindIs "map" $section }}
     {{- if gt (len $section) 0 }}

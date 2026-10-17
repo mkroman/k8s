@@ -11,7 +11,7 @@ zeta:
     tls:
       enabled: true
     channels:
-      "#zeta.dev": {}
+      - name: "#zeta.dev"
 
   tracing:
     enabled: true
