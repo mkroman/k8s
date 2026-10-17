@@ -344,7 +344,7 @@ zeta:
     youtube:
       enabled: true
       # Enable the `.yt` command.
-      enable_command: true
+      enable_command: false
 
   # Tracing Configuration.
   tracing:
