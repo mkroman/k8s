@@ -8,7 +8,7 @@ description: >-
 type: application
 version: 0.1.0
 # renovate: datasource=github-releases depName=immich-app/immich
-appVersion: "v3.3.0"
+appVersion: "v3.3.5"
 kubeVersion: ">=1.25.0-0"
 home: https://immich.app/
 icon: https://immich.app/img/immich-logo-inline-light.png
