@@ -185,8 +185,8 @@ zeta:
     #   enabled: true
     #   nameservers: ["1.1.1.1", "1.0.0.1", "2606:4700:4700::1111", "2606:4700:4700::1001"]
     #
-    # filter:
-    #   enabled: true
+    filter:
+      enabled: true
     #
     # gay:
     #   enabled: true
@@ -233,8 +233,8 @@ zeta:
     #   enabled: true
     #   api_key: "..."
     #
-    # kagi:
-    #   enabled: true
+    kagi:
+      enabled: true
     #   session_token: "..."
     #   session_duration: 15m
     #   language: en-US,en;q=0.9
@@ -303,8 +303,8 @@ zeta:
     #   prefix: tiktok
     #   public_url_base: https://pub.rwx.im/tiktok
     #
-    # titles:
-    #   enabled: true
+    titles:
+      enabled: true
     #   ignored_hosts: ["reddit.com", "youtube.com", ...]
     #   max_redirects: 3
     #   max_message_length: 400
@@ -340,7 +340,7 @@ zeta:
     youtube:
       enabled: true
       # Enable the `.yt` command.
-      enable_command: false
+      enable_command: true
 
   # Tracing Configuration.
   tracing:
