@@ -89,7 +89,7 @@ zeta:
     # Hostmasks of admin users, in `nick!user@hostname` form where any of the three components
     # may contain wildcards (`*` or `?`). Admins are authorized to manage URL and sender filters
     # with the `.filter` command; when unset, nobody is an admin.
-    # admin_hostmasks: ["mk!mk@*", "*!*@example.com"]
+    admin_hostmasks: ["*!~mk@static.166.16.13.49.clients.your-server.de"]
 
     # TLS Configuration.
     tls:
