@@ -6,6 +6,10 @@ kind: Application
 metadata:
   name: {{ required "A valid application .name is required" .name | quote }}
   namespace: {{ $.Values.argocdNamespace }}
+  {{- with .annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   {{- if hasKey . "finalizers" }}
   finalizers:
     {{- .finalizers | default list | toYaml | nindent 4 }}

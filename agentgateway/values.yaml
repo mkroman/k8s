@@ -1,0 +1,51 @@
+agentgateway:
+  # -- Complete the Pod Security Standards "restricted" profile. The upstream
+  # chart already runs the controller container as non-root with a read-only
+  # root filesystem, no privilege escalation and all capabilities dropped; the
+  # seccomp profile is the only restricted-profile requirement it leaves unset.
+  podSecurityContext:
+    seccompProfile:
+      type: RuntimeDefault
+
+  # -- The upstream chart only sets requests, but the deployment derives
+  # GOMEMLIMIT/GOMAXPROCS from the limits, so set both.
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: "1"
+      memory: 512Mi
+
+  # -- This cluster does not run Istio, so do not grant the controller RBAC
+  # access to Istio ServiceEntry/WorkloadEntry resources.
+  # https://agentgateway.dev/docs/kubernetes/latest/documentation/install/advanced/#istio-resource-discovery
+  istio:
+    enabled: false
+
+  # -- Scrape the control plane and provisioned proxies with the in-cluster
+  # Prometheus Operator stack, which selects monitors by the
+  # `metrics.uplink.io/monitor: prometheus` label, and provision the bundled
+  # Grafana dashboard for the sidecar in the grafana chart.
+  monitoring:
+    enabled: true
+    serviceMonitor:
+      extraLabels:
+        metrics.uplink.io/monitor: prometheus
+    grafanaDashboard:
+      labels:
+        grafana.com/dashboard: "true"
+
+  # -- Restrict the namespaces the controller may provision Gateway workloads
+  # in (empty keeps the default cluster-wide write access). Add the namespaces
+  # that hold Gateways here, together with matching `destinations` in the
+  # agentgateway AppProject, for least-privilege RBAC.
+  # https://agentgateway.dev/docs/kubernetes/latest/documentation/install/advanced/#namespace-scoped-write-permissions
+  rbac:
+    gatewayNamespaces: []
+
+  # -- Limit config discovery to specific namespaces (empty watches all
+  # namespaces). Each entry is a namespace selector with matchLabels or
+  # matchExpressions.
+  # https://agentgateway.dev/docs/kubernetes/latest/documentation/install/advanced/#namespace-discovery
+  discoveryNamespaceSelectors: []

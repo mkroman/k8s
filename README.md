@@ -25,10 +25,12 @@ Helm chart for Applications sourced from external Git repositories.
 
 | App                         | Path                                            | Status |
 |-----------------------------|-------------------------------------------------|--------|
+| agentgateway                | [`agentgateway`](agentgateway/)                  | [![App Status](https://argo-cd.infra.rwx.im/api/badge?name=agentgateway)](https://argo-cd.infra.rwx.im/applications/agentgateway) |
 | cert-manager                | [`cert-manager`](cert-manager/)                  | [![App Status](https://argo-cd.infra.rwx.im/api/badge?name=cert-manager)](https://argo-cd.infra.rwx.im/applications/cert-manager) |
 | chadgpt                     | [`chadgpt`](chadgpt/)                           | [![App Status](https://argo-cd.infra.rwx.im/api/badge?name=chadgpt)](https://argo-cd.infra.rwx.im/applications/chadgpt) |
 | chadgpt-magistr             | [`chadgpt`](chadgpt/)                           | [![App Status](https://argo-cd.infra.rwx.im/api/badge?name=chadgpt-magistr)](https://argo-cd.infra.rwx.im/applications/chadgpt-magistr) |
 | cloudnative-pg              | [`cloudnative-pg`](cloudnative-pg/)              | [![App Status](https://argo-cd.infra.rwx.im/api/badge?name=cloudnative-pg)](https://argo-cd.infra.rwx.im/applications/cloudnative-pg) |
+| gateway-api                 | [`gateway-api`](gateway-api/)                    | [![App Status](https://argo-cd.infra.rwx.im/api/badge?name=gateway-api)](https://argo-cd.infra.rwx.im/applications/gateway-api) |
 | grafana                     | [`grafana`](grafana/)                           | [![App Status](https://argo-cd.infra.rwx.im/api/badge?name=grafana)](https://argo-cd.infra.rwx.im/applications/grafana) |
 | longhorn                    | [`longhorn`](longhorn/)                         | [![App Status](https://argo-cd.infra.rwx.im/api/badge?name=longhorn)](https://argo-cd.infra.rwx.im/applications/longhorn) |
 | monitoring                  | [`monitoring`](monitoring/)                     | [![App Status](https://argo-cd.infra.rwx.im/api/badge?name=monitoring)](https://argo-cd.infra.rwx.im/applications/monitoring) |

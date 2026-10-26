@@ -10,6 +10,7 @@ resources:
   - ../../base
   - ./manifests/project.production.yaml
   - ./manifests/repository.mkroman-k8s.yaml
+  - ./manifests/repository.cr-agentgateway-dev.yaml
   - ./manifests/application.apps.yaml
   - ./manifests/middleware.yaml
   - ./manifests/certificate.yaml

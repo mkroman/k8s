@@ -15,6 +15,26 @@ applications:
 
 # -- List of Argo CD projects.
 projects:
+  - name: agentgateway
+    description: "Agentgateway control plane for AI, MCP and A2A traffic (Kubernetes Gateway API)"
+    destinations:
+      - namespace: agentgateway-system
+    sourceRepos:
+      - https://github.com/mkroman/k8s
+    clusterResourceWhitelist:
+      - group: apiextensions.k8s.io
+        kind: CustomResourceDefinition
+      - group: admissionregistration.k8s.io
+        kind: ValidatingAdmissionPolicy
+      - group: admissionregistration.k8s.io
+        kind: ValidatingAdmissionPolicyBinding
+      - group: gateway.networking.k8s.io
+        kind: GatewayClass
+      - group: rbac.authorization.k8s.io
+        kind: ClusterRole
+      - group: rbac.authorization.k8s.io
+        kind: ClusterRoleBinding
+
   - name: cert-manager
     description: "Automated TLS certificate management via ACME"
     destinations:
@@ -290,6 +310,16 @@ projects:
 
 # List of namespaces to create.
 namespaces:
+  - name: agentgateway-system
+    labels:
+      # Enforce the restricted Pod Security Standard on the agentgateway
+      # control plane namespace.
+      pod-security.kubernetes.io/enforce: restricted
+      pod-security.kubernetes.io/enforce-version: latest
+      pod-security.kubernetes.io/audit: restricted
+      pod-security.kubernetes.io/audit-version: latest
+      pod-security.kubernetes.io/warn: restricted
+      pod-security.kubernetes.io/warn-version: latest
   - name: cert-manager
   - name: chadgpt
   - name: chadgpt-magistr
@@ -311,6 +341,29 @@ namespaces:
   - name: zeta-prod
 
 newApplications:
+  - name: agentgateway
+    project: agentgateway
+    destination:
+      namespace: agentgateway-system
+    source:
+      repoURL: https://github.com/mkroman/k8s
+      path: agentgateway
+    syncPolicy:
+      automated:
+        prune: true
+        selfHeal: true
+      syncOptions:
+        - ApplyOutOfSyncOnly=true
+        # The CRDs from the agentgateway-crds dependency are part of this
+        # release and too large for client-side apply.
+        - ServerSideApply=true
+      retry:
+        limit: 5
+        backoff:
+          duration: 5s
+          factor: 2
+          maxDuration: 3m
+
   - name: cert-manager
     project: cert-manager
     source:
@@ -348,6 +401,32 @@ newApplications:
         # We need to use server-side apply because the CRD metadata is too large.
         - ServerSideApply=true
 
+  # Gateway API CRDs must be installed before the agentgateway control plane,
+  # hence the earlier sync wave.
+  - name: gateway-api
+    annotations:
+      argocd.argoproj.io/sync-wave: "-1"
+    project: agentgateway
+    destination:
+      namespace: agentgateway-system
+    source:
+      repoURL: https://github.com/mkroman/k8s
+      path: gateway-api
+    syncPolicy:
+      automated:
+        prune: true
+        selfHeal: true
+      syncOptions:
+        - ApplyOutOfSyncOnly=true
+        # The CRD metadata is too large for client-side apply.
+        - ServerSideApply=true
+      retry:
+        limit: 5
+        backoff:
+          duration: 5s
+          factor: 2
+          maxDuration: 3m
+
   - name: grafana
     project: monitoring
     destination:
@@ -378,14 +457,6 @@ newApplications:
       repoURL: https://github.com/mkroman/k8s
       path: monitoring
 
-  - name: mumble
-    project: mumble
-    destination:
-      namespace: rwx
-    source:
-      repoURL: https://github.com/mkroman/k8s
-      path: mumble
-
   - name: mosquitto
     project: mosquitto
     destination:
@@ -412,6 +483,14 @@ newApplications:
       helm:
         valueFiles:
           - values-topic-metrics.yaml
+
+  - name: mumble
+    project: mumble
+    destination:
+      namespace: rwx
+    source:
+      repoURL: https://github.com/mkroman/k8s
+      path: mumble
 
   - name: nats
     project: nats

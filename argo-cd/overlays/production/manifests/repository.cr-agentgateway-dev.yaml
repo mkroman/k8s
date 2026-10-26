@@ -1,0 +1,14 @@
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: cr-agentgateway-dev
+  namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: repository
+stringData:
+  # OCI Helm repository hosting the agentgateway charts, required for the
+  # agentgateway chart dependencies to resolve.
+  url: cr.agentgateway.dev/charts
+  type: helm
+  enableOCI: "true"
