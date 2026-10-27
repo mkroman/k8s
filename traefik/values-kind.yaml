@@ -1,0 +1,13 @@
+# kind has no Cilium load-balancer IPAM. Use NodePort and the Google Docker Hub
+# mirror for the upstream image.
+traefik:
+  deployment:
+    replicas: 2
+  image:
+    registry: mirror.gcr.io
+    repository: library/traefik
+  service:
+    annotations: null
+    spec:
+      type: NodePort
+      externalTrafficPolicy: Local

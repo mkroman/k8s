@@ -1,0 +1,33 @@
+# Applications exercised by the Argo CD end-to-end workflow.
+#
+# Add an app here only after verifying that it becomes Synced and Healthy in a
+# kind cluster. The workflow selects only applications whose source path,
+# Application values, or e2e entry changed in the pull request.
+#
+# requires lists other e2e apps that must be healthy first. The runner deploys
+# them as real Argo CD Applications, in dependency order, before the selected
+# app. An app can be both a prerequisite and a test target.
+apps:
+  agentgateway:
+    requires:
+      - gateway-api
+      - prometheus-operator
+  cert-manager: {}
+  cloudnative-pg:
+    requires:
+      - cert-manager
+      - prometheus-operator
+  gateway-api: {}
+  prometheus-operator:
+    requires:
+      - cert-manager
+  sealed-secrets: {}
+  traefik:
+    requires:
+      - prometheus-operator
+  vector-agent:
+    requires:
+      - prometheus-operator
+  vector-aggregator:
+    requires:
+      - prometheus-operator

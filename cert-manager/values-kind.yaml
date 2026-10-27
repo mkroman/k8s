@@ -1,0 +1,4 @@
+# Ephemeral kind clusters do not have the production sealed-secrets key.
+# The controller, CRDs and ClusterIssuers are still fully exercised.
+sealedSecret:
+  enabled: false

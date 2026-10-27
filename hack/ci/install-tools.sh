@@ -7,8 +7,9 @@
 # github-release-attachments datasource, so adding a tool only requires a new
 # block.
 #
-# Every archive is verified with SHA-256 before extraction. No third-party
-# GitHub Actions, Go toolchain, or container images are involved.
+# Every download is verified with SHA-256 before extraction. Raw assets are
+# installed directly; archives use the binary path from the manifest. No
+# third-party GitHub Actions, Go toolchain, or container images are involved.
 #
 # Usage:
 #   ./hack/ci/install-tools.sh [BIN_DIR] [TOOL...]
@@ -106,18 +107,21 @@ install_tool() {
   verify_sha256 "${expected_sha}" "${archive}"
 
   case "${archive_format}" in
+    raw)
+      install -m 0755 "${archive}" "${BIN_DIR}/${tool}"
+      ;;
     tar.gz)
       tar -xzf "${archive}" -C "${TEMP_DIR}"
+      install -m 0755 "${TEMP_DIR}/${binary}" "${BIN_DIR}/${tool}"
       ;;
     tar.xz)
       tar -xJf "${archive}" -C "${TEMP_DIR}"
+      install -m 0755 "${TEMP_DIR}/${binary}" "${BIN_DIR}/${tool}"
       ;;
     *)
       die "unsupported archive format for ${tool}: ${archive_format}"
       ;;
   esac
-
-  install -m 0755 "${TEMP_DIR}/${binary}" "${BIN_DIR}/${tool}"
   printf 'Installed %s into %s\n' "${tool}" "${BIN_DIR}"
 }
 

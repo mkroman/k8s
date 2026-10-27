@@ -48,7 +48,7 @@ jobs:
           ./hack/ci/install-tools.sh "${RUNNER_TEMP}/ci-bin" shellcheck
           echo "${RUNNER_TEMP}/ci-bin" >>"${GITHUB_PATH}"
       - name: Lint scripts
-        run: shellcheck hack/ci/*.sh
+        run: shellcheck hack/ci/*.sh hack/e2e/*.sh
 
   zizmor:
     name: zizmor

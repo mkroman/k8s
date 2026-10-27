@@ -11,7 +11,7 @@
 #   tag=<release tag template>
 #   asset=<release asset template>
 #   binary=<path inside the archive>
-#   archive=tar.gz|tar.xz
+#   archive=tar.gz|tar.xz|raw
 #
 # ${version} is expanded from the version field. Renovate updates version and
 # sha256 using the github-release-attachments datasource.
@@ -24,6 +24,15 @@ tag=v${version}
 asset=actionlint_${version}_linux_amd64.tar.gz
 binary=actionlint
 archive=tar.gz
+
+[kind]
+repo=kubernetes-sigs/kind
+version=0.33.0
+sha256=aee6151561422756b764a4ae28e7f44cda5af5a9eead3cc9985112b1de8d8e0d
+tag=v${version}
+asset=kind-linux-amd64
+binary=kind
+archive=raw
 
 [kubeconform]
 repo=yannh/kubeconform
@@ -42,3 +51,12 @@ tag=v${version}
 asset=shellcheck-v${version}.linux.x86_64.tar.xz
 binary=shellcheck-v${version}/shellcheck
 archive=tar.xz
+
+[yq]
+repo=mikefarah/yq
+version=4.54.1
+sha256=e68a456f90c577af3fe4960184b3a3cf5c461e0348407c10f107da3a5fec8972
+tag=v${version}
+asset=yq_linux_amd64.tar.gz
+binary=yq_linux_amd64
+archive=tar.gz
