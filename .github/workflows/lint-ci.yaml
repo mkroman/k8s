@@ -18,25 +18,31 @@ defaults:
     shell: bash
 
 env:
-  ACTIONLINT_IMAGE: "rhysd/actionlint:1.7.12@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667"
-  SHELLCHECK_IMAGE: "koalaman/shellcheck:v0.11.0@sha256:61862eba1fcf09a484ebcc6feea46f1782532571a34ed51fedf90dd25f925a8d"
+  GO_VERSION: "1.27"
+  ACTIONLINT_VERSION: "v1.7.12"
+  SHELLCHECK_VERSION: "v0.11.0"
 
 jobs:
   actionlint:
     name: actionlint
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Lint workflows
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: false
+      - name: Install actionlint
         run: |
-          docker run --rm \
-            -v "${PWD}:/repo:ro" \
-            -w /repo \
-            "${ACTIONLINT_IMAGE}"
+          go install "github.com/rhysd/actionlint/cmd/actionlint@${ACTIONLINT_VERSION}"
+          echo "$(go env GOPATH)/bin" >>"${GITHUB_PATH}"
+      - name: Lint workflows
+        run: actionlint
 
   shellcheck:
     name: shellcheck
@@ -48,12 +54,10 @@ jobs:
         with:
           persist-credentials: false
       - name: Lint scripts
-        run: |
-          docker run --rm \
-            -v "${PWD}:/repo:ro" \
-            -w /repo \
-            "${SHELLCHECK_IMAGE}" \
-            hack/ci/*.sh
+        uses: ludeeus/action-shellcheck@00b27aa7cb85167568cb48a3838b75f4265f2bca # master, 2024-06-20
+        with:
+          scandir: hack/ci
+          version: ${{ env.SHELLCHECK_VERSION }}
 
   zizmor:
     name: zizmor

@@ -19,8 +19,8 @@ core kinds are still validated strictly.
 
 - `kubectl` (or `kustomize`) for `validate-kustomize.sh`
 - `helm` 3.x for `validate-helm.sh`
-- Either `kubeconform` in `PATH`, or Docker (the scripts use the pinned
-  `ghcr.io/yannh/kubeconform` image)
+- `kubeconform` in `PATH`:
+  `go install github.com/yannh/kubeconform/cmd/kubeconform@v0.8.0`
 - `yamllint` 1.38+ for `lint-yaml.sh`
 
 Run from anywhere in the repository:

@@ -12,7 +12,6 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 readonly SCRIPT_DIR
 REPO_ROOT="$(git -C "${SCRIPT_DIR}" rev-parse --show-toplevel)"
 readonly REPO_ROOT
-readonly KUBECONFORM_IMAGE="ghcr.io/yannh/kubeconform:v0.8.0@sha256:faffaf43f95aa6425306e1ab8d6fcad72acb9049158f38e574c085ea1ec0f64e"
 readonly RENDER_NAMESPACE="monitoring"
 
 TEMP_DIR=""
@@ -86,21 +85,12 @@ render_chart() {
 run_kubeconform() {
   local directory="$1"
 
-  if command -v kubeconform >/dev/null 2>&1; then
-    kubeconform -strict -ignore-missing-schemas -summary "${directory}"
-    return
-  fi
-
-  if ! command -v docker >/dev/null 2>&1; then
-    printf '::error title=kubeconform::Neither kubeconform nor docker is available.\n'
+  if ! command -v kubeconform >/dev/null 2>&1; then
+    printf '::error title=kubeconform::kubeconform is not installed. Install it with: go install github.com/yannh/kubeconform/cmd/kubeconform@v0.8.0\n'
     return 1
   fi
 
-  docker run --rm \
-    -v "${directory}:/work:ro" \
-    -w /work \
-    "${KUBECONFORM_IMAGE}" \
-    -strict -ignore-missing-schemas -summary .
+  kubeconform -strict -ignore-missing-schemas -summary "${directory}"
 }
 
 main() {
