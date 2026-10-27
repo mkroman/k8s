@@ -17,6 +17,7 @@ spec:
         app.kubernetes.io/name: thanos-store
         app.kubernetes.io/component: store-gateway
     spec:
+      automountServiceAccountToken: false
       containers:
         - name: thanos-store
           image: quay.io/thanos/thanos:v0.37.2
