@@ -21,6 +21,10 @@ apps:
   grafana:
     requires:
       - prometheus-operator
+  monitoring:
+    requires:
+      - prometheus-operator
+    timeout_seconds: 900
   cluster-exporters:
     requires:
       - prometheus-operator

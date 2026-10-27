@@ -35,6 +35,7 @@ prerequisite CRDs are copied or applied by hand.
 | `cloudnative-pg` | Kustomize | `cert-manager`, `prometheus-operator` |
 | `gateway-api` | Kustomize | none |
 | `grafana` | Helm | `prometheus-operator`; checks the renderer scrape path |
+| `monitoring` | Kustomize | `prometheus-operator`; asserts the control-plane scrape targets are up |
 | `prometheus-operator` | Kustomize | `cert-manager` |
 | `sealed-secrets` | Kustomize | none |
 | `traefik` | Helm | `prometheus-operator` |

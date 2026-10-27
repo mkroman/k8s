@@ -1,0 +1,25 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: monitoring
+
+resources:
+  - ../../prometheus
+  - e2e-prometheus-targets.yaml
+
+patches:
+  - target:
+      group: monitoring.coreos.com
+      version: v1
+      kind: Prometheus
+      name: prometheus
+    patch: |-
+      - op: remove
+        path: /spec/alerting
+      - op: remove
+        path: /spec/thanos
+      - op: remove
+        path: /spec/storage
+      - op: replace
+        path: /spec/replicas
+        value: 1

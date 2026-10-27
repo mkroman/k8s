@@ -7,3 +7,16 @@ nodes:
   - role: control-plane
   - role: worker
   - role: worker
+
+# kubeadm binds the scheduler and controller-manager metrics to localhost.
+# Expose them on the node address so Prometheus can scrape them in e2e, matching
+# the Kubespray layout.
+kubeadmConfigPatches:
+  - |
+    kind: ClusterConfiguration
+    scheduler:
+      extraArgs:
+        bind-address: 0.0.0.0
+    controllerManager:
+      extraArgs:
+        bind-address: 0.0.0.0
