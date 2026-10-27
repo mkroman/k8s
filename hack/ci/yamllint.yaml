@@ -1,0 +1,17 @@
+---
+extends: relaxed
+
+rules:
+  # Validate structure and duplicate keys, not the repository's mixed
+  # indentation or the long lines in vendored CRDs and SealedSecrets.
+  line-length: disable
+  indentation: disable
+  truthy: disable
+  comments: disable
+  comments-indentation: disable
+  document-start: disable
+  document-end: disable
+  empty-lines: disable
+  trailing-spaces: disable
+  new-line-at-end-of-file: disable
+  key-duplicates: enable

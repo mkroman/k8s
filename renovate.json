@@ -8,29 +8,50 @@
   "customManagers": [
     {
       "customType": "regex",
-      "managerFilePatterns": ["/Chart\\.ya?ml$/"],
+      "managerFilePatterns": [
+        "/Chart\\.ya?ml$/"
+      ],
       "matchStrings": [
         "#\\s*renovate:\\s*datasource=(?<datasource>\\S+)\\s+depName=(?<depName>\\S+)(?:\\s+packageName=(?<packageName>\\S+))?(?:\\s+versioning=(?<versioning>\\S+))?.*?\\n\\s*appVersion:\\s*[\"']?(?<currentValue>[^\\s\"']+)[\"']?"
       ]
     },
     {
       "customType": "regex",
-      "managerFilePatterns": ["/Chart\\.ya?ml$/"],
+      "managerFilePatterns": [
+        "/Chart\\.ya?ml$/"
+      ],
       "matchStrings": [
         "appVersion:\\s*[\"']?(?<currentValue>[^\\s\"']+)[\"']?\\s*#\\s*renovate:\\s*datasource=(?<datasource>\\S+)\\s+depName=(?<depName>\\S+)(?:\\s+packageName=(?<packageName>\\S+))?(?:\\s+versioning=(?<versioning>\\S+))?"
       ]
     },
     {
       "customType": "regex",
-      "managerFilePatterns": ["/values\\.ya?ml$/"],
+      "managerFilePatterns": [
+        "/values\\.ya?ml$/"
+      ],
       "matchStrings": [
         "#\\s*renovate:\\s*datasource=(?<datasource>\\S+)\\s+depName=(?<depName>\\S+)(?:\\s+packageName=(?<packageName>\\S+))?(?:\\s+versioning=(?<versioning>\\S+))?\\s*(?:\\r?\\n)\\s*tag:\\s*[\"']?(?<currentValue>[^\\s\"']+)[\"']?\\s*(?:\\r?\\n)\\s*(?:sha|digest):\\s*[\"']?(?<currentDigest>[^\\s\"']*)[\"']?"
       ]
+    },
+    {
+      "customType": "regex",
+      "description": "Update CI tool versions and checksums in tools.txt",
+      "managerFilePatterns": [
+        "/^hack\\/ci\\/tools\\.txt$/"
+      ],
+      "matchStrings": [
+        "\\[(?<tool>[a-z0-9-]+)\\]\\nrepo=(?<depName>[^\\n]+)\\nversion=(?<currentValue>[^\\n]+)\\nsha256=(?<currentDigest>[a-f0-9]{64})"
+      ],
+      "datasourceTemplate": "github-release-attachments",
+      "versioningTemplate": "semver",
+      "extractVersionTemplate": "^v?(?<version>.*)$"
     }
   ],
   "packageRules": [
     {
-      "matchManagers": ["helm-values"],
+      "matchManagers": [
+        "helm-values"
+      ],
       "pinDigests": false
     }
   ],

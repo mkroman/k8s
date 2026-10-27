@@ -20,3 +20,4 @@ projects: []
 
 
 # -- List of Argo CD applications to create.
+applications: []

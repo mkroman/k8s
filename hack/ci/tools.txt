@@ -1,0 +1,44 @@
+# CI tool manifest.
+#
+# Each [tool] block is read by install-tools.sh. Keep repo, version and
+# sha256 contiguous: the Renovate manager in renovate.json matches that block
+# head. All other keys are installer details.
+#
+#   [tool]
+#   repo=owner/repository
+#   version=1.2.3
+#   sha256=<64 hex characters>
+#   tag=<release tag template>
+#   asset=<release asset template>
+#   binary=<path inside the archive>
+#   archive=tar.gz|tar.xz
+#
+# ${version} is expanded from the version field. Renovate updates version and
+# sha256 using the github-release-attachments datasource.
+#
+[actionlint]
+repo=rhysd/actionlint
+version=1.7.12
+sha256=8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+tag=v${version}
+asset=actionlint_${version}_linux_amd64.tar.gz
+binary=actionlint
+archive=tar.gz
+
+[kubeconform]
+repo=yannh/kubeconform
+version=0.8.0
+sha256=9bc2bffbf71f261128533edaf912153948b7ff238f9a531ae6d34466ec287883
+tag=v${version}
+asset=kubeconform-linux-amd64.tar.gz
+binary=kubeconform
+archive=tar.gz
+
+[shellcheck]
+repo=koalaman/shellcheck
+version=0.11.0
+sha256=8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198
+tag=v${version}
+asset=shellcheck-v${version}.linux.x86_64.tar.xz
+binary=shellcheck-v${version}/shellcheck
+archive=tar.xz
