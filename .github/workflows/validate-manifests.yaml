@@ -1,0 +1,72 @@
+name: Validate manifests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-manifests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  YAMLLINT_VERSION: "1.38.0"
+  KUBECTL_VERSION: "v1.37.1"
+  HELM_VERSION: "v3.22.1"
+
+jobs:
+  yaml:
+    name: YAML syntax
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install yamllint
+        run: |
+          pipx install "yamllint==${YAMLLINT_VERSION}"
+          echo "${HOME}/.local/bin" >>"${GITHUB_PATH}"
+      - name: Lint YAML
+        run: ./hack/ci/lint-yaml.sh
+
+  kustomize:
+    name: Kustomize build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install kubectl
+        uses: azure/setup-kubectl@bda439f5f36b99b262ebdcd3613869bddb064c8e # v5.2.0
+        with:
+          version: ${{ env.KUBECTL_VERSION }}
+      - name: Build and validate
+        run: ./hack/ci/validate-kustomize.sh
+
+  helm:
+    name: Helm templates
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install Helm
+        uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: ${{ env.HELM_VERSION }}
+      - name: Render and validate
+        run: ./hack/ci/validate-helm.sh
