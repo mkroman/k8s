@@ -1,0 +1,152 @@
+{{- if .Values.e2e.enabled }}
+{{- $probeNamespace := required "e2e.probeNamespace is required when e2e.enabled is true" .Values.e2e.probeNamespace }}
+{{- $probeImage := required "e2e.probeImage is required when e2e.enabled is true" .Values.e2e.probeImage }}
+{{- $rendererURL := printf "http://%s-image-renderer.%s.svc.cluster.local:8081/metrics" .Release.Name .Release.Namespace }}
+{{- $grafanaURL := printf "http://%s.%s.svc.cluster.local/api/health" .Release.Name .Release.Namespace }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: e2e-grafana-renderer-allow
+  namespace: {{ $probeNamespace }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "10"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  activeDeadlineSeconds: 120
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: prometheus
+        app.kubernetes.io/instance: prometheus
+    spec:
+      automountServiceAccountToken: false
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: probe
+          image: {{ $probeImage | quote }}
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          command:
+            - sh
+            - -ec
+            - |
+              metrics="$(wget -q -O - -T 45 {{ $rendererURL }})"
+              printf '%s\n' "${metrics}" | grep -q '^# HELP '
+              echo "renderer metrics are reachable from a Prometheus pod in monitoring"
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: e2e-grafana-renderer-deny
+  namespace: {{ $probeNamespace }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "10"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  activeDeadlineSeconds: 120
+  backoffLimit: 0
+  template:
+    spec:
+      automountServiceAccountToken: false
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: probe
+          image: {{ $probeImage | quote }}
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          command:
+            - sh
+            - -ec
+            - |
+              if wget -q -O /dev/null -T 5 {{ $rendererURL }}; then
+                echo "renderer is unexpectedly reachable from a pod without Prometheus labels" >&2
+                exit 1
+              fi
+              echo "renderer is blocked from a pod without Prometheus labels"
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: e2e-grafana-health-control
+  namespace: {{ $probeNamespace }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "10"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  activeDeadlineSeconds: 120
+  backoffLimit: 0
+  template:
+    spec:
+      automountServiceAccountToken: false
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: probe
+          image: {{ $probeImage | quote }}
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          command:
+            - sh
+            - -ec
+            - |
+              wget -q -O - -T 10 {{ $grafanaURL }} |
+                grep -q '"database": "ok"'
+              echo "control probe reached Grafana from the monitoring namespace"
+{{- end }}

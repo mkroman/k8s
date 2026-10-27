@@ -1,0 +1,41 @@
+# Ephemeral kind cluster: no production sealed-secrets key, no cert-manager
+# Certificate/IngressRoute, and no external plugins.
+sealedSecret:
+  enabled: false
+
+grafana:
+  admin:
+    existingSecret: ""
+  envFromSecret: ""
+  grafana.ini:
+    users:
+      # The production database has the users org at ID 2. A fresh kind
+      # install only has the default org (ID 1).
+      auto_assign_org_id: 1
+  replicas: 1
+  plugins: []
+  image:
+    registry: mirror.gcr.io
+  imageRenderer:
+    image:
+      registry: mirror.gcr.io
+    env:
+      AUTH_TOKEN: e2e-renderer-token
+  env:
+    GF_RENDERING_RENDERER_TOKEN: e2e-renderer-token
+  sidecar:
+    dashboards:
+      enabled: false
+  testFramework:
+    enabled: false
+
+certificate:
+  enabled: false
+
+ingressRoute:
+  enabled: false
+
+e2e:
+  enabled: true
+  probeNamespace: monitoring
+  probeImage: mirror.gcr.io/library/busybox:1.37.0@sha256:66a6306db78bf2dbf3487f293aa8d6990d8e506fdffab9cc43fe422becf886e4

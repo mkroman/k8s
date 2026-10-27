@@ -107,3 +107,16 @@ ingressRoute:
   hostname: grafana.infra.rwx.im
   tls:
     secretName: grafana.infra.rwx.im-tls
+
+sealedSecret:
+  # -- Create the production SealedSecrets (admin credentials and environment).
+  # Disable in environments without the production sealed-secrets key, such as
+  # the kind e2e cluster, where Grafana generates its own admin credentials.
+  enabled: true
+
+# -- E2E-only PostSync probes. Enabled by values-kind.yaml in the kind e2e
+# environment; never enabled in production.
+e2e:
+  enabled: false
+  probeNamespace: monitoring
+  probeImage: ""

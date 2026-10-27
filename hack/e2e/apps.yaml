@@ -18,6 +18,9 @@ apps:
       - cert-manager
       - prometheus-operator
   gateway-api: {}
+  grafana:
+    requires:
+      - prometheus-operator
   cluster-exporters:
     requires:
       - prometheus-operator

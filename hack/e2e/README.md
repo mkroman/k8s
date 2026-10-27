@@ -31,9 +31,10 @@ prerequisite CRDs are copied or applied by hand.
 | --- | --- | --- |
 | `agentgateway` | Helm, OCI dependencies | `gateway-api`, `prometheus-operator` |
 | `cert-manager` | Helm | none |
+| `cluster-exporters` | Helm | `prometheus-operator` |
 | `cloudnative-pg` | Kustomize | `cert-manager`, `prometheus-operator` |
 | `gateway-api` | Kustomize | none |
-| `cluster-exporters` | Helm | `prometheus-operator` |
+| `grafana` | Helm | `prometheus-operator`; checks the renderer scrape path |
 | `prometheus-operator` | Kustomize | `cert-manager` |
 | `sealed-secrets` | Kustomize | none |
 | `traefik` | Helm | `prometheus-operator` |
@@ -42,6 +43,24 @@ prerequisite CRDs are copied or applied by hand.
 
 `agentgateway` reuses the production OCI Helm repository registration. Its
 chart dependencies are resolved by Argo CD, not by the runner.
+
+## Behavioural checks
+
+Charts can ship e2e-only probes as Helm hooks gated by `.Values.e2e.enabled`.
+`grafana/templates/e2e/checks.yaml` is the reference: it runs PostSync Jobs
+after Grafana is Healthy, checks that a Prometheus-labelled pod can scrape the
+image renderer, checks that an unlabelled pod is still blocked by the
+NetworkPolicy, and runs a control request against Grafana's health endpoint.
+The Jobs are enabled from `values-kind.yaml`; Argo CD maps the Helm hook
+annotations to its own PostSync hooks, so a failed probe fails the Application
+sync. No runner-specific check code is needed.
+
+Helm's own `helm.sh/hook: test` tests are only executed by `helm test`, and
+Argo CD does not map the Helm test hooks. Mapping `post-install`/`post-upgrade`
+to Argo CD's `PostSync` is the supported equivalent. The probes therefore use
+`helm.sh/hook: post-install,post-upgrade`, are idempotent, have a bounded
+`activeDeadlineSeconds`, and use `before-hook-creation,hook-succeeded` cleanup.
+They test behaviour, not just Argo CD's resource-health status.
 
 ## Adding an app
 
