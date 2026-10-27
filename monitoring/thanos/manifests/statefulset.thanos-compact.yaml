@@ -36,6 +36,9 @@ spec:
                 secretKeyRef:
                   key: thanos.yaml
                   name: thanos-storage
+          ports:
+            - name: http
+              containerPort: 10902
           livenessProbe:
             failureThreshold: 4
             httpGet:

@@ -1,0 +1,15 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: thanos-compact
+  labels:
+    app.kubernetes.io/name: thanos-compact
+    metrics.uplink.io/monitor: prometheus
+spec:
+  jobLabel: app.kubernetes.io/name
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: thanos-compact
+  podMetricsEndpoints:
+  - interval: 30s
+    port: http
