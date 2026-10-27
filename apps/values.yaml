@@ -2,6 +2,10 @@ repository: https://github.com/mkroman/k8s.git
 
 argocdNamespace: argocd
 
+# -- Render the Application that manages Argo CD itself.
+argoCDApplication:
+  enabled: true
+
 spec:
   destination:
     server: https://kubernetes.default.svc

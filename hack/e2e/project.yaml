@@ -1,0 +1,17 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: e2e
+  namespace: argocd
+spec:
+  description: Ephemeral kind end-to-end tests
+  # The test serves the checkout from a local Git daemon on an ephemeral port,
+  # so the URL is not known until runtime.
+  sourceRepos:
+    - "*"
+  destinations:
+    - namespace: "*"
+      server: https://kubernetes.default.svc
+  clusterResourceWhitelist:
+    - group: "*"
+      kind: "*"

@@ -32,6 +32,9 @@ binary=actionlint
 archive=tar.gz
 ```
 
+`archive` is `tar.gz`, `tar.xz`, or `raw`. A `raw` asset is installed
+directly; archive assets use `binary` as the path inside the archive.
+
 Adding a tool only requires a new block. `install-tools.sh` is generic, and
 Renovate updates every `version` and `sha256` with one custom manager using
 the `github-release-attachments` datasource, so no per-tool regex is needed.
@@ -40,6 +43,16 @@ currently supports Linux x86_64.
 
 Keep `repo`, `version`, and `sha256` directly after the `[tool]` header: the
 Renovate regex matches that block head.
+
+## Application e2e tests
+
+The Argo CD application tests live in [`hack/e2e/`](../e2e/). The workflow runs
+only the applications changed in a pull request, creates a throwaway kind
+cluster, and deploys them through Argo CD using the normal `apps` chart and
+kind-specific values or overlays.
+
+See [`hack/e2e/README.md`](../e2e/README.md) for the flow, the kind support
+conventions, and how to add an app or a prerequisite.
 
 ## Local setup
 
@@ -64,6 +77,8 @@ Run from anywhere in the repository:
 
 - `.github/workflows/validate-manifests.yaml` runs the three checks above.
 - `.github/workflows/lint-ci.yaml` runs actionlint, shellcheck, and zizmor.
+- `.github/workflows/e2e-apps.yaml` runs the changed-application e2e tests on
+  kind; see [`hack/e2e/README.md`](../e2e/README.md).
 
 The workflows use only official `actions/*` and `azure/*` actions, plus the
 official zizmor action. The CLI tools are installed from their upstream
@@ -85,3 +100,5 @@ explicit timeouts.
 - [Renovate github-release-attachments datasource](https://docs.renovatebot.com/modules/datasource/github-release-attachments/)
 - [GitHub Actions security hardening](https://docs.github.com/en/actions/how-tos/secure-your-work)
 - [Helm and Kustomize validation](https://runbook.academy/courses/git-cicd-gitops/lessons/git-cicd-gitops-lii-03-helm-and-kustomize-validation/)
+- [chart-testing changed-chart detection](https://github.com/helm/chart-testing)
+- [kind](https://kind.sigs.k8s.io/)

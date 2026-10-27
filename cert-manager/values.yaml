@@ -11,3 +11,10 @@ clusterIssuer:
   # -- Enable the self-signed certificate issuer.
   selfSigned:
     enabled: true
+
+sealedSecret:
+  # -- Create the SealedSecret with the Cloudflare API token.
+  # Disable this when deploying cert-manager without the sealed-secrets
+  # controller or without the production encryption key (for example in e2e
+  # clusters).
+  enabled: true
