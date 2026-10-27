@@ -1,6 +1,6 @@
 apiVersion: v2
 description: Cluster-level Prometheus exporters (kube-state-metrics, node-exporter)
-name: monitoring-exporters
+name: cluster-exporters
 type: application
 version: 0.1.0
 dependencies:

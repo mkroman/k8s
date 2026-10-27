@@ -33,7 +33,7 @@ prerequisite CRDs are copied or applied by hand.
 | `cert-manager` | Helm | none |
 | `cloudnative-pg` | Kustomize | `cert-manager`, `prometheus-operator` |
 | `gateway-api` | Kustomize | none |
-| `monitoring-exporters` | Helm | `prometheus-operator` |
+| `cluster-exporters` | Helm | `prometheus-operator` |
 | `prometheus-operator` | Kustomize | `cert-manager` |
 | `sealed-secrets` | Kustomize | none |
 | `traefik` | Helm | `prometheus-operator` |

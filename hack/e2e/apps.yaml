@@ -18,7 +18,7 @@ apps:
       - cert-manager
       - prometheus-operator
   gateway-api: {}
-  monitoring-exporters:
+  cluster-exporters:
     requires:
       - prometheus-operator
   prometheus-operator:

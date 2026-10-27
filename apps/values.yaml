@@ -461,13 +461,13 @@ newApplications:
       repoURL: https://github.com/mkroman/k8s
       path: monitoring
 
-  - name: monitoring-exporters
+  - name: cluster-exporters
     project: monitoring
     destination:
       namespace: monitoring
     source:
       repoURL: https://github.com/mkroman/k8s
-      path: monitoring/exporters
+      path: monitoring/cluster-exporters
 
   - name: mosquitto
     project: mosquitto
