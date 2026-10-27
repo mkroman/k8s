@@ -40,7 +40,7 @@ run_kubeconform() {
   local directory="$1"
 
   if ! command -v kubeconform >/dev/null 2>&1; then
-    printf '::error title=kubeconform::kubeconform is not installed. Install it with: go install github.com/yannh/kubeconform/cmd/kubeconform@v0.8.0\n'
+    printf '::error title=kubeconform::kubeconform is not installed. Download it from https://github.com/yannh/kubeconform/releases.\n'
     return 1
   fi
 
