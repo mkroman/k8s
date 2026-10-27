@@ -3,3 +3,4 @@ kind: Kustomization
 resources:
   - ./manifests/alertmanager.yaml
   - ./manifests/service.yaml
+  - ./manifests/servicemonitor.yaml

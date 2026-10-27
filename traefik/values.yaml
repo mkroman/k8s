@@ -43,7 +43,7 @@ traefik:
       prometheusRule:
         enabled: true
         additionalLabels:
-          prometheus: k8s
+          metrics.uplink.io/monitor: prometheus
         rules:
           - alert: TraefikDown
             expr: up{job="traefik"} == 0
