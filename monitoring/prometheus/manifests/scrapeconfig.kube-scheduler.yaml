@@ -1,0 +1,31 @@
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: ScrapeConfig
+metadata:
+  name: kube-scheduler
+  labels:
+    metrics.uplink.io/monitor: prometheus
+spec:
+  jobName: kube-scheduler
+  scheme: HTTPS
+  authorization:
+    type: Bearer
+    credentials:
+      name: prometheus-kubelet-token
+      key: token
+  tlsConfig:
+    insecureSkipVerify: true
+  kubernetesSDConfigs:
+    - role: Node
+  relabelings:
+    - action: keep
+      sourceLabels:
+        - __meta_kubernetes_node_labelpresent_node_role_kubernetes_io_control_plane
+      regex: "true"
+    - action: replace
+      sourceLabels:
+        - __meta_kubernetes_node_address_InternalIP
+      targetLabel: __address__
+      replacement: ${1}:10259
+    - action: replace
+      targetLabel: __metrics_path__
+      replacement: /metrics

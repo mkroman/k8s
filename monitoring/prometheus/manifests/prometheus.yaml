@@ -40,6 +40,13 @@ spec:
     matchLabels:
       metrics.uplink.io/monitor: prometheus
 
+  scrapeConfigSelector:
+    matchLabels:
+      metrics.uplink.io/monitor: prometheus
+
+  scrapeConfigNamespaceSelector:
+    matchLabels: {}
+
   thanos:
     version: v0.42.4
     objectStorageConfig:

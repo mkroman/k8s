@@ -5,3 +5,9 @@ resources:
   - ./manifests/prometheus.yaml
   - ./manifests/service.yaml
   - ./manifests/servicemonitor.yaml
+  - ./manifests/servicemonitor.kubelet.yaml
+  - ./manifests/servicemonitor.coredns.yaml
+  - ./manifests/servicemonitor.kube-apiserver.yaml
+  - ./manifests/secret.prometheus-kubelet-token.yaml
+  - ./manifests/scrapeconfig.kube-scheduler.yaml
+  - ./manifests/scrapeconfig.kube-controller-manager.yaml
