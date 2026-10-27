@@ -19,12 +19,39 @@ grafana:
       tag: v5.12.9
       sha: "cf36a94431662540a72d2058a43e0cbf72638334475d8216a25a77526a627be7"
 
+    # Chromium-based rendering is bursty; keep a small baseline request and a
+    # bounded limit so the renderer is schedulable without starving the node.
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: "1"
+        memory: 2Gi
+
+    # The chart's default ingress policy only admits Grafana pods. Prometheus
+    # runs in the monitoring namespace, so allow it to scrape port 8081.
+    networkPolicy:
+      limitIngress: true
+      extraIngressSelectors:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+              app.kubernetes.io/instance: prometheus
+
     # Configure deployment of ServiceMonitor for the image renderer.
     serviceMonitor:
       # Enable service monitor for image renderer.
       enabled: true
       labels:
         metrics.uplink.io/monitor: prometheus
+      # Keep scraping once a minute, but allow a slow /metrics response longer
+      # than the 30s default that the live target was timing out at.
+      interval: 60s
+      scrapeTimeout: 45s
 
   grafana.ini:
     server:
@@ -80,3 +107,16 @@ ingressRoute:
   hostname: grafana.infra.rwx.im
   tls:
     secretName: grafana.infra.rwx.im-tls
+
+sealedSecret:
+  # -- Create the production SealedSecrets (admin credentials and environment).
+  # Disable in environments without the production sealed-secrets key, such as
+  # the kind e2e cluster, where Grafana generates its own admin credentials.
+  enabled: true
+
+# -- E2E-only PostSync probes. Enabled by values-kind.yaml in the kind e2e
+# environment; never enabled in production.
+e2e:
+  enabled: false
+  probeNamespace: monitoring
+  probeImage: ""

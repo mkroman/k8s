@@ -100,7 +100,18 @@ diagnose() {
   printf '::endgroup::\n'
   printf '::group::Workloads\n'
   kubectl get pods -A -o wide || true
+  kubectl get jobs -A -o wide || true
   kubectl get events -A --sort-by=.lastTimestamp | tail -n 100 || true
+  printf '::endgroup::\n'
+  printf '::group::Failed hook jobs\n'
+  while IFS= read -r job; do
+    namespace="${job%%/*}"
+    name="${job#*/}"
+    kubectl -n "${namespace}" logs "job/${name}" --all-containers=true \
+      --tail=100 || true
+  done < <(kubectl get jobs -A -o json |
+    jq -r '.items[] | select((.status.failed // 0) > 0) |
+      "\(.metadata.namespace)/\(.metadata.name)"')
   printf '::endgroup::\n'
   printf '::group::Argo CD controller logs\n'
   kubectl -n argocd logs statefulset/argocd-application-controller \
@@ -295,6 +306,7 @@ render_root_app() {
         (.spec.source.helm.valuesObject * (strenv(VALUES_JSON) | from_json))' \
     "${ROOT_APP_TEMPLATE}" >"${TEMP_DIR}/root-app.yaml"
 }
+
 
 wait_for_application() {
   local app="$1"
