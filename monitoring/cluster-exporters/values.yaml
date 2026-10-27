@@ -1,0 +1,37 @@
+kube-state-metrics:
+  prometheus:
+    monitor:
+      # Create the ServiceMonitor resource since we already use prometheus
+      # operator in the cluster.
+      enabled: true
+
+      interval: 30s
+
+      # Add the service monitor selector label so our prometheus instance
+      # discovers the service monitor.
+      additionalLabels:
+        metrics.uplink.io/monitor: prometheus
+
+prometheus-node-exporter:
+  prometheus:
+    monitor:
+      # Create the ServiceMonitor resource since we already use prometheus
+      # operator in the cluster.
+      enabled: true
+
+      interval: 30s
+
+      # Add the service monitor selector label so our prometheus instance
+      # discovers the service monitor.
+      additionalLabels:
+        metrics.uplink.io/monitor: prometheus
+
+  # Access the host namespaces so the host metrics remain available. These
+  # match the chart defaults; set them explicitly so a default change cannot
+  # silently turn them off.
+  hostNetwork: true
+  hostPID: true
+
+  # Run on every node, including the tainted control-plane nodes.
+  tolerations:
+    - operator: Exists
