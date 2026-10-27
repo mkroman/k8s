@@ -1,0 +1,12 @@
+# CI tool manifest.
+#
+# Columns:
+#   tool|repo|version|sha256|tag-template|asset-template|binary-path|archive
+#
+# Renovate updates every row with the custom manager in renovate.json using
+# the github-release-attachments datasource. Add a new tool by adding a row;
+# no Renovate regex or installer code changes are required.
+#
+actionlint|rhysd/actionlint|1.7.12|8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8|v${version}|actionlint_${version}_linux_amd64.tar.gz|actionlint|tar.gz
+kubeconform|yannh/kubeconform|0.8.0|9bc2bffbf71f261128533edaf912153948b7ff238f9a531ae6d34466ec287883|v${version}|kubeconform-linux-amd64.tar.gz|kubeconform|tar.gz
+shellcheck|koalaman/shellcheck|0.11.0|8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198|v${version}|shellcheck-v${version}.linux.x86_64.tar.xz|shellcheck-v${version}/shellcheck|tar.xz

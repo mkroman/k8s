@@ -2,42 +2,27 @@
 #
 # Install pinned CI tool releases from their upstream GitHub releases.
 #
+# Tool metadata lives in tools.txt. Renovate maintains every row's version and
+# SHA-256 with the github-release-attachments datasource, so adding a tool only
+# requires a new manifest row.
+#
 # Every archive is verified with SHA-256 before extraction. No third-party
 # GitHub Actions, Go toolchain, or container images are involved.
-#
-# Versions and checksums are managed by Renovate using the
-# github-release-attachments datasource. The `# renovate:` comments and the
-# adjacent version/checksum variables are intentionally kept together.
 #
 # Usage:
 #   ./hack/ci/install-tools.sh [BIN_DIR] [TOOL...]
 #
-# TOOL is one of: actionlint, kubeconform, shellcheck. With no tools, all
-# three are installed. BIN_DIR defaults to ~/.local/bin.
+# BIN_DIR defaults to ~/.local/bin. With no TOOL arguments, every tool in the
+# manifest is installed. The script currently supports Linux x86_64.
 set -euo pipefail
 
-# renovate: datasource=github-release-attachments depName=rhysd/actionlint versioning=semver extractVersion=^v(?<version>.*)$
-ACTIONLINT_VERSION="1.7.12"
-ACTIONLINT_SHA256="8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8"
-
-# renovate: datasource=github-release-attachments depName=yannh/kubeconform versioning=semver extractVersion=^v(?<version>.*)$
-KUBECONFORM_VERSION="0.8.0"
-KUBECONFORM_SHA256="9bc2bffbf71f261128533edaf912153948b7ff238f9a531ae6d34466ec287883"
-
-# renovate: datasource=github-release-attachments depName=koalaman/shellcheck versioning=semver extractVersion=^v(?<version>.*)$
-SHELLCHECK_VERSION="0.11.0"
-SHELLCHECK_SHA256="8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198"
-
-readonly ACTIONLINT_VERSION ACTIONLINT_SHA256
-readonly KUBECONFORM_VERSION KUBECONFORM_SHA256
-readonly SHELLCHECK_VERSION SHELLCHECK_SHA256
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+readonly SCRIPT_DIR
+readonly TOOLS_FILE="${SCRIPT_DIR}/tools.txt"
 
 BIN_DIR="${1:-${HOME}/.local/bin}"
 shift || true
-TOOLS=("$@")
-if ((${#TOOLS[@]} == 0)); then
-  TOOLS=(actionlint kubeconform shellcheck)
-fi
+REQUESTED=("$@")
 
 TEMP_DIR="$(mktemp -d)"
 
@@ -67,69 +52,92 @@ verify_sha256() {
     die "SHA-256 verification failed for ${archive}"
 }
 
-install_archive_binary() {
-  local binary="$1"
-  local destination="$2"
+expand_template() {
+  local template="$1"
+  local version="$2"
 
-  install -m 0755 "${binary}" "${BIN_DIR}/${destination}"
+  printf '%s' "${template//\$\{version\}/${version}}"
 }
 
-install_actionlint() {
-  local url="https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
-  local archive="${TEMP_DIR}/actionlint.tar.gz"
+install_tool() {
+  local tool="$1"
+  local repo="$2"
+  local version="$3"
+  local expected_sha="$4"
+  local tag_template="$5"
+  local asset_template="$6"
+  local binary_template="$7"
+  local archive_format="$8"
+  local tag asset binary url archive
+
+  tag="$(expand_template "${tag_template}" "${version}")"
+  asset="$(expand_template "${asset_template}" "${version}")"
+  binary="$(expand_template "${binary_template}" "${version}")"
+  url="https://github.com/${repo}/releases/download/${tag}/${asset}"
+  archive="${TEMP_DIR}/${tool}-download"
 
   download "${url}" "${archive}"
-  verify_sha256 "${ACTIONLINT_SHA256}" "${archive}"
-  tar -xzf "${archive}" -C "${TEMP_DIR}"
-  install_archive_binary "${TEMP_DIR}/actionlint" "actionlint"
-}
+  verify_sha256 "${expected_sha}" "${archive}"
 
-install_kubeconform() {
-  local url="https://github.com/yannh/kubeconform/releases/download/v${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz"
-  local archive="${TEMP_DIR}/kubeconform.tar.gz"
+  case "${archive_format}" in
+    tar.gz)
+      tar -xzf "${archive}" -C "${TEMP_DIR}"
+      ;;
+    tar.xz)
+      tar -xJf "${archive}" -C "${TEMP_DIR}"
+      ;;
+    *)
+      die "unsupported archive format for ${tool}: ${archive_format}"
+      ;;
+  esac
 
-  download "${url}" "${archive}"
-  verify_sha256 "${KUBECONFORM_SHA256}" "${archive}"
-  tar -xzf "${archive}" -C "${TEMP_DIR}"
-  install_archive_binary "${TEMP_DIR}/kubeconform" "kubeconform"
-}
-
-install_shellcheck() {
-  local url="https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.linux.x86_64.tar.xz"
-  local archive="${TEMP_DIR}/shellcheck.tar.xz"
-
-  download "${url}" "${archive}"
-  verify_sha256 "${SHELLCHECK_SHA256}" "${archive}"
-  tar -xJf "${archive}" -C "${TEMP_DIR}"
-  install_archive_binary \
-    "${TEMP_DIR}/shellcheck-v${SHELLCHECK_VERSION}/shellcheck" \
-    "shellcheck"
+  install -m 0755 "${TEMP_DIR}/${binary}" "${BIN_DIR}/${tool}"
+  printf 'Installed %s into %s\n' "${tool}" "${BIN_DIR}"
 }
 
 main() {
-  local tool
+  local tool repo version expected_sha tag_template asset_template
+  local binary_template archive_format
+  local -A requested=()
+  local -A installed=()
 
   [[ "$(uname -s)" == "Linux" && "$(uname -m)" == "x86_64" ]] ||
     die "install-tools.sh currently supports Linux x86_64 only"
 
+  [[ -r "${TOOLS_FILE}" ]] || die "missing tool manifest: ${TOOLS_FILE}"
+
+  for tool in "${REQUESTED[@]}"; do
+    requested["${tool}"]=1
+  done
+
   mkdir -p "${BIN_DIR}"
 
-  for tool in "${TOOLS[@]}"; do
-    case "${tool}" in
-      actionlint)
-        install_actionlint
-        ;;
-      kubeconform)
-        install_kubeconform
-        ;;
-      shellcheck)
-        install_shellcheck
-        ;;
-      *)
-        die "unknown tool: ${tool}"
-        ;;
-    esac
-    printf 'Installed %s into %s\n' "${tool}" "${BIN_DIR}"
+  while IFS='|' read -r tool repo version expected_sha tag_template asset_template binary_template archive_format; do
+    [[ -n "${tool}" && "${tool}" != \#* ]] || continue
+
+    [[ -n "${repo}" && -n "${version}" && -n "${expected_sha}" &&
+      -n "${tag_template}" && -n "${asset_template}" &&
+      -n "${binary_template}" && -n "${archive_format}" ]] ||
+      die "invalid tools.txt row for ${tool}"
+
+    if ((${#requested[@]} > 0)); then
+      [[ -n "${requested[${tool}]:-}" ]] || continue
+    fi
+
+    install_tool \
+      "${tool}" \
+      "${repo}" \
+      "${version}" \
+      "${expected_sha}" \
+      "${tag_template}" \
+      "${asset_template}" \
+      "${binary_template}" \
+      "${archive_format}"
+    installed["${tool}"]=1
+  done <"${TOOLS_FILE}"
+
+  for tool in "${!requested[@]}"; do
+    [[ -n "${installed[${tool}]:-}" ]] || die "unknown tool: ${tool}"
   done
 }
 
