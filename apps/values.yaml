@@ -461,6 +461,14 @@ newApplications:
       repoURL: https://github.com/mkroman/k8s
       path: monitoring
 
+  - name: monitoring-exporters
+    project: monitoring
+    destination:
+      namespace: monitoring
+    source:
+      repoURL: https://github.com/mkroman/k8s
+      path: monitoring/exporters
+
   - name: mosquitto
     project: mosquitto
     destination:
