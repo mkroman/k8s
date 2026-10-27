@@ -37,7 +37,7 @@ prerequisite CRDs are copied or applied by hand.
 | `grafana` | Helm | `prometheus-operator`; checks the renderer scrape path |
 | `monitoring` | Kustomize | `prometheus-operator`; asserts the control-plane scrape targets are up |
 | `prometheus-operator` | Kustomize | `cert-manager` |
-| `sealed-secrets` | Kustomize | none |
+| `sealed-secrets` | Kustomize | `prometheus-operator` |
 | `traefik` | Helm | `prometheus-operator` |
 | `vector-agent` | Helm | `prometheus-operator` |
 | `vector-aggregator` | Helm | `prometheus-operator` |
@@ -115,7 +115,9 @@ conventions are applied automatically:
 Use these for environment-specific differences such as cluster-specific
 secrets, storage classes, or load-balancer settings. For example,
 `cert-manager/values-kind.yaml` disables the production `SealedSecret` because
-an ephemeral kind cluster does not have the production sealed-secrets key.
+an ephemeral kind cluster does not have the production sealed-secrets key, and
+disables its ServiceMonitor because Prometheus Operator depends on
+cert-manager and is therefore not deployed first.
 
 ## Running locally
 

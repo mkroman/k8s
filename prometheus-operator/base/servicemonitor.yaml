@@ -1,0 +1,15 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: prometheus-operator
+  labels:
+    app.kubernetes.io/name: prometheus-operator
+    metrics.uplink.io/monitor: prometheus
+spec:
+  jobLabel: app.kubernetes.io/name
+  endpoints:
+  - interval: 30s
+    port: http
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: prometheus-operator

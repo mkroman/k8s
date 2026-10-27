@@ -60,6 +60,12 @@ longhorn:
     backupTarget: s3://mkroman-backup@eu-central-003/
     backupTargetCredentialSecret: backblaze-b2
     defaultReplicaCount: "2"
+  metrics:
+    serviceMonitor:
+      enabled: true
+      interval: 30s
+      additionalLabels:
+        metrics.uplink.io/monitor: prometheus
   # persistence:
   #   defaultNodeSelector:
   #     enable: true

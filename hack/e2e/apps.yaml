@@ -47,7 +47,9 @@ apps:
   prometheus-operator:
     requires:
       - cert-manager
-  sealed-secrets: {}
+  sealed-secrets:
+    requires:
+      - prometheus-operator
   traefik:
     requires:
       - prometheus-operator
