@@ -2,9 +2,10 @@
 #
 # Install pinned CI tool releases from their upstream GitHub releases.
 #
-# Tool metadata lives in tools.txt. Renovate maintains every row's version and
-# SHA-256 with the github-release-attachments datasource, so adding a tool only
-# requires a new manifest row.
+# Tool metadata lives in tools.txt as readable [tool] blocks. Renovate
+# maintains every block's version and SHA-256 with the
+# github-release-attachments datasource, so adding a tool only requires a new
+# block.
 #
 # Every archive is verified with SHA-256 before extraction. No third-party
 # GitHub Actions, Go toolchain, or container images are involved.
@@ -26,13 +27,38 @@ REQUESTED=("$@")
 
 TEMP_DIR="$(mktemp -d)"
 
+SECTION=""
+REPO=""
+VERSION=""
+SHA256=""
+TAG_TEMPLATE=""
+ASSET_TEMPLATE=""
+BINARY_TEMPLATE=""
+ARCHIVE_FORMAT=""
+
+declare -A REQUESTED_TOOLS=()
+declare -A INSTALLED_TOOLS=()
+
 cleanup() {
   rm -rf "${TEMP_DIR}"
 }
 
+trap cleanup EXIT
+
 die() {
   printf 'error: %s\n' "$*" >&2
   exit 1
+}
+
+reset_section() {
+  SECTION=""
+  REPO=""
+  VERSION=""
+  SHA256=""
+  TAG_TEMPLATE=""
+  ASSET_TEMPLATE=""
+  BINARY_TEMPLATE=""
+  ARCHIVE_FORMAT=""
 }
 
 download() {
@@ -95,11 +121,36 @@ install_tool() {
   printf 'Installed %s into %s\n' "${tool}" "${BIN_DIR}"
 }
 
+flush_section() {
+  [[ -n "${SECTION}" ]] || return 0
+
+  [[ -n "${REPO}" && -n "${VERSION}" && -n "${SHA256}" &&
+    -n "${TAG_TEMPLATE}" && -n "${ASSET_TEMPLATE}" &&
+    -n "${BINARY_TEMPLATE}" && -n "${ARCHIVE_FORMAT}" ]] ||
+    die "incomplete tools.txt block for ${SECTION}"
+
+  [[ "${SHA256}" =~ ^[a-f0-9]{64}$ ]] ||
+    die "invalid sha256 for ${SECTION}"
+
+  if ((${#REQUESTED_TOOLS[@]} == 0)) ||
+    [[ -n "${REQUESTED_TOOLS[${SECTION}]:-}" ]]; then
+    install_tool \
+      "${SECTION}" \
+      "${REPO}" \
+      "${VERSION}" \
+      "${SHA256}" \
+      "${TAG_TEMPLATE}" \
+      "${ASSET_TEMPLATE}" \
+      "${BINARY_TEMPLATE}" \
+      "${ARCHIVE_FORMAT}"
+    INSTALLED_TOOLS["${SECTION}"]=1
+  fi
+
+  reset_section
+}
+
 main() {
-  local tool repo version expected_sha tag_template asset_template
-  local binary_template archive_format
-  local -A requested=()
-  local -A installed=()
+  local tool key value line
 
   [[ "$(uname -s)" == "Linux" && "$(uname -m)" == "x86_64" ]] ||
     die "install-tools.sh currently supports Linux x86_64 only"
@@ -107,37 +158,59 @@ main() {
   [[ -r "${TOOLS_FILE}" ]] || die "missing tool manifest: ${TOOLS_FILE}"
 
   for tool in "${REQUESTED[@]}"; do
-    requested["${tool}"]=1
+    REQUESTED_TOOLS["${tool}"]=1
   done
 
   mkdir -p "${BIN_DIR}"
 
-  while IFS='|' read -r tool repo version expected_sha tag_template asset_template binary_template archive_format; do
-    [[ -n "${tool}" && "${tool}" != \#* ]] || continue
+  while IFS= read -r line; do
+    [[ -n "${line}" && "${line}" != \#* ]] || continue
 
-    [[ -n "${repo}" && -n "${version}" && -n "${expected_sha}" &&
-      -n "${tag_template}" && -n "${asset_template}" &&
-      -n "${binary_template}" && -n "${archive_format}" ]] ||
-      die "invalid tools.txt row for ${tool}"
-
-    if ((${#requested[@]} > 0)); then
-      [[ -n "${requested[${tool}]:-}" ]] || continue
+    if [[ "${line}" == \[*\] ]]; then
+      flush_section
+      SECTION="${line:1:${#line}-2}"
+      continue
     fi
 
-    install_tool \
-      "${tool}" \
-      "${repo}" \
-      "${version}" \
-      "${expected_sha}" \
-      "${tag_template}" \
-      "${asset_template}" \
-      "${binary_template}" \
-      "${archive_format}"
-    installed["${tool}"]=1
+    [[ "${line}" == *=* ]] || die "invalid tools.txt line: ${line}"
+
+    key="${line%%=*}"
+    value="${line#*=}"
+
+    [[ -n "${SECTION}" ]] || die "tools.txt key outside a block: ${key}"
+
+    case "${key}" in
+      repo)
+        REPO="${value}"
+        ;;
+      version)
+        VERSION="${value}"
+        ;;
+      sha256)
+        SHA256="${value}"
+        ;;
+      tag)
+        TAG_TEMPLATE="${value}"
+        ;;
+      asset)
+        ASSET_TEMPLATE="${value}"
+        ;;
+      binary)
+        BINARY_TEMPLATE="${value}"
+        ;;
+      archive)
+        ARCHIVE_FORMAT="${value}"
+        ;;
+      *)
+        die "unknown tools.txt key: ${key}"
+        ;;
+    esac
   done <"${TOOLS_FILE}"
 
-  for tool in "${!requested[@]}"; do
-    [[ -n "${installed[${tool}]:-}" ]] || die "unknown tool: ${tool}"
+  flush_section
+
+  for tool in "${!REQUESTED_TOOLS[@]}"; do
+    [[ -n "${INSTALLED_TOOLS[${tool}]:-}" ]] || die "unknown tool: ${tool}"
   done
 }
 

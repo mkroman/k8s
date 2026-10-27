@@ -40,7 +40,7 @@
         "/^hack\\/ci\\/tools\\.txt$/"
       ],
       "matchStrings": [
-        "(?<tool>[a-z0-9-]+)\\|(?<depName>[^|]+)\\|(?<currentValue>[^|]+)\\|(?<currentDigest>[a-f0-9]{64})\\|(?<tag>[^|]+)\\|(?<asset>[^|]+)\\|(?<binary>[^|]+)\\|(?<archive>[^|\\n]+)"
+        "\\[(?<tool>[a-z0-9-]+)\\]\\nrepo=(?<depName>[^\\n]+)\\nversion=(?<currentValue>[^\\n]+)\\nsha256=(?<currentDigest>[a-f0-9]{64})"
       ],
       "datasourceTemplate": "github-release-attachments",
       "versioningTemplate": "semver",

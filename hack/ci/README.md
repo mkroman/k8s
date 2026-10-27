@@ -18,16 +18,28 @@ core kinds are still validated strictly.
 
 ## Tool manifest
 
-`tools.txt` is the single source of truth for the CI tools. Each row is:
+`tools.txt` is the single source of truth for the CI tools. Each tool is one
+INI-style block:
 
-```text
-tool|repo|version|sha256|tag-template|asset-template|binary-path|archive
+```ini
+[actionlint]
+repo=rhysd/actionlint
+version=1.7.12
+sha256=8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+tag=v${version}
+asset=actionlint_${version}_linux_amd64.tar.gz
+binary=actionlint
+archive=tar.gz
 ```
 
-Adding a tool only requires a new row. `install-tools.sh` is generic, and
-Renovate updates every row's version and checksum with one custom manager
-using the `github-release-attachments` datasource. The installer currently
-supports Linux x86_64.
+Adding a tool only requires a new block. `install-tools.sh` is generic, and
+Renovate updates every `version` and `sha256` with one custom manager using
+the `github-release-attachments` datasource, so no per-tool regex is needed.
+`${version}` is expanded in `tag`, `asset`, and `binary`. The installer
+currently supports Linux x86_64.
+
+Keep `repo`, `version`, and `sha256` directly after the `[tool]` header: the
+Renovate regex matches that block head.
 
 ## Local setup
 
