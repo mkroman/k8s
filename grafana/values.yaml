@@ -5,7 +5,6 @@ grafana:
   envFromSecret: grafana-env
 
   image:
-    # renovate: datasource=docker depName=grafana/grafana
     repository: grafana/grafana
     tag: 13.3.0
     sha: ""
@@ -14,10 +13,9 @@ grafana:
     enabled: true
 
     image:
-      # renovate: datasource=docker depName=grafana/grafana-image-renderer
       repository: grafana/grafana-image-renderer
-      tag: v5.12.10
-      sha: "cf36a94431662540a72d2058a43e0cbf72638334475d8216a25a77526a627be7"
+      tag: v5.12.10@sha256:a7970b826f6e477461e02bf5463d92634e9ad27d525e4e50296978a2e592d2d7
+      sha: ""
 
     # Chromium-based rendering is bursty; keep a small baseline request and a
     # bounded limit so the renderer is schedulable without starving the node.

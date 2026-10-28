@@ -1,13 +1,13 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
-    "config:recommended",
     "config:best-practices",
     ":disableRateLimiting"
   ],
   "customManagers": [
     {
       "customType": "regex",
+      "description": "Update appVersion from a Renovate annotation on the preceding line",
       "managerFilePatterns": [
         "/Chart\\.ya?ml$/"
       ],
@@ -17,6 +17,7 @@
     },
     {
       "customType": "regex",
+      "description": "Update appVersion from an inline Renovate annotation",
       "managerFilePatterns": [
         "/Chart\\.ya?ml$/"
       ],
@@ -26,12 +27,15 @@
     },
     {
       "customType": "regex",
+      "description": "Update the Renovate image in the self-hosted chart's Artifact Hub annotation",
       "managerFilePatterns": [
-        "/values\\.ya?ml$/"
+        "/^renovate\\/Chart\\.yaml$/"
       ],
       "matchStrings": [
-        "#\\s*renovate:\\s*datasource=(?<datasource>\\S+)\\s+depName=(?<depName>\\S+)(?:\\s+packageName=(?<packageName>\\S+))?(?:\\s+versioning=(?<versioning>\\S+))?\\s*(?:\\r?\\n)\\s*tag:\\s*[\"']?(?<currentValue>[^\\s\"']+)[\"']?\\s*(?:\\r?\\n)\\s*(?:sha|digest):\\s*[\"']?(?<currentDigest>[^\\s\"']*)[\"']?"
-      ]
+        "image:\\s*renovate/renovate:(?<currentValue>[^\\s]+)"
+      ],
+      "datasourceTemplate": "docker",
+      "depNameTemplate": "renovate/renovate"
     },
     {
       "customType": "regex",
@@ -49,14 +53,43 @@
   ],
   "packageRules": [
     {
+      "description": "Do not add image digests in Helm values files",
       "matchManagers": [
         "helm-values"
       ],
       "pinDigests": false
+    },
+    {
+      "description": "Keep the agentgateway chart and its CRDs chart on the same version and in one PR",
+      "matchManagers": [
+        "helmv3"
+      ],
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchPackageNames": [
+        "cr.agentgateway.dev/charts/agentgateway",
+        "cr.agentgateway.dev/charts/agentgateway-crds"
+      ],
+      "groupName": "agentgateway"
+    },
+    {
+      "description": "The self-hosted Renovate image is controlled by the chart appVersion",
+      "matchManagers": [
+        "helm-values"
+      ],
+      "matchFileNames": [
+        "renovate/values.yaml"
+      ],
+      "enabled": false
+    },
+    {
+      "description": "Keep the self-hosted Renovate chart and Artifact Hub image metadata in sync without digest pins",
+      "matchPackageNames": [
+        "renovate/renovate"
+      ],
+      "groupName": "renovate",
+      "pinDigests": false
     }
-  ],
-  "ignorePaths": [
-    "renovate/**",
-    "kustomize/**"
   ]
 }

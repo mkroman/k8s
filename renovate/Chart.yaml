@@ -6,6 +6,7 @@ description: >-
   https://docs.renovatebot.com/
 type: application
 version: 0.1.0
+# renovate: datasource=docker depName=renovate/renovate
 appVersion: "44.56.3"
 kubeVersion: ">=1.21.0-0"
 home: https://docs.renovatebot.com/
@@ -22,7 +23,8 @@ maintainers:
 annotations:
   artifacthub.io/license: AGPL-3.0-only
   # Default image; overridden when image.tag/image.registry change. Pinned
-  # versions only, per the Helm image best practice.
+  # versions only, per the Helm image best practice. Keep in sync with the
+  # appVersion above; Renovate updates both.
   artifacthub.io/images: |
     - name: renovate
       image: renovate/renovate:44.56.3
