@@ -7,6 +7,10 @@
 # requires lists other e2e apps that must be healthy first. The runner deploys
 # them as real Argo CD Applications, in dependency order, before the selected
 # app. An app can be both a prerequisite and a test target.
+#
+# prometheus_targets optionally declares a Prometheus Service and the job names
+# whose targets must all be up after the app is healthy. The runner reads it
+# generically, so more than one app can use it.
 apps:
   agentgateway:
     requires:
@@ -21,6 +25,22 @@ apps:
   grafana:
     requires:
       - prometheus-operator
+  monitoring:
+    requires:
+      - prometheus-operator
+    timeout_seconds: 900
+    # After the Application is healthy, query the Prometheus target API through
+    # the Kubernetes service proxy. Every target for these jobs must be up.
+    prometheus_targets:
+      namespace: monitoring
+      service: prometheus
+      port: 9090
+      jobs:
+        - kubelet
+        - kube-dns
+        - apiserver
+        - kube-scheduler
+        - kube-controller-manager
   cluster-exporters:
     requires:
       - prometheus-operator

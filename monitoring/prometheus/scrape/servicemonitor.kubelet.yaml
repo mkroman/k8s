@@ -1,0 +1,67 @@
+# The Prometheus Operator Deployment runs with
+# `--kubelet-service=kube-system/kubelet`, so the operator creates the headless
+# `kubelet` Service and its Endpoints (one address per node, port
+# `https-metrics` 10250) from the Node objects. The Service carries both
+# `k8s-app: kubelet` and `app.kubernetes.io/name: kubelet`; selecting the
+# standard label keeps this aligned with kube-prometheus.
+#
+# This uses `bearerTokenFile`, which reads the Prometheus pod's short-lived
+# projected service-account token. The field is deprecated in the
+# ServiceMonitor API, but it avoids depending on the long-lived token Secret
+# that ScrapeConfig requires. Revisit when the operator exposes a projected
+# token for ScrapeConfig.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: kubelet
+  labels:
+    app.kubernetes.io/name: kubelet
+spec:
+  jobLabel: app.kubernetes.io/name
+  namespaceSelector:
+    matchNames:
+    - kube-system
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kubelet
+  endpoints:
+  - port: https-metrics
+    scheme: https
+    path: /metrics
+    interval: 30s
+    honorLabels: true
+    bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+    tlsConfig:
+      insecureSkipVerify: true
+    relabelings:
+    - action: replace
+      sourceLabels:
+      - __metrics_path__
+      targetLabel: metrics_path
+  - port: https-metrics
+    scheme: https
+    path: /metrics/cadvisor
+    interval: 30s
+    honorLabels: true
+    honorTimestamps: false
+    bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+    tlsConfig:
+      insecureSkipVerify: true
+    relabelings:
+    - action: replace
+      sourceLabels:
+      - __metrics_path__
+      targetLabel: metrics_path
+  - port: https-metrics
+    scheme: https
+    path: /metrics/probes
+    interval: 30s
+    honorLabels: true
+    bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+    tlsConfig:
+      insecureSkipVerify: true
+    relabelings:
+    - action: replace
+      sourceLabels:
+      - __metrics_path__
+      targetLabel: metrics_path

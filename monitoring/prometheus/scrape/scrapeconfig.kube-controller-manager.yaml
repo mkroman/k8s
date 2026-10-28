@@ -1,0 +1,47 @@
+# kube-controller-manager is a static pod, so there is no Service to select
+# with a ServiceMonitor. See scrapeconfig.kube-scheduler.yaml for why this uses
+# node discovery and a ScrapeConfig instead.
+#
+# Keep in sync with scrapeconfig.kube-scheduler.yaml: only the name, jobName,
+# port and app label differ.
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: ScrapeConfig
+metadata:
+  name: kube-controller-manager
+  labels:
+    app.kubernetes.io/name: kube-controller-manager
+spec:
+  jobName: kube-controller-manager
+  scheme: https
+  scrapeInterval: 30s
+  metricsPath: /metrics
+  authorization:
+    type: Bearer
+    credentials:
+      name: prometheus-scrape-token
+      key: token
+  tlsConfig:
+    insecureSkipVerify: true
+  kubernetesSDConfigs:
+  - role: Node
+  relabelings:
+  - action: keep
+    sourceLabels:
+    - __meta_kubernetes_node_labelpresent_node_role_kubernetes_io_control_plane
+    regex: "true"
+  - action: replace
+    sourceLabels:
+    - __meta_kubernetes_node_address_InternalIP
+    regex: '^([0-9.]+)$'
+    targetLabel: __address__
+    replacement: ${1}:10257
+  - action: replace
+    sourceLabels:
+    - __meta_kubernetes_node_address_InternalIP
+    regex: '^([0-9a-fA-F:]+)$'
+    targetLabel: __address__
+    replacement: '[${1}]:10257'
+  - action: replace
+    sourceLabels:
+    - __meta_kubernetes_node_name
+    targetLabel: node

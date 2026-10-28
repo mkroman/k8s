@@ -35,6 +35,7 @@ prerequisite CRDs are copied or applied by hand.
 | `cloudnative-pg` | Kustomize | `cert-manager`, `prometheus-operator` |
 | `gateway-api` | Kustomize | none |
 | `grafana` | Helm | `prometheus-operator`; checks the renderer scrape path |
+| `monitoring` | Kustomize | `prometheus-operator`; asserts the control-plane scrape targets are up |
 | `prometheus-operator` | Kustomize | `cert-manager` |
 | `sealed-secrets` | Kustomize | none |
 | `traefik` | Helm | `prometheus-operator` |
@@ -61,6 +62,25 @@ to Argo CD's `PostSync` is the supported equivalent. The probes therefore use
 `helm.sh/hook: post-install,post-upgrade`, are idempotent, have a bounded
 `activeDeadlineSeconds`, and use `before-hook-creation,hook-succeeded` cleanup.
 They test behaviour, not just Argo CD's resource-health status.
+
+Kustomize apps can use `overlays/kind` for environment-specific composition;
+`monitoring/overlays/kind` selects the production-free Prometheus base.
+
+For runtime assertions, an app can declare `prometheus_targets` in `apps.yaml`.
+After the Application is Synced and Healthy, `run-app.sh` port-forwards to the
+configured Service and checks the target API. Every target for the listed jobs
+must report `up`. This is generic; any app with a Prometheus-compatible Service
+can use it:
+
+```yaml
+  my-app:
+    prometheus_targets:
+      namespace: monitoring
+      service: prometheus
+      port: 9090
+      jobs:
+        - kubelet
+```
 
 ## Adding an app
 

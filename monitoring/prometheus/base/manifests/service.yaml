@@ -4,13 +4,13 @@ metadata:
   name: prometheus
   labels:
     app.kubernetes.io/name: prometheus
-    metrics.uplink.io/monitor-instance: default
-    prometheus.prometheus-operator.dev/instance: prometheus
 spec:
   type: ClusterIP
   ports:
   - name: web
     port: 9090
     targetPort: web
+  # Match the Prometheus Operator pod labels. The e2e harness also
+  # port-forwards to this Service to query the target API.
   selector:
-    prometheus.prometheus-operator.dev/instance: prometheus
+    app.kubernetes.io/name: prometheus

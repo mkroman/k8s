@@ -1,0 +1,57 @@
+# kube-scheduler is a static pod, so there is no Service to select with a
+# ServiceMonitor. The monitoring Argo CD project only writes to the monitoring
+# namespace, so instead of creating discovery Services in kube-system we
+# discover the control-plane nodes through the Node API.
+#
+# ScrapeConfig is v1alpha1 in prometheus-operator v0.94.1. The e2e overlay
+# exercises this path so an operator upgrade cannot silently break it.
+#
+# Keep in sync with scrapeconfig.kube-controller-manager.yaml: only the name,
+# jobName, port and app label differ.
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: ScrapeConfig
+metadata:
+  name: kube-scheduler
+  labels:
+    app.kubernetes.io/name: kube-scheduler
+spec:
+  jobName: kube-scheduler
+  scheme: https
+  scrapeInterval: 30s
+  metricsPath: /metrics
+  authorization:
+    type: Bearer
+    credentials:
+      name: prometheus-scrape-token
+      key: token
+  tlsConfig:
+    insecureSkipVerify: true
+  kubernetesSDConfigs:
+  - role: Node
+  relabelings:
+  # Kubespray and kubeadm label control-plane nodes with
+  # node-role.kubernetes.io/control-plane (the value is empty).
+  - action: keep
+    sourceLabels:
+    - __meta_kubernetes_node_labelpresent_node_role_kubernetes_io_control_plane
+    regex: "true"
+  # The secure port is not part of the node address. Handle IPv4 and IPv6
+  # separately so dual-stack and IPv6-only clusters produce a valid host:port.
+  - action: replace
+    sourceLabels:
+    - __meta_kubernetes_node_address_InternalIP
+    regex: '^([0-9.]+)$'
+    targetLabel: __address__
+    replacement: ${1}:10259
+  - action: replace
+    sourceLabels:
+    - __meta_kubernetes_node_address_InternalIP
+    regex: '^([0-9a-fA-F:]+)$'
+    targetLabel: __address__
+    replacement: '[${1}]:10259'
+  # Keep a stable node label for dashboards and alerts; Node SD already sets
+  # instance to the node name.
+  - action: replace
+    sourceLabels:
+    - __meta_kubernetes_node_name
+    targetLabel: node

@@ -1,0 +1,28 @@
+# The built-in `kubernetes` Service in the default namespace always exists and
+# points at the kube-apiserver, so this target is safe without cluster access.
+# Mirrors the kube-prometheus kube-apiserver ServiceMonitor. The bearer token
+# is the Prometheus pod's projected service-account token; the CA and server
+# name verify the API server certificate.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: kube-apiserver
+  labels:
+    app.kubernetes.io/name: kube-apiserver
+spec:
+  jobLabel: component
+  namespaceSelector:
+    matchNames:
+    - default
+  selector:
+    matchLabels:
+      component: apiserver
+      provider: kubernetes
+  endpoints:
+  - port: https
+    scheme: https
+    interval: 30s
+    bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+    tlsConfig:
+      caFile: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+      serverName: kubernetes
