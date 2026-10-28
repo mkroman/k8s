@@ -103,6 +103,8 @@ gateway_ip() {
 }
 
 diagnose() {
+  local app job namespace name
+
   printf '::group::Argo CD Applications\n'
   kubectl -n argocd get applications -o wide || true
   for app in "${ORDER[@]}"; do
@@ -358,6 +360,46 @@ wait_for_application() {
   done
 }
 
+# Verify that an app's expected resources from apps.yaml were deployed. This
+# catches objects that render correctly but fail to apply, such as monitor CRs
+# whose CRD is missing.
+check_resources() {
+  local app="$1"
+  local config resource api_version kind namespace name manifest identifier output
+
+  config="$(yq -o=json -I=0 ".apps[\"${app}\"].resources // []" "${CONFIG_FILE}")"
+  [[ "$(jq -r 'length' <<<"${config}")" -gt 0 ]] || return 0
+
+  while IFS= read -r resource; do
+    [[ -n "${resource}" ]] || continue
+
+    api_version="$(jq -r '.apiVersion // ""' <<<"${resource}")"
+    kind="$(jq -r '.kind // ""' <<<"${resource}")"
+    namespace="$(jq -r '.namespace // ""' <<<"${resource}")"
+    name="$(jq -r '.name // ""' <<<"${resource}")"
+
+    [[ -n "${api_version}" && -n "${kind}" && -n "${name}" ]] ||
+      die "resources for ${app} must set apiVersion, kind and name"
+
+    identifier="${name}"
+    [[ -n "${namespace}" ]] && identifier="${namespace}/${name}"
+
+    manifest="$(printf 'apiVersion: %s\nkind: %s\nmetadata:\n  name: %s\n' \
+      "${api_version}" "${kind}" "${name}")"
+    if [[ -n "${namespace}" ]]; then
+      manifest+=$'\n'"  namespace: ${namespace}"
+    fi
+
+    if ! output="$(kubectl get -f - 2>&1 <<<"${manifest}")"; then
+      printf '%s\n' "${output}" >&2
+      diagnose
+      die "expected ${kind} ${identifier} for ${app} was not deployed"
+    fi
+
+    printf 'Found expected %s %s\n' "${kind}" "${identifier}"
+  done < <(jq -c '.[]' <<<"${config}")
+}
+
 # Verify the Prometheus target API for an app that declares prometheus_targets
 # in apps.yaml. Every target for the listed jobs must report up.
 check_prometheus_targets() {
@@ -536,14 +578,22 @@ main() {
     timeout_seconds="$(yq -r ".apps[\"${app}\"].timeout_seconds // 600" "${CONFIG_FILE}")"
     wait_for_application "${app}" "${revision}" "${timeout_seconds}"
   done
+  printf '::endgroup::\n'
+
+  printf '::group::Check expected resources\n'
+  for app in "${ORDER[@]}"; do
+    check_resources "${app}"
+  done
+  printf '::endgroup::\n'
+
   printf '::group::Check Prometheus targets\n'
   for app in "${ORDER[@]}"; do
     check_prometheus_targets "${app}"
   done
   printf '::endgroup::\n'
+
   wait_for_root_sync "${revision}" 600
   kubectl -n argocd get applications
-  printf '::endgroup::\n'
 }
 
 main "${APP}"

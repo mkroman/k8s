@@ -30,17 +30,20 @@ prerequisite CRDs are copied or applied by hand.
 | Application | Source | Prerequisites |
 | --- | --- | --- |
 | `agentgateway` | Helm, OCI dependencies | `gateway-api`, `prometheus-operator` |
-| `cert-manager` | Helm | none |
+| `cert-manager` | Helm | none; ServiceMonitor disabled in kind |
 | `cluster-exporters` | Helm | `prometheus-operator` |
 | `cloudnative-pg` | Kustomize | `cert-manager`, `prometheus-operator` |
 | `gateway-api` | Kustomize | none |
 | `grafana` | Helm | `prometheus-operator`; checks the renderer scrape path |
 | `monitoring` | Kustomize | `prometheus-operator`; asserts the control-plane scrape targets are up |
-| `prometheus-operator` | Kustomize | `cert-manager` |
-| `sealed-secrets` | Kustomize | `prometheus-operator` |
+| `prometheus-operator` | Kustomize | `cert-manager`; asserts its ServiceMonitor is deployed |
+| `sealed-secrets` | Kustomize | `prometheus-operator`; asserts its PodMonitor is deployed |
 | `traefik` | Helm | `prometheus-operator` |
 | `vector-agent` | Helm | `prometheus-operator` |
 | `vector-aggregator` | Helm | `prometheus-operator` |
+
+`longhorn` is not e2e-enabled because kind cannot run it; its chart and
+ServiceMonitor are covered by the Helm validation workflow instead.
 
 `agentgateway` reuses the production OCI Helm repository registration. Its
 chart dependencies are resolved by Argo CD, not by the runner.
@@ -81,6 +84,23 @@ can use it:
       jobs:
         - kubelet
 ```
+
+An app can also declare `resources` that must exist after it is Synced and
+Healthy. The runner looks up each object by API version, kind, name and
+namespace, which verifies that monitor CRs were actually applied and not just
+rendered:
+
+```yaml
+  my-app:
+    resources:
+      - apiVersion: monitoring.coreos.com/v1
+        kind: ServiceMonitor
+        namespace: monitoring
+        name: my-app
+```
+
+Resource checks run for prerequisites too, so declaring the object under the
+Application that owns it verifies it in every test that deploys that app.
 
 ## Adding an app
 
