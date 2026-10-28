@@ -39,7 +39,7 @@
     },
     {
       "customType": "regex",
-      "description": "Update CI tool versions and checksums in tools.txt",
+      "description": "Update CI tool tags and checksums in tools.txt",
       "managerFilePatterns": [
         "/^hack\\/ci\\/tools\\.txt$/"
       ],
@@ -47,8 +47,7 @@
         "\\[(?<tool>[a-z0-9-]+)\\]\\nrepo=(?<depName>[^\\n]+)\\nversion=(?<currentValue>[^\\n]+)\\nsha256=(?<currentDigest>[a-f0-9]{64})"
       ],
       "datasourceTemplate": "github-release-attachments",
-      "versioningTemplate": "semver",
-      "extractVersionTemplate": "^v?(?<version>.*)$"
+      "versioningTemplate": "semver"
     }
   ],
   "packageRules": [
