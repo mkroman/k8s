@@ -85,6 +85,9 @@ grafana:
       labelValue: "true"
       # -- Only monitor ConfigMaps
       resource: configmap
+      provider:
+        # Grafana users and dashboards live in org 2 (auto_assign_org_id).
+        orgid: 2
 
 certificate:
   # -- Create the Certificate resource.
