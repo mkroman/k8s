@@ -1,2 +1,5 @@
 resources:
   - ./base/controller-v0.36.6.yaml
+  - ./podmonitor.yaml
+
+namespace: kube-system

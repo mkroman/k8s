@@ -11,11 +11,17 @@
 # prometheus_targets optionally declares a Prometheus Service and the job names
 # whose targets must all be up after the app is healthy. The runner reads it
 # generically, so more than one app can use it.
+#
+# resources optionally lists objects that must exist after the app is healthy.
+# Use it to verify that resources such as ServiceMonitors and PodMonitors were
+# actually deployed, not just rendered.
 apps:
   agentgateway:
     requires:
       - gateway-api
       - prometheus-operator
+  # The ServiceMonitor is disabled in values-kind.yaml because Prometheus
+  # Operator depends on cert-manager, so there is nothing to assert here.
   cert-manager: {}
   cloudnative-pg:
     requires:
@@ -47,7 +53,19 @@ apps:
   prometheus-operator:
     requires:
       - cert-manager
-  sealed-secrets: {}
+    resources:
+      - apiVersion: monitoring.coreos.com/v1
+        kind: ServiceMonitor
+        namespace: prometheus-operator
+        name: prometheus-operator
+  sealed-secrets:
+    requires:
+      - prometheus-operator
+    resources:
+      - apiVersion: monitoring.coreos.com/v1
+        kind: PodMonitor
+        namespace: kube-system
+        name: sealed-secrets-controller
   traefik:
     requires:
       - prometheus-operator

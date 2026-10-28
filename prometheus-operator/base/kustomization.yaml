@@ -3,3 +3,4 @@ kind: Kustomization
 namespace: prometheus-operator
 resources:
   - ./manifests/prometheus-operator-v0.94.1.yaml
+  - ./servicemonitor.yaml

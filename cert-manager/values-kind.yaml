@@ -2,3 +2,10 @@
 # The controller, CRDs and ClusterIssuers are still fully exercised.
 sealedSecret:
   enabled: false
+
+cert-manager:
+  # Prometheus Operator depends on cert-manager, so its CRDs do not exist when
+  # the cert-manager e2e Application runs on its own.
+  prometheus:
+    servicemonitor:
+      enabled: false

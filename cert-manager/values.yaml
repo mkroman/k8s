@@ -1,6 +1,14 @@
 cert-manager:
   installCRDs: true
 
+  prometheus:
+    servicemonitor:
+      enabled: true
+      interval: 30s
+      scrapeTimeout: 10s
+      labels:
+        metrics.uplink.io/monitor: prometheus
+
 clusterIssuer:
   # -- Enable the production letsencrypt cert issuer.
   letsEncryptProduction:
