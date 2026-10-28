@@ -5,6 +5,12 @@ metadata:
 spec:
   replicas: 2
 
+  # Production identity for federation, remote write and shared dashboards.
+  # The kind overlay deliberately leaves these unset.
+  externalLabels:
+    cluster: rwx
+    environment: prod
+
   alerting:
     alertmanagers:
       - name: cluster

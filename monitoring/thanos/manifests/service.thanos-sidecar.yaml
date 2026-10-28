@@ -14,4 +14,5 @@ spec:
     port: 10902
     targetPort: http
   selector:
-    prometheus: prometheus
+    app.kubernetes.io/name: prometheus
+    app.kubernetes.io/instance: prometheus

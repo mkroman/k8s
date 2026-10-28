@@ -2,8 +2,17 @@ apiVersion: monitoring.coreos.com/v1
 kind: Alertmanager
 metadata:
   name: cluster
+  labels:
+    app.kubernetes.io/name: alertmanager
+    app.kubernetes.io/instance: cluster
+    app.kubernetes.io/component: alert-router
+    app.kubernetes.io/part-of: monitoring
+    app.kubernetes.io/managed-by: prometheus-operator
 spec:
   replicas: 3
+  podMetadata:
+    labels:
+      app.kubernetes.io/part-of: monitoring
   externalUrl: http://127.0.0.1:8001/api/v1/proxy/namespaces/monitoring/services/alertmanager:web/
   resources:
     requests:

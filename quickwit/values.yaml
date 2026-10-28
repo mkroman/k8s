@@ -58,6 +58,8 @@ quickwit:
   prometheusRule:
     # -- Create the provided prometheus rule resources.
     enabled: true
+    additionalLabels:
+      metrics.uplink.io/monitor: prometheus
 
     rules:
       - alert: QuickwitSustainedHighThroughput

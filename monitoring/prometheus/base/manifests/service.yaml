@@ -4,6 +4,10 @@ metadata:
   name: prometheus
   labels:
     app.kubernetes.io/name: prometheus
+    app.kubernetes.io/instance: prometheus
+    app.kubernetes.io/component: server
+    app.kubernetes.io/part-of: monitoring
+    self-monitor: "true"
 spec:
   type: ClusterIP
   ports:
@@ -14,3 +18,4 @@ spec:
   # port-forwards to this Service to query the target API.
   selector:
     app.kubernetes.io/name: prometheus
+    app.kubernetes.io/instance: prometheus
