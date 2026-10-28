@@ -28,8 +28,11 @@ spec:
         - protocol: TCP
           port: 4318
 
-    # Prometheus scrapes agent metrics directly.
+    # Prometheus and the e2e probe scrape agent metrics directly.
     - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: vector-e2e
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: monitoring
@@ -54,8 +57,11 @@ spec:
         - protocol: TCP
           port: 4318
 
-    # Prometheus scrapes aggregator metrics directly.
+    # Prometheus and the e2e probe scrape aggregator metrics directly.
     - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: vector-e2e
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: monitoring

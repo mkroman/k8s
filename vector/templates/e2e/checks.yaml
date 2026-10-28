@@ -1,0 +1,132 @@
+{{- $e2e := .Values.vector.e2e | default dict }}
+{{- if and $e2e.enabled (eq .Values.vector.role "Agent") }}
+{{- $probeNamespace := required "vector.e2e.probeNamespace is required when e2e.enabled is true" $e2e.probeNamespace }}
+{{- $telemetrygenImage := required "vector.e2e.telemetrygenImage is required when e2e.enabled is true" $e2e.telemetrygenImage }}
+{{- $curlImage := required "vector.e2e.curlImage is required when e2e.enabled is true" $e2e.curlImage }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: e2e-{{ .Release.Name }}-otlp
+  namespace: {{ $probeNamespace }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "10"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  activeDeadlineSeconds: 180
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: vector-e2e
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      automountServiceAccountToken: false
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        - name: send-log
+          image: {{ $telemetrygenImage | quote }}
+          imagePullPolicy: IfNotPresent
+          args:
+            - logs
+            - --otlp-endpoint
+            - vector-agent.vector.svc.cluster.local:4318
+            - --otlp-http
+            - --otlp-insecure
+            - --logs
+            - "1"
+            - --service
+            - vector-e2e
+            - --body
+            - e2e-log
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+        - name: send-trace
+          image: {{ $telemetrygenImage | quote }}
+          imagePullPolicy: IfNotPresent
+          args:
+            - traces
+            - --otlp-endpoint
+            - vector-agent.vector.svc.cluster.local:4318
+            - --otlp-http
+            - --otlp-insecure
+            - --traces
+            - "1"
+            - --service
+            - vector-e2e
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+      containers:
+        - name: probe
+          image: {{ $curlImage | quote }}
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -ec
+            - |
+              agent_metrics_url="http://vector-agent.vector.svc.cluster.local:9090/metrics"
+              aggregator_metrics_url="http://vector-aggregator.vector.svc.cluster.local:9090/metrics"
+
+              for attempt in $(seq 1 30); do
+                agent_metrics="$(curl -fsS --max-time 5 "${agent_metrics_url}" || true)"
+                aggregator_metrics="$(curl -fsS --max-time 5 "${aggregator_metrics_url}" || true)"
+
+                if printf '%s\n' "${agent_metrics}" |
+                    grep -Eq '^vector_component_received_events_total\{[^}]*component_id="otel"[^}]*\} [1-9][0-9]*( [0-9]+)?$' &&
+                  printf '%s\n' "${aggregator_metrics}" |
+                    grep -Eq '^vector_component_received_events_total\{[^}]*component_id="otel"[^}]*\} [1-9][0-9]*( [0-9]+)?$' &&
+                  printf '%s\n' "${agent_metrics}" |
+                    grep -Eq '^vector_component_sent_events_total\{[^}]*component_id="aggregator_otel_logs"[^}]*\} [1-9][0-9]*( [0-9]+)?$' &&
+                  printf '%s\n' "${agent_metrics}" |
+                    grep -Eq '^vector_component_sent_events_total\{[^}]*component_id="aggregator_otel_traces"[^}]*\} [1-9][0-9]*( [0-9]+)?$'; then
+                  echo "OTLP logs and traces reached the aggregator"
+                  exit 0
+                fi
+
+                sleep 2
+              done
+
+              echo "OTLP metrics did not become non-zero within 60s" >&2
+              exit 1
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+{{- end }}

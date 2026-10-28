@@ -294,6 +294,8 @@ projects:
         kind: ServiceAccount
       - group: apps
         kind: DaemonSet
+      - group: batch
+        kind: Job
       - group: networking.k8s.io
         kind: NetworkPolicy
       - group: monitoring.coreos.com

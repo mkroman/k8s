@@ -72,6 +72,37 @@ apps:
   vector-agent:
     requires:
       - prometheus-operator
+      - vector-aggregator
+    resources:
+      - apiVersion: networking.k8s.io/v1
+        kind: NetworkPolicy
+        namespace: vector
+        name: vector-agent
+      - apiVersion: v1
+        kind: Service
+        namespace: vector
+        name: vector-agent
+      - apiVersion: monitoring.coreos.com/v1
+        kind: PodMonitor
+        namespace: vector
+        name: vector-agent
   vector-aggregator:
     requires:
       - prometheus-operator
+    resources:
+      - apiVersion: networking.k8s.io/v1
+        kind: NetworkPolicy
+        namespace: vector
+        name: vector-aggregator
+      - apiVersion: v1
+        kind: Service
+        namespace: vector
+        name: vector-aggregator
+      - apiVersion: apps/v1
+        kind: StatefulSet
+        namespace: vector
+        name: vector-aggregator
+      - apiVersion: monitoring.coreos.com/v1
+        kind: PodMonitor
+        namespace: vector
+        name: vector-aggregator

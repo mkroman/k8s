@@ -108,6 +108,14 @@ Prometheus scrapes `:9090/metrics` on both roles. Useful alerts:
 > `vector/vector-agent` / `vector/vector-aggregator` job names; update any
 > external alerts that matched the old names.
 
+## E2E
+
+`values-kind.yaml` only overrides the kind StorageClass and enables a PostSync
+OTLP smoke probe. The probe sends one log and one trace to the agent Service,
+then asserts non-zero OTLP metrics on both the agent and aggregator. The
+`vector-agent` e2e app depends on `vector-aggregator` so the full hop is
+exercised.
+
 ## Notes
 
 - The agent accepts OTLP on `:4317`/`:4318` and forwards logs/traces to the

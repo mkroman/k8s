@@ -5,3 +5,9 @@
 vector:
   persistence:
     storageClassName: standard
+
+  e2e:
+    enabled: true
+    probeNamespace: vector
+    telemetrygenImage: ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen:v0.164.1
+    curlImage: curlimages/curl:8.17.0
