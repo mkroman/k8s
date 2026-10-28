@@ -83,11 +83,21 @@
       "enabled": false
     },
     {
-      "description": "Keep the self-hosted Renovate chart and Artifact Hub image metadata in sync without digest pins",
+      "description": "Group every reference to Renovate itself and only update it once a week",
+      "matchSourceUrls": [
+        "https://github.com/renovatebot/renovate"
+      ],
+      "groupName": "renovate",
+      "groupSlug": "renovate",
+      "schedule": [
+        "* 0-3 * * 1"
+      ]
+    },
+    {
+      "description": "Keep the self-hosted chart appVersion and Artifact Hub image metadata unpinned",
       "matchPackageNames": [
         "renovate/renovate"
       ],
-      "groupName": "renovate",
       "pinDigests": false
     }
   ]
