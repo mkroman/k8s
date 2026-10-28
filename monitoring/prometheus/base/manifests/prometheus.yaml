@@ -5,7 +5,9 @@ metadata:
   labels:
     prometheus.prometheus-operator.dev/instance: prometheus
 spec:
-  replicas: 2
+  # The production overlay sets two replicas. The base stays at one so an
+  # ephemeral environment can run it without a second PVC or anti-affinity.
+  replicas: 1
 
   serviceAccountName: prometheus
 
@@ -15,12 +17,6 @@ spec:
 
   ruleNamespaceSelector:
     matchLabels: {}
-
-  alerting:
-    alertmanagers:
-      - name: cluster
-        namespace: monitoring
-        port: web
 
   prometheusExternalLabelName: prometheus.prometheus-operator.dev/instance
 
@@ -40,6 +36,8 @@ spec:
     matchLabels:
       metrics.uplink.io/monitor: prometheus
 
+  # ScrapeConfigs cover targets that cannot be expressed as a ServiceMonitor,
+  # currently the kube-scheduler and kube-controller-manager static pods.
   scrapeConfigSelector:
     matchLabels:
       metrics.uplink.io/monitor: prometheus
@@ -47,23 +45,8 @@ spec:
   scrapeConfigNamespaceSelector:
     matchLabels: {}
 
-  thanos:
-    version: v0.42.4
-    objectStorageConfig:
-      key: thanos.yaml
-      name: thanos-storage
-
   securityContext:
-    # Prometheus will fail to start because it can't write to the query log in
-    # the attached volume without this.
+    # Prometheus runs as nobody and needs to write its data directory, whether
+    # that is a PVC in production or an emptyDir in an ephemeral environment.
     runAsUser: 65534
     fsGroup: 65534
-
-  # Configure persistent storage.
-  storage:
-    volumeClaimTemplate:
-      spec:
-        storageClassName: ssd-gp1x1
-        resources:
-          requests:
-            storage: 15Gi

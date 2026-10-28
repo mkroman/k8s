@@ -1,0 +1,27 @@
+apiVersion: monitoring.coreos.com/v1
+kind: Prometheus
+metadata:
+  name: prometheus
+spec:
+  replicas: 2
+
+  alerting:
+    alertmanagers:
+      - name: cluster
+        namespace: monitoring
+        port: web
+
+  thanos:
+    version: v0.42.4
+    objectStorageConfig:
+      key: thanos.yaml
+      name: thanos-storage
+
+  # Configure persistent storage.
+  storage:
+    volumeClaimTemplate:
+      spec:
+        storageClassName: ssd-gp1x1
+        resources:
+          requests:
+            storage: 15Gi

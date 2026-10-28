@@ -1,13 +1,7 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Production is the default Prometheus composition. Environment-specific
+# variants live in overlays/ and reuse base/ plus scrape/.
 resources:
-  - ./manifests/clusterrole.yaml
-  - ./manifests/clusterrolebinding.yaml
-  - ./manifests/serviceaccount.yaml
-  - ./manifests/prometheus.yaml
-  - ./manifests/service.yaml
-  - ./manifests/servicemonitor.yaml
-  - ./manifests/servicemonitor.kubelet.yaml
-  - ./manifests/servicemonitor.coredns.yaml
-  - ./manifests/servicemonitor.kube-apiserver.yaml
-  - ./manifests/secret.prometheus-kubelet-token.yaml
-  - ./manifests/scrapeconfig.kube-scheduler.yaml
-  - ./manifests/scrapeconfig.kube-controller-manager.yaml
+  - ./overlays/production

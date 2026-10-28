@@ -63,6 +63,25 @@ to Argo CD's `PostSync` is the supported equivalent. The probes therefore use
 `activeDeadlineSeconds`, and use `before-hook-creation,hook-succeeded` cleanup.
 They test behaviour, not just Argo CD's resource-health status.
 
+Kustomize apps can use `overlays/kind` for environment-specific composition;
+`monitoring/overlays/kind` selects the production-free Prometheus base.
+
+For runtime assertions, an app can declare `prometheus_targets` in `apps.yaml`.
+After the Application is Synced and Healthy, `run-app.sh` port-forwards to the
+configured Service and checks the target API. Every target for the listed jobs
+must report `up`. This is generic; any app with a Prometheus-compatible Service
+can use it:
+
+```yaml
+  my-app:
+    prometheus_targets:
+      namespace: monitoring
+      service: prometheus
+      port: 9090
+      jobs:
+        - kubelet
+```
+
 ## Adding an app
 
 Add the app to `apps.yaml`:

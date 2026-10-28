@@ -1,13 +1,14 @@
 # Kubespray creates the `kube-dns` Service in kube-system with a `metrics`
 # port on 9153, and its CoreDNS Corefile enables `prometheus :9153`.
-# Mirrors the kube-prometheus-stack core-dns ServiceMonitor.
+# Mirrors the kube-prometheus CoreDNS ServiceMonitor. `jobLabel: k8s-app`
+# yields `job="kube-dns"`, which is the value dashboards and the e2e check
+# expect.
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   name: coredns
   labels:
     app.kubernetes.io/name: coredns
-    metrics.uplink.io/monitor: prometheus
 spec:
   jobLabel: k8s-app
   namespaceSelector:

@@ -39,14 +39,25 @@ GIT_DAEMON_PORT="${GIT_DAEMON_PORT:-9418}"
 KIND_NODE_IMAGE="${KIND_NODE_IMAGE:-}"
 TEMP_DIR="$(mktemp -d)"
 GIT_DAEMON_PID=""
+PORT_FORWARD_PID=""
 CLUSTER_CREATED=0
 declare -A DEPTH=()
 declare -A IN_PROGRESS=()
 declare -A ORDERED=()
 declare -a ORDER=()
 
+stop_port_forward() {
+  if [[ -n "${PORT_FORWARD_PID}" ]]; then
+    kill "${PORT_FORWARD_PID}" >/dev/null 2>&1 || true
+    wait "${PORT_FORWARD_PID}" >/dev/null 2>&1 || true
+    PORT_FORWARD_PID=""
+  fi
+}
+
 cleanup() {
   local status=$?
+
+  stop_port_forward
 
   if [[ "${KEEP_CLUSTER:-0}" != "1" && "${CLUSTER_CREATED}" == "1" ]]; then
     kind delete cluster --name "${CLUSTER_NAME}" >/dev/null 2>&1 || true
@@ -347,6 +358,84 @@ wait_for_application() {
   done
 }
 
+# Verify the Prometheus target API for an app that declares prometheus_targets
+# in apps.yaml. Every target for the listed jobs must report up.
+check_prometheus_targets() {
+  local app="$1"
+  local config namespace service port jobs timeout_seconds local_port
+  local start deadline payload summary
+
+  config="$(
+    yq -o=json -I=0 ".apps[\"${app}\"].prometheus_targets // {}" "${CONFIG_FILE}"
+  )"
+  [[ "$(jq -r 'length' <<<"${config}")" -gt 0 ]] || return 0
+
+  require_tool curl
+  namespace="$(jq -r '.namespace // ""' <<<"${config}")"
+  service="$(jq -r '.service // ""' <<<"${config}")"
+  port="$(jq -r '.port // 9090' <<<"${config}")"
+  jobs="$(jq -c '.jobs' <<<"${config}")"
+  timeout_seconds="$(jq -r '.timeout_seconds // 300' <<<"${config}")"
+
+  [[ -n "${namespace}" ]] ||
+    die "prometheus_targets.namespace is required for ${app}"
+  [[ -n "${service}" ]] ||
+    die "prometheus_targets.service is required for ${app}"
+  jq -e 'type == "array" and length > 0' <<<"${jobs}" >/dev/null ||
+    die "prometheus_targets.jobs for ${app} must be a non-empty list"
+  [[ "${timeout_seconds}" =~ ^[0-9]+$ ]] ||
+    die "prometheus_targets.timeout_seconds for ${app} must be an integer"
+
+  local_port=$((20000 + RANDOM % 20000))
+  kubectl -n "${namespace}" port-forward "svc/${service}" \
+    "${local_port}:${port}" >"${TEMP_DIR}/prometheus-port-forward.log" 2>&1 &
+  PORT_FORWARD_PID=$!
+  trap stop_port_forward RETURN
+
+  start="$(date +%s)"
+  deadline=$((start + timeout_seconds))
+  summary="Prometheus API is not reachable yet"
+
+  while (( $(date +%s) < deadline )); do
+    if ! kill -0 "${PORT_FORWARD_PID}" 2>/dev/null; then
+      die "port-forward to ${namespace}/${service} failed: $(tail -n 1 "${TEMP_DIR}/prometheus-port-forward.log")"
+    fi
+
+    if payload="$(
+      curl -fsS --max-time 10 \
+        "http://127.0.0.1:${local_port}/api/v1/targets?state=active" 2>/dev/null
+    )"; then
+      summary="$(
+        jq -r --argjson jobs "${jobs}" '
+          [.data.activeTargets[] | select(.labels.job != null)]
+          | group_by(.labels.job)
+          | map({key: .[0].labels.job, value: map(.health)})
+          | from_entries as $health
+          | [$jobs[] | . as $job
+             | ($health[$job] // []) as $values
+             | select(($values | length) == 0 or ($values | any(. != "up")))
+             | "\($job)=\(
+                 if ($values | length) == 0 then "missing"
+                 else ($values | join(","))
+                 end
+               )"]
+          | join("; ")
+        ' <<<"${payload}" 2>/dev/null || printf 'invalid target response'
+      )"
+
+      if [[ -z "${summary}" ]]; then
+        printf 'Prometheus targets are healthy: %s\n' "$(jq -c . <<<"${jobs}")"
+        return 0
+      fi
+    fi
+
+    sleep 5
+  done
+
+  diagnose
+  die "Prometheus targets for ${app} did not become healthy: ${summary}"
+}
+
 wait_for_root_sync() {
   local revision="$1"
   local timeout_seconds="$2"
@@ -447,6 +536,11 @@ main() {
     timeout_seconds="$(yq -r ".apps[\"${app}\"].timeout_seconds // 600" "${CONFIG_FILE}")"
     wait_for_application "${app}" "${revision}" "${timeout_seconds}"
   done
+  printf '::group::Check Prometheus targets\n'
+  for app in "${ORDER[@]}"; do
+    check_prometheus_targets "${app}"
+  done
+  printf '::endgroup::\n'
   wait_for_root_sync "${revision}" 600
   kubectl -n argocd get applications
   printf '::endgroup::\n'

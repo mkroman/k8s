@@ -10,7 +10,8 @@ nodes:
 
 # kubeadm binds the scheduler and controller-manager metrics to localhost.
 # Expose them on the node address so Prometheus can scrape them in e2e, matching
-# the Kubespray layout.
+# the Kubespray layout. kind's patch helper translates the map form for
+# kubeadm v1beta4 and preserves its enable-hostpath-provisioner default.
 kubeadmConfigPatches:
   - |
     kind: ClusterConfiguration

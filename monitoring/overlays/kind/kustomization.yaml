@@ -3,23 +3,8 @@ kind: Kustomization
 
 namespace: monitoring
 
+# The kind environment runs the same Prometheus base and scrape targets as
+# production, without Alertmanager, Thanos, ingress or a PVC. The e2e harness
+# checks the target API after the Application is healthy.
 resources:
-  - ../../prometheus
-  - e2e-prometheus-targets.yaml
-
-patches:
-  - target:
-      group: monitoring.coreos.com
-      version: v1
-      kind: Prometheus
-      name: prometheus
-    patch: |-
-      - op: remove
-        path: /spec/alerting
-      - op: remove
-        path: /spec/thanos
-      - op: remove
-        path: /spec/storage
-      - op: replace
-        path: /spec/replicas
-        value: 1
+  - ../../prometheus/overlays/kind

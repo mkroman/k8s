@@ -1,0 +1,13 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: monitoring
+
+resources:
+  - ../../base
+  - ../../scrape
+
+patches:
+  # Add the production-only features on top of the minimal base. Omitting a
+  # target keeps this fail-fast if the Prometheus CR is renamed.
+  - path: patches/prometheus.yaml
