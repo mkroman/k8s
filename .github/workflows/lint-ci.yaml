@@ -57,7 +57,7 @@ jobs:
     container:
       # Pinned to a full version and digest; the github-actions manager updates
       # both when a new Renovate release is available.
-      image: ghcr.io/renovatebot/renovate:44.191.0@sha256:3e9be1a29672f4860eea6818e68ef01c1b8fdea984e09c9c664eeaf48b7e150c
+      image: ghcr.io/renovatebot/renovate:44.192.0@sha256:20f0903127aef0ce838410be939680ced244bb42f00ce2e4bd793ad231a35419
       # GitHub-hosted runners mount the workspace as 1001:127; the Renovate
       # image runs as 12021. Match the permissions used by the official
       # renovatebot/github-action CI.
