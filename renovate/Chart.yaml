@@ -7,7 +7,7 @@ description: >-
 type: application
 version: 0.1.0
 # renovate: datasource=docker depName=renovate/renovate
-appVersion: "44.56.3"
+appVersion: "44.191.0"
 kubeVersion: ">=1.21.0-0"
 home: https://docs.renovatebot.com/
 icon: https://docs.renovatebot.com/assets/images/logo.png
@@ -27,7 +27,7 @@ annotations:
   # appVersion above; Renovate updates both.
   artifacthub.io/images: |
     - name: renovate
-      image: renovate/renovate:44.56.3
+      image: renovate/renovate:44.191.0
   artifacthub.io/links: |-
     - name: Running Renovate (self-hosting guide)
       url: https://docs.renovatebot.com/getting-started/running/
