@@ -82,7 +82,9 @@ verify_sha256() {
 expand_template() {
   local template="$1"
   local version="$2"
+  local version_nov="$3"
 
+  template="${template//\$\{version_nov\}/${version_nov}}"
   printf '%s' "${template//\$\{version\}/${version}}"
 }
 
@@ -95,11 +97,12 @@ install_tool() {
   local asset_template="$6"
   local binary_template="$7"
   local archive_format="$8"
+  local version_nov="${version#v}"
   local tag asset binary url archive
 
-  tag="$(expand_template "${tag_template}" "${version}")"
-  asset="$(expand_template "${asset_template}" "${version}")"
-  binary="$(expand_template "${binary_template}" "${version}")"
+  tag="$(expand_template "${tag_template}" "${version}" "${version_nov}")"
+  asset="$(expand_template "${asset_template}" "${version}" "${version_nov}")"
+  binary="$(expand_template "${binary_template}" "${version}" "${version_nov}")"
   url="https://github.com/${repo}/releases/download/${tag}/${asset}"
   archive="${TEMP_DIR}/${tool}-download"
 

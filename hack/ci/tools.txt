@@ -6,57 +6,61 @@
 #
 #   [tool]
 #   repo=owner/repository
-#   version=1.2.3
+#   version=v1.2.3
 #   sha256=<64 hex characters>
-#   tag=<release tag template>
+#   tag=${version}
 #   asset=<release asset template>
 #   binary=<path inside the archive>
 #   archive=tar.gz|tar.xz|raw
 #
-# ${version} is expanded from the version field. Renovate updates version and
-# sha256 using the github-release-attachments datasource.
+# version is the upstream release tag, including any leading "v". Renovate
+# updates it and sha256 with the github-release-attachments datasource, which
+# requests releases by their exact tag.
+#
+# ${version} expands to the full tag. ${version_nov} expands to the tag with a
+# leading "v" removed, for release asset names that omit the prefix.
 #
 [actionlint]
 repo=rhysd/actionlint
-version=1.7.12
+version=v1.7.12
 sha256=8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
-tag=v${version}
-asset=actionlint_${version}_linux_amd64.tar.gz
+tag=${version}
+asset=actionlint_${version_nov}_linux_amd64.tar.gz
 binary=actionlint
 archive=tar.gz
 
 [kind]
 repo=kubernetes-sigs/kind
-version=0.33.0
+version=v0.33.0
 sha256=aee6151561422756b764a4ae28e7f44cda5af5a9eead3cc9985112b1de8d8e0d
-tag=v${version}
+tag=${version}
 asset=kind-linux-amd64
 binary=kind
 archive=raw
 
 [kubeconform]
 repo=yannh/kubeconform
-version=0.8.0
+version=v0.8.0
 sha256=9bc2bffbf71f261128533edaf912153948b7ff238f9a531ae6d34466ec287883
-tag=v${version}
+tag=${version}
 asset=kubeconform-linux-amd64.tar.gz
 binary=kubeconform
 archive=tar.gz
 
 [shellcheck]
 repo=koalaman/shellcheck
-version=0.11.0
+version=v0.11.0
 sha256=8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198
-tag=v${version}
-asset=shellcheck-v${version}.linux.x86_64.tar.xz
-binary=shellcheck-v${version}/shellcheck
+tag=${version}
+asset=shellcheck-v${version_nov}.linux.x86_64.tar.xz
+binary=shellcheck-v${version_nov}/shellcheck
 archive=tar.xz
 
 [yq]
 repo=mikefarah/yq
-version=4.54.1
+version=v4.54.1
 sha256=e68a456f90c577af3fe4960184b3a3cf5c461e0348407c10f107da3a5fec8972
-tag=v${version}
+tag=${version}
 asset=yq_linux_amd64.tar.gz
 binary=yq_linux_amd64
 archive=tar.gz
