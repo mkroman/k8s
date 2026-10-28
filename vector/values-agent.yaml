@@ -9,33 +9,128 @@ vector:
       memory: "1024Mi"
       cpu: "6000m"
 
+  # This is a home lab: control-plane nodes also run workloads, so collect
+  # their logs too.
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+      effect: NoSchedule
+    - key: node-role.kubernetes.io/master
+      operator: Exists
+      effect: NoSchedule
+
+  networkPolicy:
+    enabled: true
+
+  # The agent needs root to read the host log paths and write its hostPath
+  # checkpoint directory. Harden the container without changing its UID.
+  podSecurityContext:
+    seccompProfile:
+      type: RuntimeDefault
+
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop: [ALL]
+    readOnlyRootFilesystem: true
+
+  extraVolumes:
+    - name: tmp
+      emptyDir: {}
+  extraVolumeMounts:
+    - name: tmp
+      mountPath: /tmp
+
+  podMonitor:
+    enabled: true
+    additionalLabels:
+      metrics.uplink.io/monitor: prometheus
+    # Keep the agent and aggregator jobs distinct.
+    jobLabel: app.kubernetes.io/instance
+    port: prom-exporter
+    interval: 30s
+
+  # Declare only the ports the agent actually serves. Without this, the chart
+  # also declares the aggregator's 6000 as a container port because it appears
+  # in the sink address.
+  containerPorts:
+    - name: api
+      containerPort: 8686
+      protocol: TCP
+    - name: otlp-grpc
+      containerPort: 4317
+      protocol: TCP
+    - name: otlp-http
+      containerPort: 4318
+      protocol: TCP
+    - name: prom-exporter
+      containerPort: 9090
+      protocol: TCP
+
+  service:
+    # Local routing makes an application's OTLP request terminate on the
+    # Vector agent running on the same node. Every node runs an agent because
+    # the DaemonSet tolerates the control-plane taints.
+    internalTrafficPolicy: Local
+    ports:
+      - name: otlp-grpc
+        port: 4317
+        protocol: TCP
+        targetPort: 4317
+      - name: otlp-http
+        port: 4318
+        protocol: TCP
+        targetPort: 4318
+      - name: prom-exporter
+        port: 9090
+        protocol: TCP
+        targetPort: 9090
+
+  # The agent has no StatefulSet and no need for a headless service.
+  serviceHeadless:
+    enabled: false
+
+  livenessProbe:
+    grpc:
+      port: 8686
+
+  readinessProbe:
+    grpc:
+      port: 8686
+
   customConfig:
     data_dir: /vector-data-dir
 
     # API configuration.
     api:
       enabled: true
-      address: 127.0.0.1:8686
+      address: 0.0.0.0:8686
 
     # List of sources.
     sources:
-      generate_syslog:
-        type: demo_logs
-        format: syslog
+      # Kubernetes container logs source.
+      kubernetes_logs:
+        type: kubernetes_logs
+        node_annotation_fields:
+          node_labels: "" # Disable node labels as kubevirt adds a whole lot and we don't care about them
+        # Annotations are high-cardinality and are not needed in the log store.
+        pod_annotation_fields:
+          pod_annotations: ""
+        namespace_annotation_fields:
+          namespace_annotations: ""
 
-      # Enable OTel logs and traces.
+      # Node-local OTLP ingress. The Service uses internalTrafficPolicy: Local,
+      # so applications that connect through the Service reach the agent on
+      # their own node.
       otel:
         type: opentelemetry
         grpc:
           address: 0.0.0.0:4317
         http:
           address: 0.0.0.0:4318
-
-      # Kubernetes container logs source.
-      kubernetes_logs:
-        type: kubernetes_logs
-        node_annotation_fields:
-          node_labels: "" # Disable node labels as kubevirt adds a whole lot and we don't care about them
+        decoding:
+          codec: otlp
+          signal_types: [logs, traces]
 
       # Host metrics source.
       host_metrics:
@@ -60,8 +155,59 @@ vector:
         inputs: [host_metrics, internal_metrics]
         address: 0.0.0.0:9090
 
-      # Export to an external aggregating Vector instance.
+      # Export logs to the aggregator. Metrics stay local and are scraped by
+      # Prometheus from this agent, so they are not shipped across the network.
       aggregator:
         type: vector
-        inputs: [host_metrics, internal_metrics, kubernetes_logs]
+        inputs: [kubernetes_logs]
         address: "vector-aggregator.vector.svc.cluster.local:6000"
+
+      # Quickwit 0.8.2 has no OTLP metrics support. Metrics stay in Prometheus.
+      drop_otel_metrics:
+        type: blackhole
+        inputs: [otel.metrics]
+
+      # Forward node-local OTLP logs to the aggregator. Keeping this as OTLP
+      # avoids mixing raw OTLP logs with the Kubernetes container-log schema.
+      aggregator_otel_logs:
+        type: opentelemetry
+        inputs: [otel.logs]
+        protocol:
+          type: http
+          uri: "http://vector-aggregator.vector.svc.cluster.local:4318/v1/logs"
+          encoding:
+            codec: otlp
+          compression: none
+          batch:
+            max_events: 1000
+            timeout_secs: 1
+          request:
+            retry_attempts: 10
+        acknowledgements:
+          enabled: true
+        buffer:
+          type: disk
+          max_size: 1073741824 # 1 GiB
+          when_full: block
+
+      aggregator_otel_traces:
+        type: opentelemetry
+        inputs: [otel.traces]
+        protocol:
+          type: http
+          uri: "http://vector-aggregator.vector.svc.cluster.local:4318/v1/traces"
+          encoding:
+            codec: otlp
+          compression: none
+          batch:
+            max_events: 1000
+            timeout_secs: 2
+            max_bytes: 8388608 # 8 MiB
+          request:
+            retry_attempts: 10
+        acknowledgements:
+          enabled: true
+        buffer:
+          type: disk
+          max_size: 1073741824 # 1 GiB
+          when_full: block

@@ -1,0 +1,33 @@
+{{- if .Values.grafana.sidecar.datasources.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-datasources
+  labels:
+    grafana_datasource: "1"
+data:
+  datasources.yaml: |-
+    apiVersion: 1
+    datasources:
+      - name: quickwit-prod
+        uid: deus9irpizvgga
+        type: quickwit-quickwit-datasource
+        access: proxy
+        url: http://quickwit-searcher.quickwit-prod.svc.cluster.local:7280/api/v1
+        jsonData:
+          index: vector-kubernetes_logs-v0_2
+          logMessageField: message
+          tracesDatasourceUid: quickwit-traces
+
+      # Quickwit auto-creates and owns its OTLP trace index. This datasource
+      # only queries that index; the index mapping/retention is not managed by
+      # quickwit/values.yaml.
+      - name: quickwit-traces
+        uid: quickwit-traces
+        type: quickwit-quickwit-datasource
+        access: proxy
+        url: http://quickwit-searcher.quickwit-prod.svc.cluster.local:7280/api/v1
+        jsonData:
+          index: otel-traces-v0_7
+          logsDatasourceUid: deus9irpizvgga
+{{- end }}

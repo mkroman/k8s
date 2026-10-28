@@ -1,0 +1,7 @@
+# Kind has a default "standard" StorageClass and no ssd-gp1x1. This file is
+# appended to both vector-agent and vector-aggregator values by the e2e runner.
+# The Quickwit endpoint is not deployed in kind, so the sinks will retry; the
+# pods still become Ready and the e2e health checks can complete.
+vector:
+  persistence:
+    storageClassName: standard

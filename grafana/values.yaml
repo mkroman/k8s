@@ -89,6 +89,15 @@ grafana:
         # Grafana users and dashboards live in org 2 (auto_assign_org_id).
         orgid: 2
 
+    # Provision the Quickwit log/trace datasources from GitOps as well.
+    datasources:
+      enabled: true
+      label: "grafana_datasource"
+      labelValue: "1"
+      resource: configmap
+      provider:
+        orgid: 2
+
 certificate:
   # -- Create the Certificate resource.
   enabled: true

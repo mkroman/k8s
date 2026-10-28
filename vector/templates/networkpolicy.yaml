@@ -1,0 +1,66 @@
+{{- $networkPolicy := .Values.vector.networkPolicy | default dict }}
+{{- if $networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: {{ .Chart.Name }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: {{ .Chart.Name }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  policyTypes:
+    - Ingress
+  ingress:
+{{- if eq .Values.vector.role "Agent" }}
+    # Node-local OTLP ingress. internalTrafficPolicy: Local on the agent
+    # Service ensures clients reach the agent on their own node. Standard
+    # NetworkPolicy cannot express "same node", so allow pod sources here.
+    - from:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 4317
+        - protocol: TCP
+          port: 4318
+
+    # Prometheus scrapes agent metrics directly.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - protocol: TCP
+          port: 9090
+{{- else }}
+    # Vector agents ship Kubernetes logs to the aggregator.
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: {{ .Chart.Name }}
+              app.kubernetes.io/component: Agent
+      ports:
+        - protocol: TCP
+          port: 6000
+
+    # OTLP clients. Quickwit is responsible for the destination indexes.
+    - ports:
+        - protocol: TCP
+          port: 4317
+        - protocol: TCP
+          port: 4318
+
+    # Prometheus scrapes aggregator metrics directly.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - protocol: TCP
+          port: 9090
+{{- end }}
+{{- end }}
