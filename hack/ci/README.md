@@ -77,7 +77,9 @@ Run from anywhere in the repository:
 
 ## Workflows
 
-- `.github/workflows/validate-manifests.yaml` runs the checks above.
+- `.github/workflows/validate-manifests.yaml` runs the YAML, Kustomize, and Helm checks above.
+- `.github/workflows/validate-dashboards.yaml` runs the dashboard check when
+  files under `grafana/dashboards/` or the validator change.
 - `.github/workflows/lint-ci.yaml` runs actionlint, shellcheck, and zizmor.
 - `.github/workflows/e2e-apps.yaml` runs the changed-application e2e tests on
   kind; see [`hack/e2e/README.md`](../e2e/README.md).

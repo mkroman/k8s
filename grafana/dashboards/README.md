@@ -31,6 +31,7 @@ UID is embedded in the repository.
 3. Open a pull request and let Argo/Helm sync the change.
 4. Verify the dashboard UID and panels in Grafana after sync.
 
+CI runs the validator when files in this directory or the validator change.
 Do not re-import these dashboards through the Prometheus plugin's "Import
 dashboards" action; that would re-create the plugin-managed copies and may
 restore the old `Prometheus` datasource reference.
