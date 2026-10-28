@@ -10,6 +10,7 @@ locally so failures can be reproduced without pushing.
 | `lint-yaml.sh` | Plain YAML syntax and duplicate keys. Helm templates are excluded because they contain Go templating. |
 | `validate-kustomize.sh` | Every `kustomization.yaml` builds, then kubeconform validates the rendered manifests. |
 | `validate-helm.sh` | Every chart builds its dependencies, lints, and renders; kubeconform validates the result. |
+| `validate-dashboards.py` | Grafana dashboard JSON: datasource references, variable convention, panel IDs, and removed panel types. |
 | `install-tools.sh` | Reads `tools.txt`, downloads each pinned release, verifies its SHA-256, and installs the binary. |
 
 `kubeconform` runs with `-ignore-missing-schemas` because the repository
@@ -69,13 +70,16 @@ Run from anywhere in the repository:
 
 ```bash
 ./hack/ci/lint-yaml.sh
+./hack/ci/validate-dashboards.py
 ./hack/ci/validate-kustomize.sh
 ./hack/ci/validate-helm.sh
 ```
 
 ## Workflows
 
-- `.github/workflows/validate-manifests.yaml` runs the three checks above.
+- `.github/workflows/validate-manifests.yaml` runs the YAML, Kustomize, and Helm checks above.
+- `.github/workflows/validate-dashboards.yaml` runs the dashboard check when
+  files under `grafana/dashboards/` or the validator change.
 - `.github/workflows/lint-ci.yaml` runs actionlint, shellcheck, and zizmor.
 - `.github/workflows/e2e-apps.yaml` runs the changed-application e2e tests on
   kind; see [`hack/e2e/README.md`](../e2e/README.md).

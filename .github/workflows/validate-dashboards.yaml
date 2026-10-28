@@ -1,0 +1,39 @@
+name: Validate Grafana dashboards
+
+on:
+  pull_request:
+    paths:
+      - "grafana/dashboards/**"
+      - "hack/ci/validate-dashboards.py"
+      - ".github/workflows/validate-dashboards.yaml"
+  push:
+    branches: [main]
+    paths:
+      - "grafana/dashboards/**"
+      - "hack/ci/validate-dashboards.py"
+      - ".github/workflows/validate-dashboards.yaml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-dashboards-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  dashboards:
+    name: Grafana dashboards
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Validate dashboards
+        run: ./hack/ci/validate-dashboards.py
