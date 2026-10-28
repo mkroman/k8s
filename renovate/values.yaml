@@ -22,7 +22,7 @@ image:
   repository: renovate/renovate
   # -- Image tag. MUST be a pinned version per the official recommendation to
   #    keep the bot up to date. Append "-full" for the (several GB) image with
-  #    pre-installed tooling, e.g. "44.56.3-full".
+  #    pre-installed tooling, e.g. "x.y.z-full".
   #    Defaults to .Chart.AppVersion when empty.
   tag: ""
   # -- Image pull policy.

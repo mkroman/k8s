@@ -95,7 +95,7 @@ Key values (full reference with documentation inline in [`values.yaml`](values.y
 | Key | Default | Description |
 | --- | --- | --- |
 | `image.repository` | `renovate/renovate` | Official image, default ("slim") flavor recommended by the docs |
-| `image.tag` | `.Chart.AppVersion` (`44.56.3`) | Pinned image tag; use `x.y.z-full` for the full flavor |
+| `image.tag` | `.Chart.AppVersion` | Pinned image tag; use `x.y.z-full` for the full flavor |
 | `cronjob.schedule` | `"@hourly"` | Run cadence (docs recommend hourly) |
 | `cronjob.concurrencyPolicy` | `Forbid` | Prevents overlapping runs |
 | `cronjob.backoffLimit` | `0` | No immediate retries; next run happens on schedule |

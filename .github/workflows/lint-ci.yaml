@@ -50,6 +50,26 @@ jobs:
       - name: Lint scripts
         run: shellcheck hack/ci/*.sh hack/e2e/*.sh
 
+  renovate:
+    name: renovate config
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    container:
+      # Pinned to a full version and digest; the github-actions manager updates
+      # both when a new Renovate release is available.
+      image: ghcr.io/renovatebot/renovate:44.190.2@sha256:a1fa316d623c6a48a366ad84a8513777706ba5b471f27b531a547bffa13e424b
+      # GitHub-hosted runners mount the workspace as 1001:127; the Renovate
+      # image runs as 12021. Match the permissions used by the official
+      # renovatebot/github-action CI.
+      options: -u 1001:0 --group-add 1000 --group-add 12021 --group-add 127
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Validate configuration
+        run: renovate-config-validator --no-global --strict renovate.json
+
   zizmor:
     name: zizmor
     runs-on: ubuntu-latest
