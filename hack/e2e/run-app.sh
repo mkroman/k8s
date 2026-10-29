@@ -354,11 +354,19 @@ refresh_application() {
   # API versions anyway. Refreshing now can race with AppProject creation.
   [[ -n "${previous}" ]] || return 0
 
-  kubectl -n argocd annotate application "${app}" \
-    argocd.argoproj.io/refresh=hard --overwrite >/dev/null
+  # Hard refresh through the CLI. This sets the same refresh=hard annotation
+  # the controller consumes and additionally drops the repo server's cached
+  # target manifests, which is what keeps serving renders that predate the
+  # new CRDs. The call can block until the refresh is processed, so bound it
+  # and keep the same failure handling as the wait loop below.
+  if ! argocd app get "${app}" --core -N argocd --hard-refresh \
+    --timeout "${timeout_seconds}" >/dev/null; then
+    diagnose
+    die "Application ${app} could not be refreshed within ${timeout_seconds}s"
+  fi
 
-  # The annotation above bumps resourceVersion, so baseline it afterwards:
-  # the next resourceVersion change comes from the controller.
+  # The refresh bumps resourceVersion, so baseline it afterwards: the next
+  # resourceVersion change comes from the controller.
   previous_rv="$(
     kubectl -n argocd get application "${app}" -o json 2>/dev/null |
       jq -r '.metadata.resourceVersion // ""'
@@ -410,8 +418,8 @@ require_app_revision() {
   local revision_now
 
   revision_now="$(
-    kubectl -n argocd get application "${app}" -o json 2>/dev/null |
-      jq -r '.status.sync.revision // ""'
+    argocd app get "${app}" --core -N argocd -o json 2>/dev/null |
+      jq -r '.status.sync.revision // ""' || true
   )"
   if [[ "${revision_now}" != "${revision}" ]]; then
     diagnose
@@ -649,7 +657,7 @@ main() {
   printf '::endgroup::\n'
 
   wait_for_root_sync "${revision}" 600
-  kubectl -n argocd get applications
+  argocd app list --core -N argocd
 }
 
 main "${APP}"
