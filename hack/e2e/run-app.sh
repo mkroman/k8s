@@ -106,8 +106,12 @@ diagnose() {
   local app job namespace name
 
   printf '::group::Argo CD Applications\n'
-  kubectl -n argocd get applications -o wide || true
+  argocd app list --core -N argocd || true
   for app in "${ORDER[@]}"; do
+    printf '\n===== Application %s =====\n' "${app}"
+    # The CLI summary shows sync/health per resource and the operation state,
+    # which is easier to act on than the raw Application YAML that follows.
+    argocd app get "${app}" --core -N argocd --show-operation || true
     kubectl -n argocd get application "${app}" -o yaml || true
   done
   printf '::endgroup::\n'
