@@ -328,7 +328,8 @@ render_root_app() {
 refresh_application() {
   local app="$1"
   local timeout_seconds="$2"
-  local start elapsed previous current
+  local start elapsed previous previous_rv current current_rv
+  local application_json refresh_annotation
 
   start="$(date +%s)"
 
@@ -352,6 +353,13 @@ refresh_application() {
   kubectl -n argocd annotate application "${app}" \
     argocd.argoproj.io/refresh=hard --overwrite >/dev/null
 
+  # The annotation above bumps resourceVersion, so baseline it afterwards:
+  # the next resourceVersion change comes from the controller.
+  previous_rv="$(
+    kubectl -n argocd get application "${app}" -o json 2>/dev/null |
+      jq -r '.metadata.resourceVersion // ""'
+  )"
+
   start="$(date +%s)"
 
   while true; do
@@ -361,12 +369,28 @@ refresh_application() {
       die "Application ${app} did not refresh within ${timeout_seconds}s"
     fi
 
-    current="$(
-      kubectl -n argocd get application "${app}" -o json 2>/dev/null |
-        jq -r '.status.reconciledAt // ""'
+    application_json="$(
+      kubectl -n argocd get application "${app}" -o json 2>/dev/null || true
     )"
-    if [[ -n "${current}" && "${current}" != "${previous}" ]]; then
-      return 0
+    if [[ -n "${application_json}" ]]; then
+      read -r current current_rv refresh_annotation <<<"$(
+        jq -r '[
+          (.status.reconciledAt // ""),
+          (.metadata.resourceVersion // ""),
+          (.metadata.annotations["argocd.argoproj.io/refresh"] // "")
+        ] | @tsv' <<<"${application_json}"
+      )"
+
+      # reconciledAt has second precision, so a refresh that lands in the same
+      # second as the previous reconciliation does not change it. Argo CD
+      # removes the refresh annotation and persists the reconciliation status
+      # in the same write, so the annotation disappearing or any controller
+      # write also means the refresh completed.
+      if [[ "${current}" != "${previous}" ]] ||
+        [[ "${current_rv}" != "${previous_rv}" ]] ||
+        [[ -z "${refresh_annotation}" ]]; then
+        return 0
+      fi
     fi
 
     sleep 2
