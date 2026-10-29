@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Validate Vector configuration contracts that are easy to regress.
 
-This renders the real Vector chart with the production and kind value files,
-runs `vector validate` against both roles, and checks the wiring that the e2e
-health check cannot see.
+The script renders the Vector chart for each role and environment, validates
+the resulting Vector configuration with the pinned CLI, and checks the wiring
+that the e2e health check cannot see.
 
 Run from the repository root:
 
@@ -15,12 +15,13 @@ CI reads them from hack/e2e/apps.yaml.
 
 from __future__ import annotations
 
-import json
 import shutil
 import subprocess
 import sys
 import tempfile
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Any, Sequence
 
 import yaml
 
@@ -28,6 +29,17 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 VECTOR_CHART = REPO_ROOT / "vector"
 HELM = shutil.which("helm")
 VECTOR = shutil.which("vector")
+
+NAMESPACE = "vector"
+CONFIG_MAP_KEY = "vector.yaml"
+PROMETHEUS_API_VERSION = "monitoring.coreos.com/v1"
+
+YamlDocument = dict[str, Any]
+
+
+# ---------------------------------------------------------------------------
+# Process and assertion helpers
+# ---------------------------------------------------------------------------
 
 
 def fail(message: str) -> None:
@@ -39,101 +51,226 @@ def require(condition: bool, message: str) -> None:
         fail(message)
 
 
-def run(command: list[str], cwd: Path | None = None) -> str:
+def require_equal(actual: object, expected: object, message: str) -> None:
+    if actual != expected:
+        fail(f"{message}: expected {expected!r}, got {actual!r}")
+
+
+def require_contains(values: Sequence[object], expected: object, message: str) -> None:
+    if expected not in values:
+        fail(f"{message}: expected {expected!r}, got {list(values)!r}")
+
+
+def run(command: Sequence[str], cwd: Path | None = None) -> str:
     result = subprocess.run(
         command,
         cwd=cwd,
         check=False,
         text=True,
         stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
+        stderr=subprocess.PIPE,
     )
     if result.returncode != 0:
-        fail(
-            "command failed: "
-            + " ".join(command)
-            + "\n"
-            + result.stdout.strip()
-        )
+        details = result.stderr.strip() or result.stdout.strip()
+        fail("command failed: " + " ".join(command) + "\n" + details)
     return result.stdout
 
 
-def load_yaml_documents(text: str) -> list[dict]:
-    documents = [document for document in yaml.safe_load_all(text) if document]
+def load_yaml_documents(text: str) -> tuple[YamlDocument, ...]:
+    documents = tuple(
+        document for document in yaml.safe_load_all(text) if document is not None
+    )
     if not documents:
         fail("YAML contained no documents")
     return documents
 
 
-def load_yaml_file(path: Path) -> list[dict]:
+def load_yaml_file(path: Path) -> tuple[YamlDocument, ...]:
     return load_yaml_documents(path.read_text(encoding="utf-8"))
 
 
-def parse_yaml_text(text: str) -> list[dict]:
-    return load_yaml_documents(text)
+# ---------------------------------------------------------------------------
+# Release model
+# ---------------------------------------------------------------------------
 
 
-def find(documents: list[dict], kind: str, name: str) -> dict | None:
-    for document in documents:
-        if document.get("kind") != kind:
-            continue
-        if document.get("metadata", {}).get("name") == name:
-            return document
-    return None
+@dataclass(frozen=True)
+class Manifests:
+    """Documents rendered for a single Helm release."""
+
+    release: str
+    documents: tuple[YamlDocument, ...]
+
+    def find(self, kind: str, name: str) -> YamlDocument | None:
+        for document in self.documents:
+            if document.get("kind") != kind:
+                continue
+            if document.get("metadata", {}).get("name") == name:
+                return document
+        return None
+
+    def require(self, kind: str, name: str) -> YamlDocument:
+        document = self.find(kind, name)
+        if document is None:
+            fail(f"{self.release}: missing {kind}/{name}")
+        return document
 
 
-def required_document(documents: list[dict], kind: str, name: str) -> dict:
-    document = find(documents, kind, name)
-    if document is None:
-        fail(f"missing {kind}/{name}")
-    return document
+@dataclass(frozen=True)
+class Role:
+    key: str
+    values_file: Path
+    workload_kind: str
+    service_ports: frozenset[int]
+    network_policy_ports: frozenset[int]
+    service_local: bool
 
 
-def helm_template(
-    name: str, chart: Path, values: list[Path], namespace: str
-) -> list[dict]:
+@dataclass(frozen=True)
+class Environment:
+    key: str
+    suffix: str
+    values: tuple[Path, ...]
+    storage_class: str
+    e2e_enabled: bool
+
+
+@dataclass(frozen=True)
+class Release:
+    role: Role
+    environment: Environment
+    manifests: Manifests
+
+    @property
+    def name(self) -> str:
+        return self.manifests.release
+
+
+@dataclass(frozen=True)
+class VectorConfig:
+    text: str
+    document: YamlDocument
+
+
+PRODUCTION = Environment(
+    key="production",
+    suffix="",
+    values=(),
+    storage_class="ssd-gp1x1",
+    e2e_enabled=False,
+)
+KIND = Environment(
+    key="kind",
+    suffix="-kind",
+    values=(VECTOR_CHART / "values-kind.yaml",),
+    storage_class="standard",
+    e2e_enabled=True,
+)
+ENVIRONMENTS = (PRODUCTION, KIND)
+
+AGENT = Role(
+    key="agent",
+    values_file=VECTOR_CHART / "values-agent.yaml",
+    workload_kind="DaemonSet",
+    service_ports=frozenset({4317, 4318, 9090}),
+    network_policy_ports=frozenset({4317, 4318, 9090}),
+    service_local=True,
+)
+AGGREGATOR = Role(
+    key="aggregator",
+    values_file=VECTOR_CHART / "values-aggregator.yaml",
+    workload_kind="StatefulSet",
+    service_ports=frozenset({4317, 4318, 6000, 9090}),
+    network_policy_ports=frozenset({4317, 4318, 6000, 9090}),
+    service_local=False,
+)
+ROLES = (AGENT, AGGREGATOR)
+
+
+def prepare_chart(workdir: Path) -> Path:
+    """Copy the chart and vendor its dependencies outside the checkout."""
     assert HELM is not None
-    command = [HELM, "template", name, str(chart), "--namespace", namespace]
-    for value_file in values:
+    chart = workdir / "vector"
+    shutil.copytree(
+        VECTOR_CHART,
+        chart,
+        ignore=shutil.ignore_patterns("charts"),
+    )
+    run([HELM, "dependency", "build"], cwd=chart)
+    return chart
+
+
+def render_release(chart: Path, role: Role, environment: Environment) -> Release:
+    assert HELM is not None
+    name = f"vector-{role.key}{environment.suffix}"
+    command = [HELM, "template", name, str(chart), "--namespace", NAMESPACE]
+    for value_file in (role.values_file, *environment.values):
         command.extend(["-f", str(value_file)])
-    command.extend(["--api-versions", "monitoring.coreos.com/v1"])
-    result = subprocess.run(
-        command,
-        check=False,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+    command.extend(["--api-versions", PROMETHEUS_API_VERSION])
+
+    documents = load_yaml_documents(run(command))
+    return Release(role, environment, Manifests(name, documents))
+
+
+def read_vector_config(manifests: Manifests, config_map_name: str) -> VectorConfig:
+    config_map = manifests.require("ConfigMap", config_map_name)
+    text = config_map["data"][CONFIG_MAP_KEY]
+    documents = load_yaml_documents(text)
+    require_equal(
+        len(documents),
+        1,
+        f"ConfigMap/{config_map_name}: {CONFIG_MAP_KEY} documents",
     )
-    if result.returncode != 0:
-        fail(f"helm template {name} failed:\n{result.stderr.strip()}")
-    return load_yaml_documents(result.stdout)
+    return VectorConfig(text=text, document=documents[0])
 
 
-def validate_vector_config(config: str, tmp: Path, name: str) -> None:
+def validate_vector_config(config: VectorConfig, workdir: Path, name: str) -> None:
     assert VECTOR is not None
-    config_path = tmp / f"{name}.yaml"
-    config_path.write_text(config, encoding="utf-8")
-    run(
-        [
-            VECTOR,
-            "validate",
-            "--no-environment",
-            str(config_path),
-        ]
+    config_path = workdir / f"{name}.yaml"
+    config_path.write_text(config.text, encoding="utf-8")
+    run([VECTOR, "validate", "--no-environment", str(config_path)])
+
+
+# ---------------------------------------------------------------------------
+# Kubernetes resource helpers
+# ---------------------------------------------------------------------------
+
+
+def pod_spec(workload: YamlDocument) -> YamlDocument:
+    return workload["spec"]["template"]["spec"]
+
+
+def first_container(workload: YamlDocument, label: str) -> YamlDocument:
+    containers = pod_spec(workload).get("containers", [])
+    require(len(containers) == 1, f"{label}: expected exactly one container")
+    return containers[0]
+
+
+def network_policy_ports(policy: YamlDocument) -> set[int]:
+    return {
+        port.get("port")
+        for rule in policy["spec"].get("ingress", [])
+        for port in rule.get("ports", [])
+    }
+
+
+def has_e2e_peer(policy: YamlDocument) -> bool:
+    return any(
+        peer.get("podSelector", {})
+        .get("matchLabels", {})
+        .get("app.kubernetes.io/name")
+        == "vector-e2e"
+        for rule in policy["spec"].get("ingress", [])
+        for peer in rule.get("from", [])
     )
 
 
-def require_equal(actual: object, expected: object, message: str) -> None:
-    if actual != expected:
-        fail(f"{message}: expected {expected!r}, got {actual!r}")
+# ---------------------------------------------------------------------------
+# Resource contracts
+# ---------------------------------------------------------------------------
 
 
-def require_contains(values: list, expected: object, message: str) -> None:
-    if expected not in values:
-        fail(f"{message}: expected {expected!r}, got {values!r}")
-
-
-def assert_container_security(container: dict, label: str) -> None:
+def check_container_security(container: YamlDocument, label: str) -> None:
     security = container.get("securityContext", {})
     require_equal(
         security.get("allowPrivilegeEscalation"),
@@ -152,134 +289,200 @@ def assert_container_security(container: dict, label: str) -> None:
     )
 
 
-def assert_service(
-    documents: list[dict], name: str, expected_ports: set[int], local: bool
-) -> None:
-    service = required_document(documents, "Service", name)
-    if local:
-        require_equal(
-            service["spec"].get("internalTrafficPolicy"),
-            "Local",
-            f"Service/{name}: internalTrafficPolicy",
-        )
-    else:
-        require(
-            service["spec"].get("internalTrafficPolicy") is None,
-            f"Service/{name}: internalTrafficPolicy must remain unset",
-        )
-    ports = {port.get("port") for port in service["spec"].get("ports", [])}
+def check_pod_security(workload: YamlDocument, label: str) -> None:
+    security = pod_spec(workload).get("securityContext", {})
+    require_equal(
+        security.get("seccompProfile", {}).get("type"),
+        "RuntimeDefault",
+        f"{label}: seccomp profile",
+    )
+
+
+def check_service(release: Release) -> None:
+    role = release.role
+    service = release.manifests.require("Service", release.name)
+    expected_policy = "Local" if role.service_local else None
+    require_equal(
+        service["spec"].get("internalTrafficPolicy"),
+        expected_policy,
+        f"Service/{release.name}: internalTrafficPolicy",
+    )
+
+    actual_ports = {port.get("port") for port in service["spec"].get("ports", [])}
     require(
-        expected_ports <= ports,
-        f"Service/{name}: expected ports {sorted(expected_ports)}, got {sorted(ports)}",
+        role.service_ports <= actual_ports,
+        f"Service/{release.name}: expected ports {sorted(role.service_ports)}, "
+        f"got {sorted(actual_ports)}",
     )
 
 
-def network_policy_ports(document: dict) -> set[int]:
-    return {
-        port.get("port")
-        for rule in document["spec"].get("ingress", [])
-        for port in rule.get("ports", [])
-    }
-
-
-def assert_network_policy(documents: list[dict], name: str, ports: set[int]) -> None:
-    policy = required_document(documents, "NetworkPolicy", name)
-    actual = network_policy_ports(policy)
+def check_network_policy(release: Release) -> None:
+    policy = release.manifests.require("NetworkPolicy", release.name)
+    actual_ports = network_policy_ports(policy)
     require(
-        ports <= actual,
-        f"NetworkPolicy/{name}: expected ports {sorted(ports)}, got {sorted(actual)}",
+        release.role.network_policy_ports <= actual_ports,
+        f"NetworkPolicy/{release.name}: expected ports "
+        f"{sorted(release.role.network_policy_ports)}, got {sorted(actual_ports)}",
+    )
+    require_equal(
+        has_e2e_peer(policy),
+        release.environment.e2e_enabled,
+        f"NetworkPolicy/{release.name}: e2e probe peer",
     )
 
 
-def has_e2e_peer(document: dict) -> bool:
-    return any(
-        peer.get("podSelector", {})
-        .get("matchLabels", {})
-        .get("app.kubernetes.io/name")
-        == "vector-e2e"
-        for rule in document["spec"].get("ingress", [])
-        for peer in rule.get("from", [])
-    )
-
-
-def assert_pod_monitor(documents: list[dict], name: str) -> None:
-    monitor = required_document(documents, "PodMonitor", name)
+def check_pod_monitor(release: Release) -> None:
+    monitor = release.manifests.require("PodMonitor", release.name)
     require_equal(
         monitor["spec"].get("jobLabel"),
         "app.kubernetes.io/instance",
-        f"PodMonitor/{name}: jobLabel",
+        f"PodMonitor/{release.name}: jobLabel",
     )
     endpoints = monitor["spec"].get("podMetricsEndpoints", [])
-    require(len(endpoints) == 1, f"PodMonitor/{name}: expected one endpoint")
+    require(len(endpoints) == 1, f"PodMonitor/{release.name}: expected one endpoint")
     require_equal(
         endpoints[0].get("port"),
         "prom-exporter",
-        f"PodMonitor/{name}: port",
+        f"PodMonitor/{release.name}: port",
     )
 
 
-def pod_spec(workload: dict) -> dict:
-    return workload["spec"]["template"]["spec"]
-
-
-def first_container(workload: dict) -> dict:
-    containers = pod_spec(workload).get("containers", [])
-    require(len(containers) == 1, "expected exactly one Vector container")
-    return containers[0]
-
-
-def assert_config_contracts(agent_config: dict, aggregator_config: dict) -> None:
-    agent_sources = agent_config.get("sources", {})
-    agent_sinks = agent_config.get("sinks", {})
-    aggregator_sources = aggregator_config.get("sources", {})
-    aggregator_sinks = aggregator_config.get("sinks", {})
-
+def check_persistence(release: Release) -> None:
+    workload = release.manifests.require(
+        release.role.workload_kind,
+        release.name,
+    )
+    claim_templates = workload["spec"].get("volumeClaimTemplates", [])
+    require(
+        len(claim_templates) == 1,
+        f"{release.name}: expected one volumeClaimTemplate",
+    )
     require_equal(
-        agent_sources.get("otel", {}).get("decoding", {}).get("codec"),
+        claim_templates[0]["spec"].get("storageClassName"),
+        release.environment.storage_class,
+        f"{release.name}: storage class",
+    )
+
+
+def check_agent_workload(release: Release) -> None:
+    workload = release.manifests.require(release.role.workload_kind, release.name)
+    check_container_security(first_container(workload, release.name), release.name)
+    check_pod_security(workload, release.name)
+
+
+def check_aggregator_workload(release: Release) -> None:
+    workload = release.manifests.require(release.role.workload_kind, release.name)
+    check_container_security(first_container(workload, release.name), release.name)
+
+    security = pod_spec(workload).get("securityContext", {})
+    require_equal(
+        security.get("runAsNonRoot"),
+        True,
+        f"{release.name}: runAsNonRoot",
+    )
+    require_equal(
+        security.get("runAsUser"),
+        1000,
+        f"{release.name}: runAsUser",
+    )
+    require_equal(
+        security.get("fsGroup"),
+        1000,
+        f"{release.name}: fsGroup",
+    )
+    check_pod_security(workload, release.name)
+
+
+def check_common_contracts(release: Release) -> None:
+    check_service(release)
+    check_network_policy(release)
+    check_pod_monitor(release)
+
+
+def check_agent_contracts(release: Release) -> None:
+    check_common_contracts(release)
+    check_agent_workload(release)
+
+
+def check_aggregator_contracts(release: Release) -> None:
+    check_common_contracts(release)
+    check_aggregator_workload(release)
+    check_persistence(release)
+
+
+# ---------------------------------------------------------------------------
+# Vector configuration contracts
+# ---------------------------------------------------------------------------
+
+
+def nested(document: object, *keys: str) -> object:
+    current = document
+    for key in keys:
+        if not isinstance(current, dict):
+            return None
+        current = current.get(key)
+    return current
+
+
+def sink_uri(config: YamlDocument, sink_name: str, *path: str) -> str:
+    return str(nested(config, "sinks", sink_name, *path) or "")
+
+
+def check_agent_config(config: YamlDocument) -> None:
+    decoding = nested(config, "sources", "otel", "decoding")
+    require_equal(
+        nested(decoding, "codec"),
         "otlp",
         "agent OTel decoding codec",
     )
-    signal_types = agent_sources.get("otel", {}).get("decoding", {}).get(
-        "signal_types", []
-    )
-    require_contains(signal_types, "logs", "agent OTel signal types")
-    require_contains(signal_types, "traces", "agent OTel signal types")
+    signal_types = nested(decoding, "signal_types") or []
+    for signal in ("logs", "traces"):
+        require_contains(signal_types, signal, "agent OTel signal types")
 
     require_equal(
-        agent_sinks.get("aggregator", {}).get("inputs"),
+        nested(config, "sinks", "aggregator", "inputs"),
         ["kubernetes_logs"],
         "agent aggregator sink inputs",
     )
-    require_equal(
-        aggregator_sources.get("otel", {}).get("decoding", {}).get("codec"),
-        "otlp",
-        "aggregator OTel decoding codec",
-    )
 
+
+def check_otlp_routing(config: YamlDocument) -> None:
     require(
-        str(agent_sinks.get("aggregator_otel_logs", {}).get("protocol", {}).get("uri", ""))
-        .endswith(":4318/v1/logs"),
+        sink_uri(config, "aggregator_otel_logs", "protocol", "uri").endswith(
+            ":4318/v1/logs"
+        ),
         "agent OTel log sink must target the aggregator OTLP logs endpoint",
     )
     require(
-        str(agent_sinks.get("aggregator_otel_traces", {}).get("protocol", {}).get("uri", ""))
-        .endswith(":4318/v1/traces"),
+        sink_uri(config, "aggregator_otel_traces", "protocol", "uri").endswith(
+            ":4318/v1/traces"
+        ),
         "agent OTel trace sink must target the aggregator OTLP traces endpoint",
     )
 
+
+def check_aggregator_config(config: YamlDocument) -> None:
+    require_equal(
+        nested(config, "sources", "otel", "decoding", "codec"),
+        "otlp",
+        "aggregator OTel decoding codec",
+    )
     require(
-        str(aggregator_sinks.get("quickwit_k8s_logs", {}).get("uri", ""))
-        .endswith("/api/v1/vector-kubernetes_logs-v0_2/ingest"),
+        sink_uri(config, "quickwit_k8s_logs", "uri").endswith(
+            "/api/v1/vector-kubernetes_logs-v0_2/ingest"
+        ),
         "Kubernetes logs must use the v0_2 Quickwit index",
     )
     require(
-        str(aggregator_sinks.get("quickwit_otel_logs", {}).get("protocol", {}).get("uri", ""))
-        .endswith("/api/v1/otlp/v1/logs"),
+        sink_uri(config, "quickwit_otel_logs", "protocol", "uri").endswith(
+            "/api/v1/otlp/v1/logs"
+        ),
         "OTel logs must use Quickwit's OTLP logs endpoint",
     )
     require(
-        str(aggregator_sinks.get("quickwit_otel_traces", {}).get("protocol", {}).get("uri", ""))
-        .endswith("/api/v1/otlp/v1/traces"),
+        sink_uri(config, "quickwit_otel_traces", "protocol", "uri").endswith(
+            "/api/v1/otlp/v1/traces"
+        ),
         "OTel traces must use Quickwit's OTLP traces endpoint",
     )
 
@@ -288,37 +491,66 @@ def assert_config_contracts(agent_config: dict, aggregator_config: dict) -> None
         "quickwit_otel_logs",
         "quickwit_otel_traces",
     ):
-        buffer = aggregator_sinks.get(sink_name, {}).get("buffer", {})
         require_equal(
-            buffer.get("type"),
+            nested(config, "sinks", sink_name, "buffer", "type"),
             "disk",
             f"aggregator sink {sink_name} buffer type",
         )
 
 
-def assert_quickwit_values() -> None:
+# ---------------------------------------------------------------------------
+# E2E probe contracts
+# ---------------------------------------------------------------------------
+
+
+def check_e2e_probe(agent_kind: Release, aggregator_kind: Release) -> None:
+    job = agent_kind.manifests.require(
+        "Job",
+        f"e2e-{agent_kind.name}-otlp",
+    )
+    require_equal(
+        len(pod_spec(job).get("initContainers", [])),
+        2,
+        "Vector e2e probe init containers",
+    )
+    require(
+        aggregator_kind.manifests.find(
+            "Job",
+            f"e2e-{aggregator_kind.name}-otlp",
+        )
+        is None,
+        "aggregator release must not render the OTLP probe",
+    )
+
+
+# ---------------------------------------------------------------------------
+# Repository-level contracts
+# ---------------------------------------------------------------------------
+
+
+def check_quickwit_values() -> None:
     values = load_yaml_file(REPO_ROOT / "quickwit" / "values.yaml")
-    require(len(values) == 1, "quickwit/values.yaml must be one document")
-    indexes = values[0].get("quickwit", {}).get("seed", {}).get("indexes", [])
+    require_equal(len(values), 1, "quickwit/values.yaml must be one document")
+    indexes = nested(values[0], "quickwit", "seed", "indexes") or []
     require_equal(len(indexes), 1, "Quickwit seed index count")
     require_equal(
-        indexes[0].get("index_id"),
+        nested(indexes[0], "index_id"),
         "vector-kubernetes_logs-v0_2",
         "Quickwit seed index",
     )
     require(
-        "otel-" not in json.dumps(indexes),
+        "otel-" not in yaml.safe_dump(indexes),
         "Quickwit must not declare auto-created OTel indexes",
     )
     require(
-        bool(indexes[0].get("retention", {}).get("period")),
+        bool(nested(indexes[0], "retention", "period")),
         "Quickwit seed index must define retention",
     )
 
 
-def assert_app_projects() -> None:
+def check_app_projects() -> None:
     assert HELM is not None
-    result = subprocess.run(
+    output = run(
         [
             HELM,
             "template",
@@ -326,22 +558,58 @@ def assert_app_projects() -> None:
             str(REPO_ROOT / "apps"),
             "--namespace",
             "argocd",
-        ],
-        check=False,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        ]
     )
-    if result.returncode != 0:
-        fail(f"helm template apps failed:\n{result.stderr.strip()}")
-    projects = load_yaml_documents(result.stdout)
+    projects = Manifests("apps", load_yaml_documents(output))
     for name in ("vector-agent", "vector-aggregator"):
-        project = required_document(projects, "AppProject", name)
+        project = projects.require("AppProject", name)
         whitelist = project["spec"].get("namespaceResourceWhitelist", [])
         require(
             any(item.get("kind") == "NetworkPolicy" for item in whitelist),
             f"AppProject/{name} must allow NetworkPolicy",
         )
+
+
+def check_grafana_datasources() -> None:
+    datasources = (
+        REPO_ROOT / "grafana" / "templates" / "configmap.datasources.yaml"
+    ).read_text(encoding="utf-8")
+    require(
+        "vector-kubernetes_logs-v0_2" in datasources,
+        "Grafana logs datasource must use the v0_2 index",
+    )
+    require(
+        "quickwit-traces" in datasources,
+        "Grafana traces datasource is missing",
+    )
+
+
+# ---------------------------------------------------------------------------
+# Orchestration
+# ---------------------------------------------------------------------------
+
+
+ROLE_CHECKS = {
+    AGENT.key: check_agent_contracts,
+    AGGREGATOR.key: check_aggregator_contracts,
+}
+
+
+def render_releases(chart: Path) -> dict[tuple[str, str], Release]:
+    return {
+        (role.key, environment.key): render_release(chart, role, environment)
+        for role in ROLES
+        for environment in ENVIRONMENTS
+    }
+
+
+def check_release_contracts(releases: dict[tuple[str, str], Release]) -> None:
+    for role in ROLES:
+        checker = ROLE_CHECKS.get(role.key)
+        if checker is None:
+            fail(f"no contract checker for role {role.key}")
+        for environment in ENVIRONMENTS:
+            checker(releases[(role.key, environment.key)])
 
 
 def main() -> int:
@@ -350,187 +618,32 @@ def main() -> int:
         return 2
 
     with tempfile.TemporaryDirectory(prefix="vector-config-") as temp:
-        tmp = Path(temp)
-        chart = tmp / "vector"
-        shutil.copytree(
-            VECTOR_CHART,
-            chart,
-            ignore=shutil.ignore_patterns("charts"),
-        )
-        run([HELM, "dependency", "build"], cwd=chart)
+        workdir = Path(temp)
+        chart = prepare_chart(workdir)
+        releases = render_releases(chart)
 
-        agent_prod = helm_template(
-            "vector-agent",
-            chart,
-            [VECTOR_CHART / "values-agent.yaml"],
-            "vector",
-        )
-        agent_kind = helm_template(
-            "vector-agent-kind",
-            chart,
-            [VECTOR_CHART / "values-agent.yaml", VECTOR_CHART / "values-kind.yaml"],
-            "vector",
-        )
-        aggregator_prod = helm_template(
-            "vector-aggregator",
-            chart,
-            [VECTOR_CHART / "values-aggregator.yaml"],
-            "vector",
-        )
-        aggregator_kind = helm_template(
-            "vector-aggregator-kind",
-            chart,
-            [
-                VECTOR_CHART / "values-aggregator.yaml",
-                VECTOR_CHART / "values-kind.yaml",
-            ],
-            "vector",
-        )
+        check_release_contracts(releases)
 
-        agent_daemonset = required_document(agent_prod, "DaemonSet", "vector-agent")
-        aggregator_statefulset = required_document(
-            aggregator_prod, "StatefulSet", "vector-aggregator"
-        )
-        assert_container_security(first_container(agent_daemonset), "agent")
-        assert_container_security(first_container(aggregator_statefulset), "aggregator")
+        agent_prod = releases[(AGENT.key, PRODUCTION.key)]
+        aggregator_prod = releases[(AGGREGATOR.key, PRODUCTION.key)]
+        agent_kind = releases[(AGENT.key, KIND.key)]
+        aggregator_kind = releases[(AGGREGATOR.key, KIND.key)]
 
-        agent_pod_security = pod_spec(agent_daemonset).get("securityContext", {})
-        require_equal(
-            agent_pod_security.get("seccompProfile", {}).get("type"),
-            "RuntimeDefault",
-            "agent seccomp profile",
+        agent_config = read_vector_config(agent_prod.manifests, agent_prod.name)
+        aggregator_config = read_vector_config(
+            aggregator_prod.manifests,
+            aggregator_prod.name,
         )
-        aggregator_pod_security = pod_spec(aggregator_statefulset).get(
-            "securityContext", {}
-        )
-        require_equal(
-            aggregator_pod_security.get("runAsNonRoot"),
-            True,
-            "aggregator runAsNonRoot",
-        )
-        require_equal(
-            aggregator_pod_security.get("runAsUser"),
-            1000,
-            "aggregator runAsUser",
-        )
-        require_equal(
-            aggregator_pod_security.get("fsGroup"),
-            1000,
-            "aggregator fsGroup",
-        )
-        require_equal(
-            aggregator_pod_security.get("seccompProfile", {}).get("type"),
-            "RuntimeDefault",
-            "aggregator seccomp profile",
-        )
+        validate_vector_config(agent_config, workdir, "agent-validate")
+        validate_vector_config(aggregator_config, workdir, "aggregator-validate")
+        check_agent_config(agent_config.document)
+        check_otlp_routing(agent_config.document)
+        check_aggregator_config(aggregator_config.document)
 
-        assert_service(agent_prod, "vector-agent", {4317, 4318, 9090}, local=True)
-        assert_service(
-            aggregator_prod,
-            "vector-aggregator",
-            {4317, 4318, 6000, 9090},
-            local=False,
-        )
-        assert_network_policy(agent_prod, "vector-agent", {4317, 4318, 9090})
-        assert_network_policy(
-            aggregator_prod, "vector-aggregator", {4317, 4318, 6000, 9090}
-        )
-        require(
-            not has_e2e_peer(
-                required_document(agent_prod, "NetworkPolicy", "vector-agent")
-            ),
-            "production agent NetworkPolicy must not allow the e2e probe",
-        )
-        require(
-            not has_e2e_peer(
-                required_document(
-                    aggregator_prod, "NetworkPolicy", "vector-aggregator"
-                )
-            ),
-            "production aggregator NetworkPolicy must not allow the e2e probe",
-        )
-        require(
-            has_e2e_peer(
-                required_document(agent_kind, "NetworkPolicy", "vector-agent-kind")
-            ),
-            "kind agent NetworkPolicy must allow the e2e probe",
-        )
-        require(
-            has_e2e_peer(
-                required_document(
-                    aggregator_kind, "NetworkPolicy", "vector-aggregator-kind"
-                )
-            ),
-            "kind aggregator NetworkPolicy must allow the e2e probe",
-        )
-        assert_pod_monitor(agent_prod, "vector-agent")
-        assert_pod_monitor(aggregator_prod, "vector-aggregator")
-
-        production_pvc = aggregator_statefulset["spec"]["volumeClaimTemplates"][0]
-        require_equal(
-            production_pvc["spec"].get("storageClassName"),
-            "ssd-gp1x1",
-            "production aggregator storage class",
-        )
-        kind_statefulset = required_document(
-            aggregator_kind, "StatefulSet", "vector-aggregator-kind"
-        )
-        kind_pvc = kind_statefulset["spec"]["volumeClaimTemplates"][0]
-        require_equal(
-            kind_pvc["spec"].get("storageClassName"),
-            "standard",
-            "kind aggregator storage class",
-        )
-
-        agent_config_map = required_document(agent_prod, "ConfigMap", "vector-agent")
-        aggregator_config_map = required_document(
-            aggregator_prod, "ConfigMap", "vector-aggregator"
-        )
-        agent_config = parse_yaml_text(
-            agent_config_map["data"]["vector.yaml"]
-        )[0]
-        aggregator_config = parse_yaml_text(
-            aggregator_config_map["data"]["vector.yaml"]
-        )[0]
-        validate_vector_config(
-            agent_config_map["data"]["vector.yaml"],
-            tmp,
-            "agent-validate",
-        )
-        validate_vector_config(
-            aggregator_config_map["data"]["vector.yaml"],
-            tmp,
-            "aggregator-validate",
-        )
-        assert_config_contracts(agent_config, aggregator_config)
-
-        e2e_job = required_document(
-            agent_kind, "Job", "e2e-vector-agent-kind-otlp"
-        )
-        require_equal(
-            len(pod_spec(e2e_job).get("initContainers", [])),
-            2,
-            "Vector e2e probe init containers",
-        )
-        require(
-            find(aggregator_kind, "Job", "e2e-vector-aggregator-kind-otlp") is None,
-            "aggregator release must not render the OTLP probe",
-        )
-
-        assert_app_projects()
-        assert_quickwit_values()
-
-        grafana_datasources = (
-            REPO_ROOT / "grafana" / "templates" / "configmap.datasources.yaml"
-        ).read_text(encoding="utf-8")
-        require(
-            "vector-kubernetes_logs-v0_2" in grafana_datasources,
-            "Grafana logs datasource must use the v0_2 index",
-        )
-        require(
-            "quickwit-traces" in grafana_datasources,
-            "Grafana traces datasource is missing",
-        )
+        check_e2e_probe(agent_kind, aggregator_kind)
+        check_app_projects()
+        check_quickwit_values()
+        check_grafana_datasources()
 
     print("Vector config contracts: OK")
     return 0
