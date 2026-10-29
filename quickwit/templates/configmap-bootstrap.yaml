@@ -1,0 +1,24 @@
+{{- /*
+Bootstrap ConfigMap for Quickwit indexes.
+
+This mirrors the upstream chart's configmap-bootstrap template, which is
+disabled via `quickwit.bootstrap.enabled: false` because that chart also
+renders a bootstrap Job whose name is not RFC 1123-safe.
+*/ -}}
+{{- $quickwit := .Subcharts.quickwit -}}
+{{- if $quickwit.Values.bootstrap.enabled -}}
+{{- fail "quickwit.bootstrap.enabled must be false: this chart renders its own bootstrap ConfigMap/Job in templates/configmap-bootstrap.yaml and templates/job-create-indices.yaml to keep the Job name RFC 1123-safe" -}}
+{{- end -}}
+{{- if $quickwit.Values.seed.indexes -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "quickwit.fullname" $quickwit }}-bootstrap
+  labels:
+    {{- include "quickwit.labels" $quickwit | nindent 4 }}
+data:
+  {{- range $quickwit.Values.seed.indexes }}
+  {{ .index_id }}.yaml: |-
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end }}

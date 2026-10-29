@@ -90,8 +90,15 @@ quickwit:
   # Create the Kubernetes log index with an explicit mapping and retention.
   # Quickwit's OTLP trace/log indexes are auto-created by Quickwit itself and
   # are intentionally not declared here.
+  #
+  # The upstream bootstrap Job names itself `<release>-index-<index_id>` without
+  # sanitizing the index ID. The Kubernetes logs index contains underscores
+  # (`vector-kubernetes_logs-v0_2`), which are invalid in object names, so we
+  # disable the upstream bootstrap and render the ConfigMap/Job ourselves in
+  # templates/configmap-bootstrap.yaml and templates/job-create-indices.yaml
+  # with an RFC 1123-safe Job name.
   bootstrap:
-    enabled: true
+    enabled: false
     resources:
       requests:
         cpu: 100m
