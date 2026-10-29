@@ -52,5 +52,10 @@ jobs:
           version: ${{ env.HELM_VERSION }}
       - name: Install PyYAML
         run: python3 -m pip install --user pyyaml
+      - name: Install Vector
+        run: |
+          ./hack/ci/install-tools.sh "${RUNNER_TEMP}/ci-bin" vector
+          echo "${RUNNER_TEMP}/ci-bin" >>"${GITHUB_PATH}"
+          "${RUNNER_TEMP}/ci-bin/vector" --version
       - name: Validate Vector configuration
         run: python3 hack/ci/test-vector-config.py

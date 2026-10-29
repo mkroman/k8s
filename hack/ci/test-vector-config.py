@@ -9,7 +9,7 @@ Run from the repository root:
 
     python3 hack/ci/test-vector-config.py
 
-Requires: helm, docker, PyYAML.
+Requires: helm, vector, PyYAML.
 """
 
 from __future__ import annotations
@@ -26,8 +26,7 @@ import yaml
 REPO_ROOT = Path(__file__).resolve().parents[2]
 VECTOR_CHART = REPO_ROOT / "vector"
 HELM = shutil.which("helm")
-DOCKER = shutil.which("docker")
-VECTOR_IMAGE = "timberio/vector:0.60.0-distroless-libc"
+VECTOR = shutil.which("vector")
 
 
 def fail(message: str) -> None:
@@ -109,31 +108,18 @@ def helm_template(
     return load_yaml_documents(result.stdout)
 
 
-def validate_vector_config(config: str, tmp: Path, name: str, non_root: bool) -> None:
-    assert DOCKER is not None
+def validate_vector_config(config: str, tmp: Path, name: str) -> None:
+    assert VECTOR is not None
     config_path = tmp / f"{name}.yaml"
     config_path.write_text(config, encoding="utf-8")
-    command = [
-        DOCKER,
-        "run",
-        "--rm",
-        "--read-only",
-        "--tmpfs",
-        "/tmp",
-        "-v",
-        f"{config_path}:/etc/vector/vector.yaml:ro",
-    ]
-    if non_root:
-        command.extend(["--user", "1000:1000"])
-    command.extend(
+    run(
         [
-            VECTOR_IMAGE,
+            VECTOR,
             "validate",
             "--no-environment",
-            "/etc/vector/vector.yaml",
+            str(config_path),
         ]
     )
-    run(command)
 
 
 def require_equal(actual: object, expected: object, message: str) -> None:
@@ -347,8 +333,8 @@ def assert_app_projects() -> None:
 
 
 def main() -> int:
-    if HELM is None or DOCKER is None:
-        print("error: helm and docker are required", file=sys.stderr)
+    if HELM is None or VECTOR is None:
+        print("error: helm and vector are required", file=sys.stderr)
         return 2
 
     with tempfile.TemporaryDirectory(prefix="vector-config-") as temp:
@@ -470,13 +456,11 @@ def main() -> int:
             agent_config_map["data"]["vector.yaml"],
             tmp,
             "agent-validate",
-            non_root=False,
         )
         validate_vector_config(
             aggregator_config_map["data"]["vector.yaml"],
             tmp,
             "aggregator-validate",
-            non_root=True,
         )
         assert_config_contracts(agent_config, aggregator_config)
 

@@ -56,6 +56,15 @@ asset=shellcheck-v${version_nov}.linux.x86_64.tar.xz
 binary=shellcheck-v${version_nov}/shellcheck
 archive=tar.xz
 
+[vector]
+repo=vectordotdev/vector
+version=v0.60.0
+sha256=89a9f134dcc35a6fbba9cb8ad0fec2d4802657bba6cb1c374a30660ef9456bdc
+tag=${version}
+asset=vector-${version_nov}-x86_64-unknown-linux-gnu.tar.gz
+binary=vector-x86_64-unknown-linux-gnu/bin/vector
+archive=tar.gz
+
 [yq]
 repo=mikefarah/yq
 version=v4.54.1
