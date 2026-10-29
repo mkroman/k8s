@@ -409,6 +409,28 @@ refresh_application() {
   done
 }
 
+# The root app syncs Applications in earlier sync-waves than their
+# AppProjects, and the Argo CD CLI rejects an application whose project does
+# not exist yet, where raw kubectl reads did not care. Wait for the project
+# so the CLI calls below cannot race the project's creation.
+wait_for_project() {
+  local app="$1"
+  local project="$2"
+  local start elapsed
+
+  [[ "${project}" == "default" ]] && return 0
+
+  start="$(date +%s)"
+  until kubectl -n argocd get appproject "${project}" >/dev/null 2>&1; do
+    elapsed=$(( $(date +%s) - start ))
+    if ((elapsed > 120)); then
+      diagnose
+      die "Project ${project} for application ${app} was not created within 120s"
+    fi
+    sleep 2
+  done
+}
+
 # argocd app wait cannot target a revision, so assert it once the application
 # settles. The e2e git daemon serves exactly one commit, so any other revision
 # means the application synced something unexpected.
@@ -643,6 +665,7 @@ main() {
   printf '::group::Wait for Applications\n'
   for app in "${ORDER[@]}"; do
     timeout_seconds="$(yq -r ".apps[\"${app}\"].timeout_seconds // 600" "${CONFIG_FILE}")"
+    wait_for_project "${app}" "$(app_entry "${app}" | jq -r '.project // "default"')"
     refresh_application "${app}" 120
     wait_for_application "${app}" "${revision}" "${timeout_seconds}"
   done
