@@ -191,6 +191,17 @@ def assert_network_policy(documents: list[dict], name: str, ports: set[int]) -> 
     )
 
 
+def has_e2e_peer(document: dict) -> bool:
+    return any(
+        peer.get("podSelector", {})
+        .get("matchLabels", {})
+        .get("app.kubernetes.io/name")
+        == "vector-e2e"
+        for rule in document["spec"].get("ingress", [])
+        for peer in rule.get("from", [])
+    )
+
+
 def assert_pod_monitor(documents: list[dict], name: str) -> None:
     monitor = required_document(documents, "PodMonitor", name)
     require_equal(
@@ -423,6 +434,34 @@ def main() -> int:
         assert_network_policy(agent_prod, "vector-agent", {4317, 4318, 9090})
         assert_network_policy(
             aggregator_prod, "vector-aggregator", {4317, 4318, 6000, 9090}
+        )
+        require(
+            not has_e2e_peer(
+                required_document(agent_prod, "NetworkPolicy", "vector-agent")
+            ),
+            "production agent NetworkPolicy must not allow the e2e probe",
+        )
+        require(
+            not has_e2e_peer(
+                required_document(
+                    aggregator_prod, "NetworkPolicy", "vector-aggregator"
+                )
+            ),
+            "production aggregator NetworkPolicy must not allow the e2e probe",
+        )
+        require(
+            has_e2e_peer(
+                required_document(agent_kind, "NetworkPolicy", "vector-agent-kind")
+            ),
+            "kind agent NetworkPolicy must allow the e2e probe",
+        )
+        require(
+            has_e2e_peer(
+                required_document(
+                    aggregator_kind, "NetworkPolicy", "vector-aggregator-kind"
+                )
+            ),
+            "kind aggregator NetworkPolicy must allow the e2e probe",
         )
         assert_pod_monitor(agent_prod, "vector-agent")
         assert_pod_monitor(aggregator_prod, "vector-aggregator")

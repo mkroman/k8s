@@ -1,4 +1,5 @@
 {{- $networkPolicy := .Values.vector.networkPolicy | default dict }}
+{{- $e2e := .Values.vector.e2e | default dict }}
 {{- if $networkPolicy.enabled }}
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -28,11 +29,13 @@ spec:
         - protocol: TCP
           port: 4318
 
-    # Prometheus and the e2e probe scrape agent metrics directly.
+    # Prometheus and, when enabled, the e2e probe scrape agent metrics.
     - from:
+{{- if $e2e.enabled }}
         - podSelector:
             matchLabels:
               app.kubernetes.io/name: vector-e2e
+{{- end }}
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: monitoring
@@ -57,11 +60,13 @@ spec:
         - protocol: TCP
           port: 4318
 
-    # Prometheus and the e2e probe scrape aggregator metrics directly.
+    # Prometheus and, when enabled, the e2e probe scrape aggregator metrics.
     - from:
+{{- if $e2e.enabled }}
         - podSelector:
             matchLabels:
               app.kubernetes.io/name: vector-e2e
+{{- end }}
         - namespaceSelector:
             matchLabels:
               kubernetes.io/metadata.name: monitoring
