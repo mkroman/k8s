@@ -373,43 +373,40 @@ refresh_application() {
   done
 }
 
+# argocd app wait cannot target a revision, so assert it once the application
+# settles. The e2e git daemon serves exactly one commit, so any other revision
+# means the application synced something unexpected.
+require_app_revision() {
+  local app="$1"
+  local revision="$2"
+  local revision_now
+
+  revision_now="$(
+    kubectl -n argocd get application "${app}" -o json 2>/dev/null |
+      jq -r '.status.sync.revision // ""'
+  )"
+  if [[ "${revision_now}" != "${revision}" ]]; then
+    diagnose
+    die "Application ${app} synced ${revision_now:-an unknown revision}, expected ${revision}"
+  fi
+}
+
 wait_for_application() {
   local app="$1"
   local revision="$2"
   local timeout_seconds="$3"
-  local start elapsed sync health phase revision_now resources
-  local application_json
 
-  start="$(date +%s)"
-
-  while true; do
-    elapsed=$(( $(date +%s) - start ))
-    if ((elapsed > timeout_seconds)); then
-      diagnose
-      die "Application ${app} did not become Synced and Healthy within ${timeout_seconds}s"
-    fi
-
-    application_json="$(
-      kubectl -n argocd get application "${app}" -o json 2>/dev/null || printf '{}'
-    )"
-    sync="$(jq -r '.status.sync.status // "Unknown"' <<<"${application_json}")"
-    health="$(jq -r '.status.health.status // "Unknown"' <<<"${application_json}")"
-    phase="$(jq -r '.status.operationState.phase // "Unknown"' <<<"${application_json}")"
-    revision_now="$(jq -r '.status.sync.revision // ""' <<<"${application_json}")"
-    resources="$(jq -r '.status.resources | length' <<<"${application_json}")"
-
-    printf 'Application %s: sync=%s health=%s operation=%s resources=%s\n' \
-      "${app}" "${sync}" "${health}" "${phase}" "${resources}"
-
-    if [[ "${sync}" == "Synced" && "${health}" == "Healthy" &&
-      "${phase}" == "Succeeded" && "${revision_now}" == "${revision}" &&
-      "${resources}" -gt 0 ]]; then
-      printf 'Application %s is Synced and Healthy at %s\n' "${app}" "${revision}"
-      return 0
-    fi
-
-    sleep 10
-  done
+  # The e2e cluster runs Argo CD headless (argocd-server is scaled to zero),
+  # so the CLI watches the Application resources directly in core mode. A
+  # failing sync leaves the application degraded or OutOfSync, which fails
+  # the wait. -N pins the lookup to the argocd namespace instead of the
+  # kubeconfig context's default namespace.
+  if ! argocd app wait "${app}" --core -N argocd \
+    --health --sync --timeout "${timeout_seconds}"; then
+    diagnose
+    die "Application ${app} did not become Synced and Healthy within ${timeout_seconds}s"
+  fi
+  require_app_revision "${app}" "${revision}"
 }
 
 # Verify that an app's expected resources from apps.yaml were deployed. This
@@ -533,36 +530,13 @@ check_prometheus_targets() {
 wait_for_root_sync() {
   local revision="$1"
   local timeout_seconds="$2"
-  local start elapsed sync phase revision_now resources
-  local application_json
 
-  start="$(date +%s)"
-
-  while true; do
-    elapsed=$(( $(date +%s) - start ))
-    if ((elapsed > timeout_seconds)); then
-      diagnose
-      die "Application e2e did not finish syncing within ${timeout_seconds}s"
-    fi
-
-    application_json="$(
-      kubectl -n argocd get application e2e -o json 2>/dev/null || printf '{}'
-    )"
-    sync="$(jq -r '.status.sync.status // "Unknown"' <<<"${application_json}")"
-    phase="$(jq -r '.status.operationState.phase // "Unknown"' <<<"${application_json}")"
-    revision_now="$(jq -r '.status.sync.revision // ""' <<<"${application_json}")"
-    resources="$(jq -r '.status.resources | length' <<<"${application_json}")"
-
-    printf 'Application e2e: sync=%s operation=%s resources=%s\n' \
-      "${sync}" "${phase}" "${resources}"
-
-    if [[ "${sync}" == "Synced" && "${phase}" == "Succeeded" &&
-      "${revision_now}" == "${revision}" && "${resources}" -gt 0 ]]; then
-      return 0
-    fi
-
-    sleep 10
-  done
+  if ! argocd app wait e2e --core -N argocd \
+    --sync --timeout "${timeout_seconds}"; then
+    diagnose
+    die "Application e2e did not finish syncing within ${timeout_seconds}s"
+  fi
+  require_app_revision e2e "${revision}"
 }
 
 main() {
@@ -575,6 +549,7 @@ main() {
   require_tool kind
   require_tool kubectl
   require_tool yq
+  require_tool argocd
 
   yq -e ".apps | has(\"${app}\")" "${CONFIG_FILE}" >/dev/null ||
     die "unknown e2e app: ${app}"

@@ -77,9 +77,9 @@ jobs:
         uses: azure/setup-kubectl@bda439f5f36b99b262ebdcd3613869bddb064c8e # v5.2.0
         with:
           version: ${{ env.KUBECTL_VERSION }}
-      - name: Install kind and yq
+      - name: Install kind, yq and argocd
         run: |
-          ./hack/ci/install-tools.sh "${RUNNER_TEMP}/ci-bin" kind yq
+          ./hack/ci/install-tools.sh "${RUNNER_TEMP}/ci-bin" kind yq argocd
           echo "${RUNNER_TEMP}/ci-bin" >>"${GITHUB_PATH}"
       - name: Test Argo CD deployment
         env:
