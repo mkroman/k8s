@@ -594,8 +594,16 @@ def check_grafana_datasources() -> None:
         org_id is not None,
         "grafana.ini.users.auto_assign_org_id must be set",
     )
+    # The datasource org must come from the same values key the Grafana ini
+    # uses, so production (org 2) and the kind e2e (org 1) cannot drift:
+    # provisioning into a missing org aborts Grafana startup.
+    require(
+        'index .Values.grafana "grafana.ini" "users" "auto_assign_org_id"'
+        in datasources,
+        "datasource org must follow grafana.ini.users.auto_assign_org_id",
+    )
     require_equal(
-        datasources.count(f"orgId: {org_id}"),
+        datasources.count("orgId: {{ $orgId }}"),
         2,
         "Grafana datasources provisioned into the user org",
     )

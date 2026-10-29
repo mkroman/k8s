@@ -1,4 +1,5 @@
 {{- if .Values.grafana.sidecar.datasources.enabled }}
+{{- $orgId := index .Values.grafana "grafana.ini" "users" "auto_assign_org_id" | default 1 }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -10,12 +11,14 @@ data:
     apiVersion: 1
     datasources:
       # Grafana assigns provisioned datasources to org 1 unless each entry
-      # sets an org. Users and dashboards live in org 2
-      # (grafana.ini.users.auto_assign_org_id), and the upstream chart has no
-      # datasources provider setting, so the org is pinned per entry.
+      # sets an org, and provisioning into a missing org aborts Grafana
+      # startup. Follow the org users are assigned to
+      # (grafana.ini.users.auto_assign_org_id): 2 in production, 1 in the
+      # kind e2e. The upstream chart has no datasources provider setting, so
+      # the org is set per entry.
       - name: quickwit-prod
         uid: deus9irpizvgga
-        orgId: 2
+        orgId: {{ $orgId }}
         type: quickwit-quickwit-datasource
         access: proxy
         url: http://quickwit-searcher.quickwit-prod.svc.cluster.local:7280/api/v1
@@ -29,7 +32,7 @@ data:
       # quickwit/values.yaml.
       - name: quickwit-traces
         uid: quickwit-traces
-        orgId: 2
+        orgId: {{ $orgId }}
         type: quickwit-quickwit-datasource
         access: proxy
         url: http://quickwit-searcher.quickwit-prod.svc.cluster.local:7280/api/v1
