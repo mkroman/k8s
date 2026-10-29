@@ -73,6 +73,15 @@
       "groupName": "agentgateway"
     },
     {
+      "description": "Keep the Vector Helm chart and CI binary release on the same version and in one PR",
+      "matchPackageNames": [
+        "vector",
+        "vectordotdev/vector"
+      ],
+      "groupName": "vector",
+      "groupSlug": "vector"
+    },
+    {
       "description": "The self-hosted Renovate image is controlled by the chart appVersion",
       "matchManagers": [
         "helm-values"
