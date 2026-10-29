@@ -1,0 +1,121 @@
+{{- /*
+Bootstrap Job for Quickwit indexes.
+
+The upstream chart derives the Job name from the index ID without sanitizing
+it. Index IDs may contain underscores, which are invalid in Kubernetes object
+names, so we render the Job here with the index ID normalized to an RFC 1123
+subdomain. The rest of the template follows the upstream chart so the Job
+keeps the same image, environment, mounts, and hook behaviour.
+*/ -}}
+{{- $quickwit := .Subcharts.quickwit -}}
+{{- range $index := $quickwit.Values.seed.indexes }}
+{{- $indexId := $index.index_id -}}
+{{- $safeIndexId := $indexId | replace "_" "-" | lower | trimSuffix "-" | trimSuffix "." -}}
+{{- $jobName := printf "%s-index-%s" (include "quickwit.fullname" $quickwit | trunc 47) $safeIndexId | trunc 63 | trimSuffix "-" -}}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ $jobName | quote }}
+  labels:
+    {{- include "quickwit.labels" $quickwit | nindent 4 }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+    "helm.sh/hook-weight": "1"
+    {{- with $quickwit.Values.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  template:
+    metadata:
+      name: {{ $quickwit.Release.Name | quote }}
+      {{- with $quickwit.Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        app.kubernetes.io/managed-by: {{ $quickwit.Release.Service | quote }}
+        app.kubernetes.io/instance: {{ $quickwit.Release.Name | quote }}
+        helm.sh/chart: "{{ $quickwit.Chart.Name }}-{{ $quickwit.Chart.Version }}"
+    spec:
+      {{- with $quickwit.Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "quickwit.serviceAccountName" $quickwit }}
+      securityContext:
+        {{- toYaml $quickwit.Values.podSecurityContext | nindent 8 }}
+      restartPolicy: Never
+      {{- with $quickwit.Values.bootstrap.indexes.initContainers }}
+      initContainers:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ $quickwit.Chart.Name }}
+          securityContext:
+            {{- toYaml $quickwit.Values.securityContext | nindent 12 }}
+          image: {{ include "quickwit.image" $quickwit | quote }}
+          imagePullPolicy: {{ $quickwit.Values.image.pullPolicy }}
+          {{- if $quickwit.Values.bootstrap.indexes.command }}
+          command: {{- toYaml $quickwit.Values.bootstrap.indexes.command | nindent 12 }}
+          {{- else }}
+          command: ["/bin/bash","-c","quickwit index describe --index {{ $indexId }} --endpoint ${QW_CLUSTER_ENDPOINT} || quickwit index create --index-config {{ $indexId }}.yaml --endpoint ${QW_CLUSTER_ENDPOINT}"]
+          {{- end }}
+          env:
+            {{- include "quickwit.environment" $quickwit | nindent 12 }}
+            {{- with (include "quickwit.extraEnv" $quickwit.Values.bootstrap.extraEnv) }}
+            {{- . | nindent 12 }}
+            {{- end }}
+          {{- if or $quickwit.Values.environmentFrom $quickwit.Values.bootstrap.extraEnvFrom }}
+          envFrom:
+            {{- with $quickwit.Values.environmentFrom }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+            {{- with $quickwit.Values.bootstrap.extraEnvFrom }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- end }}
+          volumeMounts:
+            - name: config
+              mountPath: /quickwit/node.yaml
+              subPath: node.yaml
+            - name: index
+              mountPath: /quickwit/{{ $indexId }}.yaml
+              subPath: {{ $indexId }}.yaml
+            {{- with concat ($quickwit.Values.volumeMounts | default list) ($quickwit.Values.bootstrap.indexes.extraVolumeMounts | default list) }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          resources:
+            {{- toYaml $quickwit.Values.bootstrap.resources | nindent 12 }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "quickwit.fullname" $quickwit }}
+            items:
+              - key: node.yaml
+                path: node.yaml
+        - name: index
+          configMap:
+            name: {{ include "quickwit.fullname" $quickwit }}-bootstrap
+            items:
+              - key: {{ $indexId }}.yaml
+                path: {{ $indexId }}.yaml
+        {{- with concat ($quickwit.Values.volumes | default list) ($quickwit.Values.bootstrap.indexes.extraVolumes | default list) }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with $quickwit.Values.bootstrap.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with merge (dict) ($quickwit.Values.bootstrap.affinity | default dict) ($quickwit.Values.affinity | default dict) }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- $tolerations := concat ($quickwit.Values.tolerations | default list) ($quickwit.Values.bootstrap.tolerations | default list) | compact | uniq }}
+      tolerations:
+        {{- toYaml $tolerations | nindent 8 }}
+      {{- if $quickwit.Values.bootstrap.runtimeClassName }}
+      runtimeClassName: {{ $quickwit.Values.bootstrap.runtimeClassName | quote }}
+      {{- end }}
+{{- end }}

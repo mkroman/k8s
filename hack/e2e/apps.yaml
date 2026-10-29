@@ -20,6 +20,8 @@
 # register before rendering charts with `helm dependency build`. Argo CD
 # resolves its own chart sources, so this is only used by repository checks.
 helm_repositories:
+  - name: quickwit
+    url: https://helm.quickwit.io
   - name: vector
     url: https://helm.vector.dev
 

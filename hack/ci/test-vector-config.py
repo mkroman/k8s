@@ -27,6 +27,7 @@ import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 VECTOR_CHART = REPO_ROOT / "vector"
+QUICKWIT_CHART = REPO_ROOT / "quickwit"
 HELM = shutil.which("helm")
 VECTOR = shutil.which("vector")
 
@@ -548,6 +549,30 @@ def check_quickwit_values() -> None:
     )
 
 
+def check_quickwit_bootstrap_job(workdir: Path) -> None:
+    assert HELM is not None
+    chart = workdir / "quickwit"
+    shutil.copytree(
+        QUICKWIT_CHART,
+        chart,
+        ignore=shutil.ignore_patterns("charts"),
+    )
+    run([HELM, "dependency", "build"], cwd=chart)
+    output = run(
+        [HELM, "template", "quickwit", str(chart), "--namespace", "quickwit-prod"]
+    )
+    manifests = Manifests("quickwit", load_yaml_documents(output))
+    manifests.require(
+        "Job",
+        "quickwit-index-vector-kubernetes-logs-v0-2",
+    )
+    config_map = manifests.require("ConfigMap", "quickwit-bootstrap")
+    require(
+        "vector-kubernetes_logs-v0_2.yaml" in config_map["data"],
+        "Quickwit bootstrap ConfigMap must key the index config by index ID",
+    )
+
+
 def check_app_projects() -> None:
     assert HELM is not None
     output = run(
@@ -668,6 +693,7 @@ def main() -> int:
         check_e2e_probe(agent_kind, aggregator_kind)
         check_app_projects()
         check_quickwit_values()
+        check_quickwit_bootstrap_job(workdir)
         check_grafana_datasources()
 
     print("Vector config contracts: OK")

@@ -5,6 +5,12 @@ Quickwit stores logs and traces in B2-backed indexes. The Helm values in
 jobs (`bootstrap.enabled` + `seed.indexes`). Quickwit's OTLP log/trace indexes
 are auto-created and are not declared here.
 
+The upstream bootstrap job is disabled because it derives its Job name from the
+index ID without sanitizing it; the Kubernetes logs index contains underscores,
+which are invalid in Kubernetes object names. `templates/configmap-bootstrap.yaml`
+and `templates/job-create-indices.yaml` render the equivalent ConfigMap and Job
+with an RFC 1123-safe Job name while keeping the index ID unchanged.
+
 ## Indexes
 
 | Index | Producer | Retention |
