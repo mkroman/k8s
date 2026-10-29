@@ -53,7 +53,7 @@ jobs:
         with:
           version: ${{ env.HELM_VERSION }}
       - name: Install PyYAML
-        run: python3 -m pip install --user pyyaml
+        run: python3 -m pip install --user "pyyaml==6.0.2"
       - name: Install Vector
         run: |
           ./hack/ci/install-tools.sh "${RUNNER_TEMP}/ci-bin" vector
