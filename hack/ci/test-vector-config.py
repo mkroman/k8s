@@ -9,7 +9,8 @@ Run from the repository root:
 
     python3 hack/ci/test-vector-config.py
 
-Requires: helm, vector, PyYAML.
+Requires: helm, vector, PyYAML. Helm repositories must already be registered;
+CI reads them from hack/e2e/apps.yaml.
 """
 
 from __future__ import annotations

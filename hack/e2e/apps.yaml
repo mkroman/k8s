@@ -15,6 +15,14 @@
 # resources optionally lists objects that must exist after the app is healthy.
 # Use it to verify that resources such as ServiceMonitors and PodMonitors were
 # actually deployed, not just rendered.
+#
+# helm_repositories optionally lists Helm chart repositories that CI must
+# register before rendering charts with `helm dependency build`. Argo CD
+# resolves its own chart sources, so this is only used by repository checks.
+helm_repositories:
+  - name: vector
+    url: https://helm.vector.dev
+
 apps:
   agentgateway:
     requires:
