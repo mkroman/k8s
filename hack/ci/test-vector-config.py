@@ -582,6 +582,23 @@ def check_grafana_datasources() -> None:
         "quickwit-traces" in datasources,
         "Grafana traces datasource is missing",
     )
+    values = load_yaml_file(REPO_ROOT / "grafana" / "values.yaml")
+    org_id = nested(
+        values[0],
+        "grafana",
+        "grafana.ini",
+        "users",
+        "auto_assign_org_id",
+    )
+    require(
+        org_id is not None,
+        "grafana.ini.users.auto_assign_org_id must be set",
+    )
+    require_equal(
+        datasources.count(f"orgId: {org_id}"),
+        2,
+        "Grafana datasources provisioned into the user org",
+    )
 
 
 # ---------------------------------------------------------------------------

@@ -95,8 +95,9 @@ grafana:
       label: "grafana_datasource"
       labelValue: "1"
       resource: configmap
-      provider:
-        orgid: 2
+      # The upstream chart only supports a provider org for dashboards, so
+      # templates/configmap.datasources.yaml pins each datasource to the org
+      # that users are assigned (grafana.ini.users.auto_assign_org_id).
 
 certificate:
   # -- Create the Certificate resource.

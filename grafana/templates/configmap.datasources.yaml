@@ -9,8 +9,13 @@ data:
   datasources.yaml: |-
     apiVersion: 1
     datasources:
+      # Grafana assigns provisioned datasources to org 1 unless each entry
+      # sets an org. Users and dashboards live in org 2
+      # (grafana.ini.users.auto_assign_org_id), and the upstream chart has no
+      # datasources provider setting, so the org is pinned per entry.
       - name: quickwit-prod
         uid: deus9irpizvgga
+        orgId: 2
         type: quickwit-quickwit-datasource
         access: proxy
         url: http://quickwit-searcher.quickwit-prod.svc.cluster.local:7280/api/v1
@@ -24,6 +29,7 @@ data:
       # quickwit/values.yaml.
       - name: quickwit-traces
         uid: quickwit-traces
+        orgId: 2
         type: quickwit-quickwit-datasource
         access: proxy
         url: http://quickwit-searcher.quickwit-prod.svc.cluster.local:7280/api/v1
