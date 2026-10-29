@@ -321,6 +321,58 @@ render_root_app() {
 }
 
 
+# Force Argo CD to re-render an application after its prerequisites, and their
+# CRDs, are healthy. The repo server caches the cluster's API versions, so an
+# application rendered before a CRD was established can keep omitting
+# CRD-backed resources indefinitely.
+refresh_application() {
+  local app="$1"
+  local timeout_seconds="$2"
+  local start elapsed previous current
+
+  start="$(date +%s)"
+
+  until kubectl -n argocd get application "${app}" >/dev/null 2>&1; do
+    elapsed=$(( $(date +%s) - start ))
+    if ((elapsed > timeout_seconds)); then
+      diagnose
+      die "Application ${app} was not created within ${timeout_seconds}s"
+    fi
+    sleep 2
+  done
+
+  previous="$(
+    kubectl -n argocd get application "${app}" -o json 2>/dev/null |
+      jq -r '.status.reconciledAt // ""'
+  )"
+  # The first reconciliation has not happened yet, so it will use the current
+  # API versions anyway. Refreshing now can race with AppProject creation.
+  [[ -n "${previous}" ]] || return 0
+
+  kubectl -n argocd annotate application "${app}" \
+    argocd.argoproj.io/refresh=hard --overwrite >/dev/null
+
+  start="$(date +%s)"
+
+  while true; do
+    elapsed=$(( $(date +%s) - start ))
+    if ((elapsed > timeout_seconds)); then
+      diagnose
+      die "Application ${app} did not refresh within ${timeout_seconds}s"
+    fi
+
+    current="$(
+      kubectl -n argocd get application "${app}" -o json 2>/dev/null |
+        jq -r '.status.reconciledAt // ""'
+    )"
+    if [[ -n "${current}" && "${current}" != "${previous}" ]]; then
+      return 0
+    fi
+
+    sleep 2
+  done
+}
+
 wait_for_application() {
   local app="$1"
   local revision="$2"
@@ -576,6 +628,7 @@ main() {
   printf '::group::Wait for Applications\n'
   for app in "${ORDER[@]}"; do
     timeout_seconds="$(yq -r ".apps[\"${app}\"].timeout_seconds // 600" "${CONFIG_FILE}")"
+    refresh_application "${app}" 120
     wait_for_application "${app}" "${revision}" "${timeout_seconds}"
   done
   printf '::endgroup::\n'
