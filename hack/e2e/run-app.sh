@@ -453,18 +453,51 @@ wait_for_application() {
   local app="$1"
   local revision="$2"
   local timeout_seconds="$3"
+  local start elapsed remaining application_json health
+
+  start="$(date +%s)"
 
   # The e2e cluster runs Argo CD headless (argocd-server is scaled to zero),
-  # so the CLI watches the Application resources directly in core mode. A
-  # failing sync leaves the application degraded or OutOfSync, which fails
-  # the wait. -N pins the lookup to the argocd namespace instead of the
-  # kubeconfig context's default namespace.
-  if ! argocd app wait "${app}" --core -N argocd \
-    --health --sync --timeout "${timeout_seconds}"; then
+  # so the CLI watches the Application resources directly in core mode. -N pins
+  # the lookup to the argocd namespace instead of the kubeconfig context's
+  # default namespace.
+  #
+  # Do not pass --health here: argocd app wait treats any Progressing ->
+  # Degraded transition as fatal, and a new Prometheus CR is briefly Degraded
+  # because prometheus-operator reports Available=False/NoPodReady until its
+  # first pod is ready. Wait for the sync operation with the CLI, then poll
+  # health until the overall deadline so a transient degraded state does not
+  # fail the run.
+  elapsed=$(( $(date +%s) - start ))
+  remaining=$((timeout_seconds - elapsed))
+  if ((remaining <= 0)) ||
+    ! argocd app wait "${app}" --core -N argocd \
+      --sync --operation --timeout "${remaining}"; then
     diagnose
-    die "Application ${app} did not become Synced and Healthy within ${timeout_seconds}s"
+    die "Application ${app} did not finish syncing within ${timeout_seconds}s"
   fi
-  require_app_revision "${app}" "${revision}"
+
+  while true; do
+    elapsed=$(( $(date +%s) - start ))
+    if ((elapsed > timeout_seconds)); then
+      diagnose
+      die "Application ${app} did not become Synced and Healthy within ${timeout_seconds}s"
+    fi
+
+    application_json="$(
+      kubectl -n argocd get application "${app}" -o json 2>/dev/null || true
+    )"
+    if [[ -n "${application_json}" ]]; then
+      health="$(jq -r '.status.health.status // "Unknown"' <<<"${application_json}")"
+      printf 'Application %s: health=%s\n' "${app}" "${health}"
+      if [[ "${health}" == "Healthy" ]]; then
+        require_app_revision "${app}" "${revision}"
+        return 0
+      fi
+    fi
+
+    sleep 5
+  done
 }
 
 # Verify that an app's expected resources from apps.yaml were deployed. This
