@@ -15,6 +15,14 @@
 # resources optionally lists objects that must exist after the app is healthy.
 # Use it to verify that resources such as ServiceMonitors and PodMonitors were
 # actually deployed, not just rendered.
+#
+# helm_repositories optionally lists Helm chart repositories that CI must
+# register before rendering charts with `helm dependency build`. Argo CD
+# resolves its own chart sources, so this is only used by repository checks.
+helm_repositories:
+  - name: vector
+    url: https://helm.vector.dev
+
 apps:
   agentgateway:
     requires:
@@ -72,6 +80,37 @@ apps:
   vector-agent:
     requires:
       - prometheus-operator
+      - vector-aggregator
+    resources:
+      - apiVersion: networking.k8s.io/v1
+        kind: NetworkPolicy
+        namespace: vector
+        name: vector-agent
+      - apiVersion: v1
+        kind: Service
+        namespace: vector
+        name: vector-agent
+      - apiVersion: monitoring.coreos.com/v1
+        kind: PodMonitor
+        namespace: vector
+        name: vector-agent
   vector-aggregator:
     requires:
       - prometheus-operator
+    resources:
+      - apiVersion: networking.k8s.io/v1
+        kind: NetworkPolicy
+        namespace: vector
+        name: vector-aggregator
+      - apiVersion: v1
+        kind: Service
+        namespace: vector
+        name: vector-aggregator
+      - apiVersion: apps/v1
+        kind: StatefulSet
+        namespace: vector
+        name: vector-aggregator
+      - apiVersion: monitoring.coreos.com/v1
+        kind: PodMonitor
+        namespace: vector
+        name: vector-aggregator

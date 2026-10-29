@@ -1,0 +1,42 @@
+{{- if .Values.grafana.sidecar.datasources.enabled }}
+{{- $orgId := index .Values.grafana "grafana.ini" "users" "auto_assign_org_id" | default 1 }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-datasources
+  labels:
+    grafana_datasource: "1"
+data:
+  datasources.yaml: |-
+    apiVersion: 1
+    datasources:
+      # Grafana assigns provisioned datasources to org 1 unless each entry
+      # sets an org, and provisioning into a missing org aborts Grafana
+      # startup. Follow the org users are assigned to
+      # (grafana.ini.users.auto_assign_org_id): 2 in production, 1 in the
+      # kind e2e. The upstream chart has no datasources provider setting, so
+      # the org is set per entry.
+      - name: quickwit-prod
+        uid: deus9irpizvgga
+        orgId: {{ $orgId }}
+        type: quickwit-quickwit-datasource
+        access: proxy
+        url: http://quickwit-searcher.quickwit-prod.svc.cluster.local:7280/api/v1
+        jsonData:
+          index: vector-kubernetes_logs-v0_2
+          logMessageField: message
+          tracesDatasourceUid: quickwit-traces
+
+      # Quickwit auto-creates and owns its OTLP trace index. This datasource
+      # only queries that index; the index mapping/retention is not managed by
+      # quickwit/values.yaml.
+      - name: quickwit-traces
+        uid: quickwit-traces
+        orgId: {{ $orgId }}
+        type: quickwit-quickwit-datasource
+        access: proxy
+        url: http://quickwit-searcher.quickwit-prod.svc.cluster.local:7280/api/v1
+        jsonData:
+          index: otel-traces-v0_7
+          logsDatasourceUid: deus9irpizvgga
+{{- end }}

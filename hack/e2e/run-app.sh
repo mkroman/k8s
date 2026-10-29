@@ -106,8 +106,12 @@ diagnose() {
   local app job namespace name
 
   printf '::group::Argo CD Applications\n'
-  kubectl -n argocd get applications -o wide || true
+  argocd app list --core -N argocd || true
   for app in "${ORDER[@]}"; do
+    printf '\n===== Application %s =====\n' "${app}"
+    # The CLI summary shows sync/health per resource and the operation state,
+    # which is easier to act on than the raw Application YAML that follows.
+    argocd app get "${app}" --core -N argocd --show-operation || true
     kubectl -n argocd get application "${app}" -o yaml || true
   done
   printf '::endgroup::\n'
@@ -321,12 +325,52 @@ render_root_app() {
 }
 
 
-wait_for_application() {
+# Force Argo CD to re-render an application after its prerequisites, and their
+# CRDs, are healthy. The repo server caches the cluster's API versions, so an
+# application rendered before a CRD was established can keep omitting
+# CRD-backed resources indefinitely.
+refresh_application() {
   local app="$1"
-  local revision="$2"
-  local timeout_seconds="$3"
-  local start elapsed sync health phase revision_now resources
-  local application_json
+  local timeout_seconds="$2"
+  local start elapsed previous previous_rv current current_rv
+  local application_json refresh_annotation
+
+  start="$(date +%s)"
+
+  until kubectl -n argocd get application "${app}" >/dev/null 2>&1; do
+    elapsed=$(( $(date +%s) - start ))
+    if ((elapsed > timeout_seconds)); then
+      diagnose
+      die "Application ${app} was not created within ${timeout_seconds}s"
+    fi
+    sleep 2
+  done
+
+  previous="$(
+    kubectl -n argocd get application "${app}" -o json 2>/dev/null |
+      jq -r '.status.reconciledAt // ""'
+  )"
+  # The first reconciliation has not happened yet, so it will use the current
+  # API versions anyway. Refreshing now can race with AppProject creation.
+  [[ -n "${previous}" ]] || return 0
+
+  # Hard refresh through the CLI. This sets the same refresh=hard annotation
+  # the controller consumes and additionally drops the repo server's cached
+  # target manifests, which is what keeps serving renders that predate the
+  # new CRDs. The call can block until the refresh is processed, so bound it
+  # and keep the same failure handling as the wait loop below.
+  if ! argocd app get "${app}" --core -N argocd --hard-refresh \
+    --timeout "${timeout_seconds}" >/dev/null; then
+    diagnose
+    die "Application ${app} could not be refreshed within ${timeout_seconds}s"
+  fi
+
+  # The refresh bumps resourceVersion, so baseline it afterwards: the next
+  # resourceVersion change comes from the controller.
+  previous_rv="$(
+    kubectl -n argocd get application "${app}" -o json 2>/dev/null |
+      jq -r '.metadata.resourceVersion // ""'
+  )"
 
   start="$(date +%s)"
 
@@ -334,30 +378,93 @@ wait_for_application() {
     elapsed=$(( $(date +%s) - start ))
     if ((elapsed > timeout_seconds)); then
       diagnose
-      die "Application ${app} did not become Synced and Healthy within ${timeout_seconds}s"
+      die "Application ${app} did not refresh within ${timeout_seconds}s"
     fi
 
     application_json="$(
-      kubectl -n argocd get application "${app}" -o json 2>/dev/null || printf '{}'
+      kubectl -n argocd get application "${app}" -o json 2>/dev/null || true
     )"
-    sync="$(jq -r '.status.sync.status // "Unknown"' <<<"${application_json}")"
-    health="$(jq -r '.status.health.status // "Unknown"' <<<"${application_json}")"
-    phase="$(jq -r '.status.operationState.phase // "Unknown"' <<<"${application_json}")"
-    revision_now="$(jq -r '.status.sync.revision // ""' <<<"${application_json}")"
-    resources="$(jq -r '.status.resources | length' <<<"${application_json}")"
+    if [[ -n "${application_json}" ]]; then
+      read -r current current_rv refresh_annotation <<<"$(
+        jq -r '[
+          (.status.reconciledAt // ""),
+          (.metadata.resourceVersion // ""),
+          (.metadata.annotations["argocd.argoproj.io/refresh"] // "")
+        ] | @tsv' <<<"${application_json}"
+      )"
 
-    printf 'Application %s: sync=%s health=%s operation=%s resources=%s\n' \
-      "${app}" "${sync}" "${health}" "${phase}" "${resources}"
-
-    if [[ "${sync}" == "Synced" && "${health}" == "Healthy" &&
-      "${phase}" == "Succeeded" && "${revision_now}" == "${revision}" &&
-      "${resources}" -gt 0 ]]; then
-      printf 'Application %s is Synced and Healthy at %s\n' "${app}" "${revision}"
-      return 0
+      # reconciledAt has second precision, so a refresh that lands in the same
+      # second as the previous reconciliation does not change it. Argo CD
+      # removes the refresh annotation and persists the reconciliation status
+      # in the same write, so the annotation disappearing or any controller
+      # write also means the refresh completed.
+      if [[ "${current}" != "${previous}" ]] ||
+        [[ "${current_rv}" != "${previous_rv}" ]] ||
+        [[ -z "${refresh_annotation}" ]]; then
+        return 0
+      fi
     fi
 
-    sleep 10
+    sleep 2
   done
+}
+
+# The root app syncs Applications in earlier sync-waves than their
+# AppProjects, and the Argo CD CLI rejects an application whose project does
+# not exist yet, where raw kubectl reads did not care. Wait for the project
+# so the CLI calls below cannot race the project's creation.
+wait_for_project() {
+  local app="$1"
+  local project="$2"
+  local start elapsed
+
+  [[ "${project}" == "default" ]] && return 0
+
+  start="$(date +%s)"
+  until kubectl -n argocd get appproject "${project}" >/dev/null 2>&1; do
+    elapsed=$(( $(date +%s) - start ))
+    if ((elapsed > 120)); then
+      diagnose
+      die "Project ${project} for application ${app} was not created within 120s"
+    fi
+    sleep 2
+  done
+}
+
+# argocd app wait cannot target a revision, so assert it once the application
+# settles. The e2e git daemon serves exactly one commit, so any other revision
+# means the application synced something unexpected.
+require_app_revision() {
+  local app="$1"
+  local revision="$2"
+  local revision_now
+
+  revision_now="$(
+    argocd app get "${app}" --core -N argocd -o json 2>/dev/null |
+      jq -r '.status.sync.revision // ""' || true
+  )"
+  if [[ "${revision_now}" != "${revision}" ]]; then
+    diagnose
+    die "Application ${app} synced ${revision_now:-an unknown revision}, expected ${revision}"
+  fi
+}
+
+wait_for_application() {
+  local app="$1"
+  local revision="$2"
+  local timeout_seconds="$3"
+
+  # The e2e cluster runs Argo CD headless (argocd-server is scaled to zero),
+  # so the CLI watches the Application resources directly in core mode. A
+  # failing sync leaves the application degraded or OutOfSync, which fails
+  # the wait. -N pins the lookup to the argocd namespace instead of the
+  # kubeconfig context's default namespace.
+  if ! argocd app wait "${app}" --core -N argocd \
+    --health --sync --timeout "${timeout_seconds}"; then
+    diagnose
+    die "Application ${app} did not become Synced and Healthy within ${timeout_seconds}s"
+  fi
+  require_app_revision "${app}" "${revision}"
 }
 
 # Verify that an app's expected resources from apps.yaml were deployed. This
@@ -481,36 +588,13 @@ check_prometheus_targets() {
 wait_for_root_sync() {
   local revision="$1"
   local timeout_seconds="$2"
-  local start elapsed sync phase revision_now resources
-  local application_json
 
-  start="$(date +%s)"
-
-  while true; do
-    elapsed=$(( $(date +%s) - start ))
-    if ((elapsed > timeout_seconds)); then
-      diagnose
-      die "Application e2e did not finish syncing within ${timeout_seconds}s"
-    fi
-
-    application_json="$(
-      kubectl -n argocd get application e2e -o json 2>/dev/null || printf '{}'
-    )"
-    sync="$(jq -r '.status.sync.status // "Unknown"' <<<"${application_json}")"
-    phase="$(jq -r '.status.operationState.phase // "Unknown"' <<<"${application_json}")"
-    revision_now="$(jq -r '.status.sync.revision // ""' <<<"${application_json}")"
-    resources="$(jq -r '.status.resources | length' <<<"${application_json}")"
-
-    printf 'Application e2e: sync=%s operation=%s resources=%s\n' \
-      "${sync}" "${phase}" "${resources}"
-
-    if [[ "${sync}" == "Synced" && "${phase}" == "Succeeded" &&
-      "${revision_now}" == "${revision}" && "${resources}" -gt 0 ]]; then
-      return 0
-    fi
-
-    sleep 10
-  done
+  if ! argocd app wait e2e --core -N argocd \
+    --sync --timeout "${timeout_seconds}"; then
+    diagnose
+    die "Application e2e did not finish syncing within ${timeout_seconds}s"
+  fi
+  require_app_revision e2e "${revision}"
 }
 
 main() {
@@ -523,6 +607,7 @@ main() {
   require_tool kind
   require_tool kubectl
   require_tool yq
+  require_tool argocd
 
   yq -e ".apps | has(\"${app}\")" "${CONFIG_FILE}" >/dev/null ||
     die "unknown e2e app: ${app}"
@@ -555,6 +640,10 @@ main() {
   fi
   CLUSTER_CREATED=1
   kubectl config use-context "kind-${CLUSTER_NAME}" >/dev/null
+  # The Argo CD CLI loads argocd-cm from the kubeconfig context's default
+  # namespace in core mode. kind contexts default to "default", so pin the
+  # namespace the control plane was installed into.
+  kubectl config set-context --current --namespace=argocd >/dev/null
   printf '::endgroup::\n'
 
   install_argo_cd
@@ -576,6 +665,8 @@ main() {
   printf '::group::Wait for Applications\n'
   for app in "${ORDER[@]}"; do
     timeout_seconds="$(yq -r ".apps[\"${app}\"].timeout_seconds // 600" "${CONFIG_FILE}")"
+    wait_for_project "${app}" "$(app_entry "${app}" | jq -r '.project // "default"')"
+    refresh_application "${app}" 120
     wait_for_application "${app}" "${revision}" "${timeout_seconds}"
   done
   printf '::endgroup::\n'
@@ -593,7 +684,7 @@ main() {
   printf '::endgroup::\n'
 
   wait_for_root_sync "${revision}" 600
-  kubectl -n argocd get applications
+  argocd app list --core -N argocd
 }
 
 main "${APP}"

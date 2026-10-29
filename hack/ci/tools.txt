@@ -29,6 +29,15 @@ asset=actionlint_${version_nov}_linux_amd64.tar.gz
 binary=actionlint
 archive=tar.gz
 
+[argocd]
+repo=argoproj/argo-cd
+version=v3.5.6
+sha256=db9d17b70593d3f86a4dcf08d9ebbb85a42e995426ac5f928b737260656102d3
+tag=${version}
+asset=argocd-linux-amd64
+binary=argocd
+archive=raw
+
 [kind]
 repo=kubernetes-sigs/kind
 version=v0.33.0
@@ -55,6 +64,15 @@ tag=${version}
 asset=shellcheck-v${version_nov}.linux.x86_64.tar.xz
 binary=shellcheck-v${version_nov}/shellcheck
 archive=tar.xz
+
+[vector]
+repo=vectordotdev/vector
+version=v0.60.0
+sha256=89a9f134dcc35a6fbba9cb8ad0fec2d4802657bba6cb1c374a30660ef9456bdc
+tag=${version}
+asset=vector-${version_nov}-x86_64-unknown-linux-gnu.tar.gz
+binary=vector-x86_64-unknown-linux-gnu/bin/vector
+archive=tar.gz
 
 [yq]
 repo=mikefarah/yq

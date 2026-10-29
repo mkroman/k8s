@@ -1,13 +1,91 @@
 vector:
   replicas: 1
   role: "Aggregator"
+
   resources:
     requests:
-      cpu: "200m"
-      memory: "256Mi"
+      cpu: "500m"
+      memory: "512Mi"
     limits:
-      cpu: "600m"
-      memory: "768Mi"
+      cpu: "2"
+      memory: "2Gi"
+
+  # Durable aggregator: the StatefulSet keeps its data directory on a PVC and
+  # the Quickwit sinks use disk buffers, so in-flight logs/traces survive an
+  # aggregator restart or upgrade.
+  persistence:
+    enabled: true
+    size: 20Gi
+    storageClassName: ssd-gp1x1
+
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+      effect: NoSchedule
+    - key: node-role.kubernetes.io/master
+      operator: Exists
+      effect: NoSchedule
+
+  networkPolicy:
+    enabled: true
+
+  # The aggregator only writes to its PVC, so it can run as a non-root user.
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+    seccompProfile:
+      type: RuntimeDefault
+
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop: [ALL]
+    readOnlyRootFilesystem: true
+
+  extraVolumes:
+    - name: tmp
+      emptyDir: {}
+  extraVolumeMounts:
+    - name: tmp
+      mountPath: /tmp
+
+  podMonitor:
+    enabled: true
+    additionalLabels:
+      metrics.uplink.io/monitor: prometheus
+    # Keep the agent and aggregator jobs distinct.
+    jobLabel: app.kubernetes.io/instance
+    port: prom-exporter
+    interval: 30s
+
+  livenessProbe:
+    grpc:
+      port: 8686
+
+  readinessProbe:
+    grpc:
+      port: 8686
+
+  terminationGracePeriodSeconds: 120
+
+  containerPorts:
+    - name: otlp-grpc
+      containerPort: 4317
+      protocol: TCP
+    - name: otlp-http
+      containerPort: 4318
+      protocol: TCP
+    - name: api
+      containerPort: 8686
+      protocol: TCP
+    - name: prom-exporter
+      containerPort: 9090
+      protocol: TCP
+    - name: vector
+      containerPort: 6000
+      protocol: TCP
 
   service:
     ports:
@@ -15,10 +93,10 @@ vector:
         port: 4318
         protocol: TCP
         targetPort: 4318
-      - name: api
-        port: 8686
+      - name: otlp-grpc
+        port: 4317
         protocol: TCP
-        targetPort: 8686
+        targetPort: 4317
       - name: prom-exporter
         port: 9090
         protocol: TCP
@@ -27,47 +105,36 @@ vector:
         port: 6000
         protocol: TCP
         targetPort: 6000
-      - name: otlp-grpc
-        port: 4317
-        protocol: TCP
-        targetPort: 4317
 
   customConfig:
     data_dir: /vector-data-dir
     api:
       enabled: true
       address: 0.0.0.0:8686
-    sources:
-      # Automatically generate random syslogs for easier debugging.
-      generate_syslog:
-        type: demo_logs
-        format: syslog
 
-      # Enable OTel logs and traces.
+    sources:
+      # OTLP ingress for applications and collectors. Quickwit 0.8.2 accepts
+      # OTLP/HTTP binary protobuf; Vector's OpenTelemetry sink handles the
+      # framing and content type.
       otel:
         type: opentelemetry
         grpc:
           address: 0.0.0.0:4317
         http:
           address: 0.0.0.0:4318
+        decoding:
+          codec: otlp
+          signal_types: [logs, traces]
 
-      # Monitor Vector metrics.
-      internal_metrics:
-        type: internal_metrics
-
-      # Enable ingestion of logs and traces directly from Vector instances.
+      # Logs from the node-local Vector agents.
       vector:
         address: 0.0.0.0:6000
         type: vector
         version: "2"
 
-    transforms:
-      # Filter that only outputs logs from the vector source.
-      vector_logs:
-        type: filter
-        inputs: [vector]
-        condition:
-          type: is_log
+      # Monitor Vector metrics.
+      internal_metrics:
+        type: internal_metrics
 
     sinks:
       prom_exporter:
@@ -75,20 +142,73 @@ vector:
         inputs: [internal_metrics]
         address: 0.0.0.0:9090
 
-      quickwit:
+      # Quickwit 0.8.2 does not support OTLP metrics. Keep metrics in
+      # Prometheus and explicitly discard the OTel metrics output so Vector
+      # does not warn about an unconsumed source.
+      drop_otel_metrics:
+        type: blackhole
+        inputs: [otel.metrics]
+
+      # Kubernetes container logs. v0_2 is a new managed index; the old v0_1
+      # index keeps its own retention and is no longer written to.
+      quickwit_k8s_logs:
         type: http
         method: post
-        inputs: [vector_logs]
+        inputs: [vector]
         encoding:
           codec: json
         framing:
           method: newline_delimited
-        uri: "http://quickwit-indexer.quickwit-prod.svc.cluster.local:7280/api/v1/vector-kubernetes_logs-v0\
-          _1/ingest"
-      # debug:
-      #   type: console
-      #   inputs: [vector_logs]
-      #   encoding:
-      #     codec: json
-      #   framing:
-      #     method: newline_delimited
+        uri: "http://quickwit-indexer.quickwit-prod.svc.cluster.local:7280/api/v1/vector-kubernetes_logs-v0_2/ingest"
+        acknowledgements:
+          enabled: true
+        buffer:
+          type: disk
+          max_size: 8589934592 # 8 GiB
+          when_full: block
+
+      # OTel logs are stored separately from Kubernetes container logs.
+      quickwit_otel_logs:
+        type: opentelemetry
+        inputs: [otel.logs]
+        protocol:
+          type: http
+          uri: "http://quickwit-indexer.quickwit-prod.svc.cluster.local:7280/api/v1/otlp/v1/logs"
+          encoding:
+            codec: otlp
+          compression: none
+          batch:
+            max_events: 1000
+            timeout_secs: 1
+          request:
+            retry_attempts: 10
+        acknowledgements:
+          enabled: true
+        buffer:
+          type: disk
+          max_size: 4294967296 # 4 GiB
+          when_full: block
+
+      # OTel traces. Quickwit 0.8.2 owns and auto-creates its OTLP trace index;
+      # we deliberately do not declare or manage that index here.
+      quickwit_otel_traces:
+        type: opentelemetry
+        inputs: [otel.traces]
+        protocol:
+          type: http
+          uri: "http://quickwit-indexer.quickwit-prod.svc.cluster.local:7280/api/v1/otlp/v1/traces"
+          encoding:
+            codec: otlp
+          compression: none
+          batch:
+            max_events: 1000
+            timeout_secs: 2
+            max_bytes: 8388608 # 8 MiB, below Quickwit's 20 MiB gRPC limit
+          request:
+            retry_attempts: 10
+        acknowledgements:
+          enabled: true
+        buffer:
+          type: disk
+          max_size: 4294967296 # 4 GiB
+          when_full: block

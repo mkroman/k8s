@@ -285,6 +285,21 @@ projects:
         kind: ClusterRole
       - group: rbac.authorization.k8s.io
         kind: ClusterRoleBinding
+    namespaceResourceWhitelist:
+      - group: ""
+        kind: ConfigMap
+      - group: ""
+        kind: Service
+      - group: ""
+        kind: ServiceAccount
+      - group: apps
+        kind: DaemonSet
+      - group: batch
+        kind: Job
+      - group: networking.k8s.io
+        kind: NetworkPolicy
+      - group: monitoring.coreos.com
+        kind: PodMonitor
 
   - name: vector-aggregator
     description: "Cluster observability aggregator"
@@ -297,6 +312,19 @@ projects:
         kind: ClusterRole
       - group: rbac.authorization.k8s.io
         kind: ClusterRoleBinding
+    namespaceResourceWhitelist:
+      - group: ""
+        kind: ConfigMap
+      - group: ""
+        kind: Service
+      - group: ""
+        kind: ServiceAccount
+      - group: apps
+        kind: StatefulSet
+      - group: networking.k8s.io
+        kind: NetworkPolicy
+      - group: monitoring.coreos.com
+        kind: PodMonitor
 
   - name: zeta
     description: "Zeta IRC bot with plugins"

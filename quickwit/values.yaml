@@ -49,6 +49,12 @@ quickwit:
         endpoint: "https://s3.eu-central-003.backblazeb2.com"
         region: "eu-central-003"
 
+    # OTLP log/trace ingestion is served by the indexer. This is enabled by
+    # default in Quickwit 0.8.2; keep it explicit so a future default change
+    # cannot disable the Vector sink endpoint silently.
+    indexer:
+      enable_otlp_endpoint: true
+
   # Deploy the ServiceMonitor so we can pick up metrics.
   serviceMonitor:
     enabled: true
@@ -80,3 +86,60 @@ quickwit:
             The Quickwit index '{{ $labels.index }}' has experienced a sustained indexing throughput
             of over 100 docs/sec for more than 30 minutes.  Current rate is {{ $value | humanize }}
             docs/sec.
+
+  # Create the Kubernetes log index with an explicit mapping and retention.
+  # Quickwit's OTLP trace/log indexes are auto-created by Quickwit itself and
+  # are intentionally not declared here.
+  bootstrap:
+    enabled: true
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 256Mi
+
+  seed:
+    indexes:
+      # Kubernetes container logs. This is a new index (v0_2), so the bootstrap
+      # job creates it with this mapping; the old v0_1 index is left untouched
+      # for its existing retention period.
+      - version: 0.7
+        index_id: vector-kubernetes_logs-v0_2
+        doc_mapping:
+          # Keep unknown fields out of the index while allowing the current
+          # Vector schema. Add new top-level fields here before emitting them.
+          mode: lenient
+          field_mappings:
+            - name: timestamp
+              type: datetime
+              input_formats: [rfc3339, unix_timestamp]
+              output_format: rfc3339
+              fast: true
+              fast_precision: milliseconds
+            - name: message
+              type: text
+              tokenizer: default
+            - name: kubernetes
+              type: json
+              tokenizer: raw
+              expand_dots: false
+            - name: file
+              type: text
+              tokenizer: raw
+              indexed: false
+            - name: source_type
+              type: text
+              tokenizer: raw
+              indexed: false
+            - name: stream
+              type: text
+              tokenizer: raw
+              fast: true
+          timestamp_field: timestamp
+        search_settings:
+          default_search_fields: [message]
+        retention:
+          period: 30 days
+          schedule: hourly

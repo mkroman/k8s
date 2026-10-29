@@ -1,0 +1,87 @@
+name: Validate Vector config
+
+on:
+  pull_request:
+    paths:
+      - "vector/**"
+      - "apps/values.yaml"
+      - "apps/templates/appproject.yaml"
+      - "quickwit/values.yaml"
+      - "grafana/templates/configmap.datasources.yaml"
+      - "hack/ci/test-vector-config.py"
+      - "hack/e2e/apps.yaml"
+      - ".github/workflows/validate-vector-config.yaml"
+  push:
+    branches: [main]
+    paths:
+      - "vector/**"
+      - "apps/values.yaml"
+      - "apps/templates/appproject.yaml"
+      - "quickwit/values.yaml"
+      - "grafana/templates/configmap.datasources.yaml"
+      - "hack/ci/test-vector-config.py"
+      - "hack/e2e/apps.yaml"
+      - ".github/workflows/validate-vector-config.yaml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-vector-config-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  HELM_VERSION: "v3.22.1"
+
+jobs:
+  vector-config:
+    name: Vector config contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install Helm
+        uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5.0.1
+        with:
+          version: ${{ env.HELM_VERSION }}
+      - name: Install PyYAML
+        run: python3 -m pip install --user "pyyaml==6.0.2"
+      - name: Install Vector
+        run: |
+          ./hack/ci/install-tools.sh "${RUNNER_TEMP}/ci-bin" vector
+          echo "${RUNNER_TEMP}/ci-bin" >>"${GITHUB_PATH}"
+          "${RUNNER_TEMP}/ci-bin/vector" --version
+      - name: Register Helm repositories
+        run: |
+          python3 - <<'PY'
+          import subprocess
+          from pathlib import Path
+
+          import yaml
+
+          config = yaml.safe_load(
+              Path("hack/e2e/apps.yaml").read_text(encoding="utf-8")
+          ) or {}
+          for repository in config.get("helm_repositories", []):
+              subprocess.run(
+                  [
+                      "helm",
+                      "repo",
+                      "add",
+                      repository["name"],
+                      repository["url"],
+                      "--force-update",
+                  ],
+                  check=True,
+              )
+          PY
+      - name: Validate Vector configuration
+        run: python3 hack/ci/test-vector-config.py
