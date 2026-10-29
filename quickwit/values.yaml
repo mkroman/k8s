@@ -134,11 +134,9 @@ quickwit:
               expand_dots: false
             - name: file
               type: text
-              tokenizer: raw
               indexed: false
             - name: source_type
               type: text
-              tokenizer: raw
               indexed: false
             - name: stream
               type: text

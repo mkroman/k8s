@@ -547,6 +547,15 @@ def check_quickwit_values() -> None:
         bool(nested(indexes[0], "retention", "period")),
         "Quickwit seed index must define retention",
     )
+    for field in nested(indexes[0], "doc_mapping", "field_mappings") or []:
+        if field.get("indexed") is not False:
+            continue
+        require(
+            not {"tokenizer", "record", "fieldnorms"} & field.keys(),
+            "Quickwit field "
+            f"{field.get('name')!r} sets tokenizer/record/fieldnorms "
+            "while indexed is false",
+        )
 
 
 def check_quickwit_bootstrap_job(workdir: Path) -> None:
