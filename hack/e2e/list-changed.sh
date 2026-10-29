@@ -139,9 +139,21 @@ mark_app_changed() {
   local file="$2"
   local path="$3"
   local value_files="$4"
-  local relative
+  local nested_paths="$5"
+  local relative nested
 
   [[ "${file}" == "${path}" || "${file}" == "${path}/"* ]] || return 1
+
+  # A nested e2e application owns its own subtree. A change under it selects
+  # that application, not every parent application whose source path happens
+  # to contain it. For example, editing monitoring/cluster-exporters must not
+  # also select the monitoring application.
+  while IFS= read -r nested; do
+    [[ -n "${nested}" ]] || continue
+    if [[ "${file}" == "${nested}" || "${file}" == "${nested}/"* ]]; then
+      return 1
+    fi
+  done <<<"${nested_paths}"
 
   if [[ "${file}" == "${path}" ]]; then
     return 0
@@ -164,6 +176,7 @@ mark_app_changed() {
 
 main() {
   local base_ref head_ref changed app path project value_files
+  local nested_app nested_path nested_paths
   local -a app_names=()
   local -a selected=()
   local app_changed project_changed shared_changed=0
@@ -221,6 +234,15 @@ main() {
       project="$(app_project "${VALUES_FILE}" "${app}")"
       value_files="$(app_value_files "${VALUES_FILE}" "${app}")"
 
+      nested_paths=""
+      for nested_app in "${app_names[@]}"; do
+        [[ "${nested_app}" == "${app}" ]] && continue
+        nested_path="$(app_path "${VALUES_FILE}" "${nested_app}")"
+        if [[ -n "${nested_path}" && "${nested_path}" == "${path}/"* ]]; then
+          nested_paths+="${nested_path}"$'\n'
+        fi
+      done
+
       while IFS= read -r changed_file; do
         [[ -n "${changed_file}" ]] || continue
 
@@ -233,7 +255,8 @@ main() {
             ;;
         esac
 
-        if mark_app_changed "${app}" "${changed_file}" "${path}" "${value_files}"; then
+        if mark_app_changed "${app}" "${changed_file}" "${path}" \
+          "${value_files}" "${nested_paths}"; then
           app_changed=1
         fi
       done <<<"${changed}"
