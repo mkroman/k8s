@@ -618,6 +618,10 @@ main() {
   fi
   CLUSTER_CREATED=1
   kubectl config use-context "kind-${CLUSTER_NAME}" >/dev/null
+  # The Argo CD CLI loads argocd-cm from the kubeconfig context's default
+  # namespace in core mode. kind contexts default to "default", so pin the
+  # namespace the control plane was installed into.
+  kubectl config set-context --current --namespace=argocd >/dev/null
   printf '::endgroup::\n'
 
   install_argo_cd
