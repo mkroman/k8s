@@ -31,8 +31,8 @@ archive=tar.gz
 
 [argocd]
 repo=argoproj/argo-cd
-version=v3.5.6
-sha256=db9d17b70593d3f86a4dcf08d9ebbb85a42e995426ac5f928b737260656102d3
+version=v3.5.7
+sha256=e9b7c3f5316b8546bdd499dfb8d874e413a5e3605899a55ec2ce0b668a3e2801
 tag=${version}
 asset=argocd-linux-amd64
 binary=argocd
