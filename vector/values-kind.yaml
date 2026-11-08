@@ -10,6 +10,6 @@ vector:
     enabled: true
     probeNamespace: vector
     # renovate: datasource=docker depName=ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen
-    telemetrygenImage: ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen:v0.164.1
+    telemetrygenImage: ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen:v0.165.0
     # renovate: datasource=docker depName=curlimages/curl
     curlImage: curlimages/curl:8.17.0
