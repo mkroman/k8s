@@ -57,10 +57,10 @@ jobs:
       - name: Install PyYAML
         run: python3 -m pip install --user "pyyaml==6.0.2"
       - name: Install Vector
+        # GitHub-hosted ubuntu-latest already has $HOME/.local/bin on PATH.
         run: |
-          ./hack/ci/install-tools.sh "${RUNNER_TEMP}/ci-bin" vector
-          echo "${RUNNER_TEMP}/ci-bin" >>"${GITHUB_PATH}"
-          "${RUNNER_TEMP}/ci-bin/vector" --version
+          ./hack/ci/install-tools.sh "${HOME}/.local/bin" vector
+          "${HOME}/.local/bin/vector" --version
       - name: Register Helm repositories
         run: |
           python3 - <<'PY'

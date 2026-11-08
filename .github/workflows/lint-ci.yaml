@@ -28,9 +28,8 @@ jobs:
         with:
           persist-credentials: false
       - name: Install actionlint
-        run: |
-          ./hack/ci/install-tools.sh "${RUNNER_TEMP}/ci-bin" actionlint shellcheck
-          echo "${RUNNER_TEMP}/ci-bin" >>"${GITHUB_PATH}"
+        # GitHub-hosted ubuntu-latest already has $HOME/.local/bin on PATH.
+        run: ./hack/ci/install-tools.sh "${HOME}/.local/bin" actionlint shellcheck
       - name: Lint workflows
         run: actionlint
 
@@ -44,9 +43,8 @@ jobs:
         with:
           persist-credentials: false
       - name: Install shellcheck
-        run: |
-          ./hack/ci/install-tools.sh "${RUNNER_TEMP}/ci-bin" shellcheck
-          echo "${RUNNER_TEMP}/ci-bin" >>"${GITHUB_PATH}"
+        # GitHub-hosted ubuntu-latest already has $HOME/.local/bin on PATH.
+        run: ./hack/ci/install-tools.sh "${HOME}/.local/bin" shellcheck
       - name: Lint scripts
         run: shellcheck hack/ci/*.sh hack/e2e/*.sh
 
