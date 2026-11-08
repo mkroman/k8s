@@ -48,6 +48,16 @@
       ],
       "datasourceTemplate": "github-release-attachments",
       "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
+      "description": "Update images pinned in kind-only values overrides",
+      "managerFilePatterns": [
+        "/(^|/)values-kind\\.ya?ml$/"
+      ],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\n\\s*[A-Za-z0-9_]+: [^:\\s]+:(?<currentValue>\\S+)"
+      ]
     }
   ],
   "packageRules": [
@@ -55,6 +65,16 @@
       "description": "Do not add image digests in Helm values files",
       "matchManagers": [
         "helm-values"
+      ],
+      "pinDigests": false
+    },
+    {
+      "description": "Do not add image digests in kind-only values overrides",
+      "matchManagers": [
+        "custom.regex"
+      ],
+      "matchFileNames": [
+        "**/values-kind.yaml"
       ],
       "pinDigests": false
     },
