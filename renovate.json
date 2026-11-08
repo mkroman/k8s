@@ -82,6 +82,24 @@
       "groupSlug": "vector"
     },
     {
+      "description": "Keep the Traefik Helm chart and image updates in one PR",
+      "matchPackageNames": [
+        "traefik",
+        "library/traefik"
+      ],
+      "groupName": "traefik",
+      "groupSlug": "traefik"
+    },
+    {
+      "description": "Keep the Grafana Helm chart and image updates in one PR",
+      "matchPackageNames": [
+        "grafana",
+        "grafana/grafana"
+      ],
+      "groupName": "grafana",
+      "groupSlug": "grafana"
+    },
+    {
       "description": "The self-hosted Renovate image is controlled by the chart appVersion",
       "matchManagers": [
         "helm-values"
