@@ -6,6 +6,8 @@
 # modify the checkout. All charts are attempted so one broken chart does not
 # hide failures in the others. Repository URLs are read from each chart's
 # dependency list; repositories are deduplicated before `helm repo update`.
+# Dependency builds are retried a bounded number of times so transient chart
+# download failures (for example, GitHub release CDN 503s) recover.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -13,6 +15,8 @@ readonly SCRIPT_DIR
 REPO_ROOT="$(git -C "${SCRIPT_DIR}" rev-parse --show-toplevel)"
 readonly REPO_ROOT
 readonly RENDER_NAMESPACE="monitoring"
+readonly DEPENDENCY_BUILD_ATTEMPTS=5
+readonly DEPENDENCY_BUILD_INITIAL_DELAY=2
 
 TEMP_DIR=""
 declare -A SEEN_REPOS=()
@@ -54,6 +58,34 @@ add_chart_repositories() {
   )
 }
 
+build_dependencies() {
+  local chart="$1"
+  local copy="$2"
+  local log="$3"
+  local attempt
+  local delay="${DEPENDENCY_BUILD_INITIAL_DELAY}"
+
+  for ((attempt = 1; attempt <= DEPENDENCY_BUILD_ATTEMPTS; attempt++)); do
+    # Re-copy the chart so a partial download cannot poison the next attempt.
+    rm -rf "${copy}"
+    cp -a "${REPO_ROOT}/${chart}" "${copy}"
+
+    if helm dependency build "${copy}" >/dev/null 2>"${log}"; then
+      return 0
+    fi
+
+    printf '::warning title=Helm dependency build::Attempt %d/%d failed for %s\n' \
+      "${attempt}" "${DEPENDENCY_BUILD_ATTEMPTS}" "${chart}" >&2
+
+    if ((attempt < DEPENDENCY_BUILD_ATTEMPTS)); then
+      sleep "${delay}"
+      delay=$((delay * 2))
+    fi
+  done
+
+  return 1
+}
+
 render_chart() {
   local chart="$1"
   local name="$2"
@@ -61,9 +93,7 @@ render_chart() {
   local output="${TEMP_DIR}/rendered/${name}.yaml"
   local log="${TEMP_DIR}/${name}-dependency-build.log"
 
-  cp -a "${REPO_ROOT}/${chart}" "${copy}"
-
-  if ! helm dependency build "${copy}" >/dev/null 2>"${log}"; then
+  if ! build_dependencies "${chart}" "${copy}" "${log}"; then
     cat "${log}" >&2
     printf '::error title=Helm dependency build failed::%s\n' "${chart}"
     return 1

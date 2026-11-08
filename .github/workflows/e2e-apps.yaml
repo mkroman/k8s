@@ -46,9 +46,8 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - name: Install yq
-        run: |
-          ./hack/ci/install-tools.sh "${RUNNER_TEMP}/ci-bin" yq
-          echo "${RUNNER_TEMP}/ci-bin" >>"${GITHUB_PATH}"
+        # GitHub-hosted ubuntu-latest already has $HOME/.local/bin on PATH.
+        run: ./hack/ci/install-tools.sh "${HOME}/.local/bin" yq
       - name: Detect changed applications
         id: detect
         env:
@@ -78,9 +77,8 @@ jobs:
         with:
           version: ${{ env.KUBECTL_VERSION }}
       - name: Install kind, yq and argocd
-        run: |
-          ./hack/ci/install-tools.sh "${RUNNER_TEMP}/ci-bin" kind yq argocd
-          echo "${RUNNER_TEMP}/ci-bin" >>"${GITHUB_PATH}"
+        # GitHub-hosted ubuntu-latest already has $HOME/.local/bin on PATH.
+        run: ./hack/ci/install-tools.sh "${HOME}/.local/bin" kind yq argocd
       - name: Test Argo CD deployment
         env:
           APP: ${{ matrix.app }}

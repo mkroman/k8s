@@ -66,7 +66,12 @@ download() {
   local url="$1"
   local output="$2"
 
-  curl --fail --silent --show-error --location --retry 3 \
+  curl --fail --silent --show-error --location \
+    --connect-timeout 10 \
+    --max-time 180 \
+    --retry 5 \
+    --retry-delay 1 \
+    --retry-all-errors \
     --output "${output}" "${url}"
 }
 

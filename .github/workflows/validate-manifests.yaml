@@ -53,9 +53,8 @@ jobs:
         with:
           version: ${{ env.KUBECTL_VERSION }}
       - name: Install kubeconform
-        run: |
-          ./hack/ci/install-tools.sh "${RUNNER_TEMP}/ci-bin" kubeconform
-          echo "${RUNNER_TEMP}/ci-bin" >>"${GITHUB_PATH}"
+        # GitHub-hosted ubuntu-latest already has $HOME/.local/bin on PATH.
+        run: ./hack/ci/install-tools.sh "${HOME}/.local/bin" kubeconform
       - name: Build and validate
         run: ./hack/ci/validate-kustomize.sh
 
@@ -73,8 +72,7 @@ jobs:
         with:
           version: ${{ env.HELM_VERSION }}
       - name: Install kubeconform
-        run: |
-          ./hack/ci/install-tools.sh "${RUNNER_TEMP}/ci-bin" kubeconform
-          echo "${RUNNER_TEMP}/ci-bin" >>"${GITHUB_PATH}"
+        # GitHub-hosted ubuntu-latest already has $HOME/.local/bin on PATH.
+        run: ./hack/ci/install-tools.sh "${HOME}/.local/bin" kubeconform
       - name: Render and validate
         run: ./hack/ci/validate-helm.sh
