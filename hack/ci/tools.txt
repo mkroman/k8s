@@ -76,8 +76,8 @@ archive=tar.gz
 
 [yq]
 repo=mikefarah/yq
-version=v4.54.2
-sha256=7dd21fe96aac5ecccef949f4e4abecf9f9344dc3a853f5a2b4633c7a7afa7dda
+version=v4.54.3
+sha256=09a25baa0e136b8633949e03117fc82cb9e50d10910f988ef17a1305539ebce4
 tag=${version}
 asset=yq_linux_amd64.tar.gz
 binary=yq_linux_amd64
