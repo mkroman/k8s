@@ -173,7 +173,37 @@ The chart is wired into the app-of-apps (`apps/values.yaml`): project
 
 ---
 
-## 4. Verification runbook
+## 4. Values
+
+Keys not listed here fall through to the upstream chart defaults — see its
+helm-docs generated [values reference][upstream-values] for the full surface.
+All keys are validated by `values.schema.json`.
+
+[upstream-values]: https://github.com/spegel-org/spegel/blob/main/charts/spegel/README.md
+
+| Key | Default here | Purpose |
+|---|---|---|
+| `spegel.image.tag` / `digest` | empty | Inherit the chart's digest-pinned v0.8.1 image; upgrade via `Chart.yaml` |
+| `spegel.tolerations` | control-plane, master, `CriticalAddonsOnly`, catch-alls | DaemonSet coverage of every node |
+| `spegel.priorityClassName` | `system-node-critical` | Never evicted in favour of workloads |
+| `spegel.updateStrategy` | `RollingUpdate`, `maxUnavailable: 1` | One node at a time keeps a mirror candidate per image |
+| `spegel.resources` | 100m / 256Mi → 512Mi | Bounded limit: usage is mostly VFS page cache; `GOMEMLIMIT` derives from it |
+| `spegel.service.registry.nodePort` | `30020` | NodePort containerd mirror configs target; must be inside `kube_apiserver_node_port_range` |
+| `spegel.serviceMonitor.*` | enabled, 60s/30s, `metrics.uplink.io/monitor: prometheus` | Cluster Prometheus discovery |
+| `spegel.livenessProbe.enabled` | `true` | `/livez`; startupProbe already allows 3m for DHT bootstrap |
+| `spegel.networkPolicy.enabled` | `true` | DHT gossip limited to Spegel peers |
+| `spegel.basicAuthSecretName` | empty | Set on multi-tenant clusters; the NodePort is otherwise unauthenticated |
+| `spegel.spegel.mirroredRegistries` | docker.io, ghcr.io, quay.io, registry.k8s.io, gcr.io, mirror.gcr.io | Must be non-empty on Kubespray (see §1.2) |
+| `spegel.spegel.prependExisting` | `true` | Keep Kubespray-rendered certs.d entries as fallbacks |
+| `spegel.spegel.resolveTags` + `registryFilters` | `true` + `:latest$` | Digest-pinning with mutable tags excluded |
+| `spegel.spegel.containerd*` | Kubespray defaults (see file header) | Socket, namespace, certs.d path, content store |
+| `spegel.spegel.persistence` | `/var/lib/spegel` | Libp2p host key: stable DHT identities across restarts |
+| `spegel.spegel.debugWebEnabled` | `true` | `/debug/web` stats page used by the runbook |
+| `e2e.*` | disabled | Kind-only PostSync P2P pull test (`values-kind.yaml`) |
+
+---
+
+## 5. Verification runbook
 
 ### 4.1 Node-level containerd settings
 
@@ -290,7 +320,7 @@ spegel_advertised_keys                                # keys advertised per node
 
 ---
 
-## 5. Security posture
+## 6. Security posture
 
 | Control | Setting | Rationale |
 |---|---|---|
