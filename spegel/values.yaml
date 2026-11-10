@@ -1,19 +1,13 @@
 # yaml-language-server: $schema=values.schema.json
 # Wrapper chart values for Spegel — stateless cluster-local P2P OCI registry
-# mirror.
+# mirror (https://spegel.dev/docs).
 #
-#   upstream chart: oci://ghcr.io/spegel-org/helm-charts/spegel (0.8.1)
-#   upstream docs:  https://spegel.dev/docs/
+# Upstream chart keys are nested under `spegel:`; the upstream chart's own
+# `spegel` block lives under `spegel.spegel:`. Omitted keys fall through to
+# upstream defaults. Validated by values.schema.json in CI.
 #
-# All upstream chart keys are nested under `spegel:`; the upstream chart's own
-# `spegel` block therefore lives under `spegel.spegel:`. Omitted keys fall
-# through to upstream defaults. CI validates this file against
-# values.schema.json (hack/ci/validate-helm.sh).
-#
-# Containerd paths are pinned to the Kubespray defaults
-# (containerd_state_dir=/run/containerd, containerd_cfg_dir=/etc/containerd,
-# containerd_storage_dir=/var/lib/containerd); see README.md for the full
-# compatibility audit.
+# Containerd paths are pinned to the Kubespray defaults; see README.md for
+# the full compatibility audit.
 
 spegel:
   image:
@@ -21,19 +15,19 @@ spegel:
     repository: "ghcr.io/spegel-org/spegel"
     # -- Image tag; empty inherits the chart appVersion. Upgrade via Chart.yaml.
     tag: ""
-    # -- Image digest; empty inherits the digest pinned by upstream chart 0.8.1.
+    # -- Image digest; empty inherits the digest pinned by chart 0.8.1.
     #    Takes precedence over `tag` when set.
     digest: ""
     # -- Image pull policy.
     pullPolicy: "IfNotPresent"
 
-  # -- Node selector. Spegel only serves layers present on its own node, so
+  # -- Node selector. Spegel serves only layers present on its own node, so
   #    the DaemonSet must cover every node.
   nodeSelector:
     kubernetes.io/os: "linux"
 
-  # -- Tolerations for the Kubespray control-plane taints (plus catch-alls for
-  #    custom taints) so the DaemonSet also covers control-plane nodes.
+  # -- Tolerate the Kubespray control-plane taints (plus catch-alls) so the
+  #    DaemonSet also covers control-plane nodes.
   tolerations:
     - key: "node-role.kubernetes.io/control-plane"
       operator: "Exists"
@@ -51,18 +45,16 @@ spegel:
   # -- Priority class; never evicted in favour of workloads, like CNI/CRI agents.
   priorityClassName: "system-node-critical"
 
-  # -- DaemonSet update strategy; one node at a time keeps a mirror candidate
-  #    per image in the DHT during upgrades.
+  # -- Update one node at a time to keep a mirror candidate per image in the DHT.
   updateStrategy:
     type: "RollingUpdate"
     rollingUpdate:
       maxSurge: 0
       maxUnavailable: 1
 
-  # -- Resource requests and limits. The chart derives GOMEMLIMIT from
-  #    limits.memory. Keep the limit bounded: usage is mostly the VFS page
-  #    cache for layer reads (upstream FAQ), and a cap lets the kernel reclaim
-  #    it under pressure.
+  # -- Resource requests and limits; the chart derives GOMEMLIMIT from
+  #    limits.memory. Keep the limit bounded — usage is mostly VFS page cache
+  #    for layer reads, which the kernel reclaims under pressure.
   resources:
     requests:
       cpu: 100m
@@ -75,9 +67,8 @@ spegel:
       # -- In-pod registry listener.
       port: 5000
       # -- NodePort containerd mirror configs target (http://<nodeIP>:30020).
-      #    Must stay inside kube_apiserver_node_port_range (Kubespray default
-      #    30000-32767) and be unique cluster-wide; no conflict with Kubespray
-      #    host services (6443, 2379/2380, 10250, ...).
+      #    Must stay inside kube_apiserver_node_port_range (default
+      #    30000-32767) and be unique cluster-wide.
       nodePort: 30020
     router:
       # -- libp2p DHT listener (TCP + UDP/QUIC) between pod IPs; no host port.
@@ -95,20 +86,17 @@ spegel:
     labels:
       metrics.uplink.io/monitor: "prometheus"
 
-  # -- /livez liveness probe; the chart's startupProbe already allows 3m for
-  #    DHT bootstrap.
+  # -- /livez liveness probe; the startupProbe already allows 3m for bootstrap.
   livenessProbe:
     enabled: true
 
-  # -- Restrict DHT gossip to Spegel peers (v0.8 opt-in); mitigates a bad
-  #    actor joining the DHT and advertising incorrect digests. Registry and
-  #    metrics listeners stay open.
+  # -- Limit DHT gossip to Spegel peers, so rogue peers cannot advertise wrong
+  #    digests. Registry and metrics listeners stay open.
   networkPolicy:
     enabled: true
 
-  # -- Basic auth on the registry listener. The NodePort is reachable by
-  #    anything that can reach the node IP; set a secret name on multi-tenant
-  #    clusters (Spegel docs: Multi-tenant Credentials). Empty: unauthenticated.
+  # -- Basic auth on the registry listener; set on multi-tenant clusters.
+  #    Empty: unauthenticated.
   basicAuthSecretName: ""
 
   spegel:
@@ -117,16 +105,14 @@ spegel:
 
     # -- Registries to write mirror configuration for. Must be non-empty on
     #    Kubespray: empty writes only a _default catch-all, which the
-    #    certs.d/docker.io/hosts.toml that Kubespray renders takes
-    #    precedence over (see README, certs.d ownership).
+    #    Kubespray-rendered per-registry hosts.toml takes precedence over.
     mirroredRegistries:
       - "https://docker.io"
       - "https://ghcr.io"
       - "https://quay.io"
       - "https://registry.k8s.io"
       - "https://gcr.io"
-      # Google's Docker Hub pull-through mirror, used by the kind e2e probes
-      # (grafana convention) and any direct mirror.gcr.io pulls.
+      # Google's Docker Hub mirror, used by kind e2e images.
       - "https://mirror.gcr.io"
 
     # -- Prepend Spegel ahead of existing certs.d entries (Kubespray mirrors
@@ -150,28 +136,24 @@ spegel:
     # -- Let the init container write certs.d mirror config on each node.
     containerdMirrorAdd: true
 
-    # -- Resolve tags to digests so cached manifests are reusable across nodes.
-    #    A resolved tag is pinned to the first digest seen until the image
-    #    leaves the cluster, so exclude mutable tags from resolution — they
-    #    stay client-resolved while their layers are still served P2P
-    #    (Spegel docs: Resolving Tags).
+    # -- Resolve tags to digests so cached manifests are reusable. A resolved
+    #    tag pins to the first digest seen, so keep mutable tags out via
+    #    registryFilters (docs: Resolving Tags).
     resolveTags: true
+    # -- Regex filters on resolved tags; empty resolves all.
     registryFilters:
       - ":latest$"
 
-    # -- Host persistence for the libp2p host key, so nodes keep stable DHT
-    #    identities across pod restarts.
+    # -- Host persistence for the libp2p host key (stable DHT identities).
     persistence:
       enabled: true
       path: "/var/lib/spegel"
       hostPath: "/var/lib/spegel"
 
-    # -- Instance stats page at /debug/web on the metrics port; used by the
-    #    verification runbook.
+    # -- Instance stats page at /debug/web on the metrics port.
     debugWebEnabled: true
 
-# -- E2E-only PostSync probes. Enabled by values-kind.yaml in the kind e2e
-#    environment; never enabled in production.
+# -- E2E-only PostSync probes. Enabled by values-kind.yaml; never in production.
 e2e:
   enabled: false
   probeNamespace: ""
