@@ -188,7 +188,7 @@ spec:
               }
 
               mirror_hits() {
-                local total=0 seen=0 body ips ip values value found
+                local total=0 present=0 body ips ip values value found
                 body="$(api "${SPEGELS}")" || return 2
                 ips="$(printf '%s\n' "${body}" |
                   grep -o '"podIP"[[:space:]]*:[[:space:]]*"[^"]*"' |
@@ -202,22 +202,23 @@ spec:
                     "http://${ip}:${METRICS_PORT}/metrics" |
                     awk -v registry="${PULL_REGISTRY}" '
                       index($0, "spegel_mirror_requests_total{") == 1 &&
-                      index($0, "registry=\"" registry "\"") > 0 &&
-                      index($0, "cache=\"hit\"") > 0 {
-                        sum += $NF
-                        seen = 1
+                      index($0, "registry=\"" registry "\"") > 0 {
+                        present = 1
+                        if (index($0, "cache=\"hit\"") > 0) {
+                          sum += $NF
+                        }
                       }
-                      END { printf "%d %d\n", sum, seen }')" || {
+                      END { printf "%d %d\n", sum, present }')" || {
                     echo "could not scrape Spegel metrics on ${ip}" >&2
                     return 1
                   }
                   value="${values%% *}"
                   found="${values##* }"
                   total=$((total + value))
-                  seen=$((seen + found))
+                  present=$((present + found))
                 done
-                [ "${seen}" -gt 0 ] || {
-                  echo "no spegel_mirror_requests_total{registry=\"${PULL_REGISTRY}\",cache=\"hit\"} series on any Spegel pod" >&2
+                [ "${present}" -gt 0 ] || {
+                  echo "no spegel_mirror_requests_total series for registry ${PULL_REGISTRY} on any Spegel pod" >&2
                   return 1
                 }
                 printf '%s\n' "${total}"

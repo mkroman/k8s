@@ -86,7 +86,8 @@ settings are for local iterations only.
 - Probe scripts run with `/bin/sh` (BusyBox ash) in CI. Use
   `set -euo pipefail`, and make metric checks fail when the metric is absent
   instead of treating an empty scrape as success. Match the specific metric
-  label under test (for Spegel, `registry` plus `cache="hit"`), not any series.
+  labels under test (for Spegel, select the tested `registry` and count only
+  `cache="hit"`), and distinguish an absent metric from a zero value.
 - Read listener ports from chart values instead of hardcoding them. The Spegel
   probe takes the registry and metrics ports from `.Values.spegel.service`.
 - Explicitly delete probe-created pods and poll until they are gone before
