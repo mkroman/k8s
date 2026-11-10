@@ -85,12 +85,19 @@ settings are for local iterations only.
   tool; do not assume compact JSON.
 - Probe scripts run with `/bin/sh` (BusyBox ash) in CI. Use
   `set -euo pipefail`, and make metric checks fail when the metric is absent
-  instead of treating an empty scrape as success.
+  instead of treating an empty scrape as success. Match the specific metric
+  labels under test (for Spegel, select the tested `registry` and count only
+  `cache="hit"`), and distinguish an absent metric from a zero value.
+- Read listener ports from chart values instead of hardcoding them. The Spegel
+  probe takes the registry and metrics ports from `.Values.spegel.service`.
 - Explicitly delete probe-created pods and poll until they are gone before
-  reusing fixed names.
-- The Spegel probe assumes a fresh kind cluster for its cold-image
-  precondition. Reused clusters can retain images and DHT provider records;
-  recreate the cluster when validating cold-start behavior.
+  reusing fixed names. Treat only HTTP 404 as gone; 401/403/429/5xx responses
+  and timeouts are not evidence that a pod was deleted.
+- The Spegel probe assumes the configured image is cold. The e2e runner clears
+  the cold test image from the nodes before the probe, so a reused cluster
+  cannot satisfy the assertion from stale containerd content. Recreate the
+  cluster when validating cold-image or DHT provider behavior, because reuse
+  can also retain unrelated content and provider records.
 
 ## Cluster preparation
 
