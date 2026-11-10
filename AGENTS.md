@@ -49,6 +49,9 @@ REUSE_CLUSTER=1 ./hack/e2e/run-app.sh spegel
 
 - `REUSE_CLUSTER=1` requires an existing kind cluster named `e2e-<app>` (or
   `CLUSTER_NAME=...`) and skips cluster creation and cleanup deletion.
+- Reuse mode disables root auto-sync and deletes the previously selected child
+  Applications before reapplying them, so stale sync operations and resources
+  do not leak between runs. Namespaces stay in place.
 - Argo CD and the Applications are reapplied every run; the tested revision is
   always the current checkout.
 - Tear down with `kind delete cluster --name e2e-spegel`.
@@ -73,13 +76,13 @@ settings are for local iterations only.
 
 - Chart probes are Helm PostSync hooks gated by `.Values.e2e.enabled`. CI maps
   `helm.sh/hook: post-install,post-upgrade` to Argo CD PostSync hooks.
-- Do not annotate supporting ServiceAccount/Role/RoleBinding resources with
-  `helm.sh/hook` and `hook-succeeded`. Argo CD can delete passive hook
-  resources before a later hook wave uses them; render probe RBAC as normal
-  resources instead.
-- The Kubernetes API returns indented JSON in this environment. Parse fields
-  with whitespace-tolerant patterns such as `"phase"[[:space:]]*:` or use a
-  JSON tool; do not assume compact JSON.
+- Keep supporting probe RBAC as normal resources rather than `hook-succeeded`
+  hooks. Argo CD's hook cleanup for passive resources follows sync semantics,
+  not Helm's per-hook lifecycle, so normal resources are the safe way to
+  guarantee RBAC exists while the Job runs.
+- The Kubernetes API may return indented JSON. Parse fields with
+  whitespace-tolerant patterns such as `"phase"[[:space:]]*:` or use a JSON
+  tool; do not assume compact JSON.
 - Probe scripts run with `/bin/sh` (BusyBox ash) in CI. Use
   `set -euo pipefail`, and make metric checks fail when the metric is absent
   instead of treating an empty scrape as success.

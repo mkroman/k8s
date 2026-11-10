@@ -4,8 +4,8 @@
 {{- $pullImage := required "e2e.pullImage is required when e2e.enabled is true" .Values.e2e.pullImage }}
 {{- $selector := printf "app.kubernetes.io/name=%s,app.kubernetes.io/instance=%s" (include "spegel.name" .) .Release.Name }}
 # The probe's RBAC resources are normal resources, not PostSync hooks: Argo CD
-# evaluates hook-succeeded for passive resources immediately, which can delete
-# the Role/RoleBinding before the Job in a later hook wave uses them.
+# evaluates hook-succeeded for passive resources with different lifecycle
+# semantics than Helm, so keep them alive for the Job.
 apiVersion: v1
 kind: ServiceAccount
 metadata:

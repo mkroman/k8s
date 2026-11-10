@@ -145,6 +145,23 @@ diagnose() {
   printf '::endgroup::\n'
 }
 
+reset_e2e_applications() {
+  local app
+
+  # Reuse mode must not inherit an in-progress or failed sync from the
+  # previous run. Disable root auto-sync while deleting the selected child
+  # Applications, then let the freshly applied root Application recreate
+  # them. Namespaces stay in place, so a failed delete cannot leave the
+  # next sync without its destination namespace.
+  kubectl -n argocd patch application e2e --type=merge \
+    -p '{"spec":{"syncPolicy":{"automated":null}},"operation":null}' \
+    >/dev/null 2>&1 || true
+  for app in "${ORDER[@]}"; do
+    kubectl -n argocd delete application "${app}" --ignore-not-found \
+      --wait=true --timeout=300s >/dev/null 2>&1 || true
+  done
+}
+
 install_argo_cd() {
   printf '::group::Install Argo CD\n'
   kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f - >/dev/null
@@ -701,6 +718,12 @@ main() {
   printf '::endgroup::\n'
 
   install_argo_cd
+
+  if [[ "${REUSE_CLUSTER}" == "1" ]]; then
+    printf '::group::Reset reused e2e Applications\n'
+    reset_e2e_applications
+    printf '::endgroup::\n'
+  fi
 
   repo_url="git://$(gateway_ip):${GIT_DAEMON_PORT}/repo.git"
   [[ "${repo_url}" != "git://:"* ]] || die "could not determine the kind gateway IP"

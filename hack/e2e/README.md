@@ -40,8 +40,13 @@ REUSE_CLUSTER=1 ./hack/e2e/run-app.sh spegel
 
 `REUSE_CLUSTER=1` requires the cluster to exist and skips the cleanup
 deletion. The runner still reapplies Argo CD and the Application manifests, so
-the tested revision is always the current checkout. Use the same
-`CLUSTER_NAME` (default `e2e-<app>`) when reusing a cluster. Tear it down with:
+the tested revision is always the current checkout. It disables root auto-sync
+and deletes the previously selected child Applications before recreating them,
+so stale sync operations and managed resources do not leak between runs.
+Namespaces are left in place. Use the same `CLUSTER_NAME` (default
+`e2e-<app>`) when reusing a cluster. Reuse does not reset node images or
+containerd content; recreate the cluster when validating cold-image behavior.
+Tear it down with:
 
 ```bash
 kind delete cluster --name e2e-spegel
