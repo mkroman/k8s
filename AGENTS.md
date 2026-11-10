@@ -98,9 +98,14 @@ This repository does not ship Ansible or Kubespray playbooks. Document required
 containerd/Kubernetes settings in the relevant chart README and leave node
 preparation to the cluster operator.
 
-The current cluster runs containerd 2.3. `discard_unpacked_layers` was removed
-there and defaults to false; verify `config_path`/certs.d instead of setting
-the legacy variable.
+The current cluster runs containerd 2.3, which still parses
+`discard_unpacked_layers`; the field is unsupported with the transfer service,
+not removed. Keep it false or omitted: with `true`, containerd GCs layer blobs
+and Spegel cannot serve them. Kubespray only renders
+`containerd_discard_unpacked_layers` for containerd < 2.1, so master omits it
+(default false); kind's base config sets it true, which is why the e2e kind
+patch sets false. Verify `config_path`/certs.d and the effective value
+(`containerd config dump`), not just a config file.
 
 ## Chart conventions
 

@@ -280,6 +280,10 @@ projects:
         kind: RoleBinding
       - group: monitoring.coreos.com
         kind: ServiceMonitor
+      # Optional upstream VerticalPodAutoscaler, rendered only when enabled
+      # and the VPA CRD is installed.
+      - group: autoscaling.k8s.io
+        kind: VerticalPodAutoscaler
 
   - name: traefik
     description: "Traefik ingress controller"

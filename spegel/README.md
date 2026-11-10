@@ -34,37 +34,55 @@ Spegel v0.8.x (the pinned chart) officially requires **Kubernetes ≥ 1.35**
 satisfied here. Older deployments (e.g. Kubespray v2.25 with containerd
 1.7.x) cannot run chart ≥ 0.8 and must pin chart `0.7.x` instead.
 
-Spegel's startup self-checks enforce two containerd requirements:
+Spegel's startup validation (v0.8.1) requires containerd ≥ 2.2. On containerd
+2.4+ it also reads the CRI plugin's exported `RegistryConfigPath` and
+`DiscardUnpackedLayers` and refuses to start when `discard_unpacked_layers` is
+enabled. containerd 2.3 does not export those values, so there they are
+operator checks rather than startup guards:
 
-1. `config_path` must be set (registry host configuration via `certs.d`)
-2. `discard_unpacked_layers` must **not** be enabled (containerd < 2.1 only)
+1. `config_path` must point at the directory Spegel writes mirror
+   configuration to (`certs.d`), otherwise containerd never reads it.
+2. `discard_unpacked_layers` must be false, otherwise containerd's GC removes
+   layer blobs from the content store and Spegel cannot serve them.
 
 [spegel-releases]: https://spegel.dev/docs/releases/
 [spegel-v080]: https://spegel.dev/blog/spegel-v0.8.0/
 
-### 1.1 Layer retention — `discard_unpacked_layers` (containerd < 2.1 only)
+### 1.1 Layer retention — keep `discard_unpacked_layers` false
 
-Why the default breaks Spegel: Kubespray sets
-`containerd_discard_unpacked_layers: true` to save disk on older containerd
-releases. With it enabled, containerd's garbage collector deletes layer blobs
-from the content store
+Why it breaks Spegel: Kubespray's `containerd_discard_unpacked_layers` default
+is `true` to save disk, but its template only renders the setting for
+containerd < 2.1. With it enabled, containerd's garbage collector deletes layer
+blobs from the content store
 (`/var/lib/containerd/io.containerd.content.v1.content`) as soon as they are
 unpacked into the overlayfs snapshotter. Spegel serves peers by streaming
 blobs **directly out of that content store** — once discarded there is nothing
-to serve, every lookup silently falls back to the upstream registry (and
-Spegel actually refuses to start when it detects the option enabled, since it
-cannot write the fix itself: disabling it requires a containerd restart).
+to serve, so every lookup silently falls back to the upstream registry.
+
+containerd 2.3.4 still parses `discard_unpacked_layers`; the field was not
+removed in 2.1. It is legacy/unsupported with the transfer service (containerd
+2.1+ falls back to local pull mode when it is true), and only containerd 2.4+
+exposes it to Spegel's startup check. Spegel 0.8.1 therefore **starts** on
+containerd 2.3 even when the option is true, but it cannot serve layer blobs.
+Treat `true` as a misconfiguration on every version.
+
+A config-file grep alone does not prove the effective value: containerd may
+import other files, a pod may not see the host's config file at all, and a
+running daemon keeps its parsed configuration until restarted. Verify the
+effective config (`containerd config dump`) on every node, as shown in §4.1.
 
 | Kubespray version | Default containerd | `discard_unpacked_layers` rendered? | Spegel impact |
 |---|---|---|---|
 | v2.25.x | 1.7.16 | **Yes, `= true`** | ❌ breaks Spegel — override required |
-| v2.26.x / master | ≥ 2.1 (2.3.x) | No — option removed in containerd 2.1, default `false` | ✅ no action needed |
+| v2.26.x / master | ≥ 2.1 (2.3.x) | No — template renders it only for containerd < 2.1; containerd default `false` | ✅ no action needed |
+| kind (e2e only) | bundled containerd | **Yes, `= true` in kind's base config** | `hack/e2e/kind.yaml` patches it to `false` for the P2P probe |
 
-Fix: on containerd < 2.1, set `containerd_discard_unpacked_layers: false` in
-the Kubespray containerd configuration for every node. This cluster runs
-containerd 2.3, where the option no longer exists and layers are retained by
-default; no override is needed. Verify `config_path` and the certs.d ownership
-below instead.
+Fix: ensure `discard_unpacked_layers` is false (or omitted) in the effective
+configuration on every node. On Kubespray < 2.26 set
+`containerd_discard_unpacked_layers: false`; Kubespray master omits it for
+containerd ≥ 2.1, whose default is `false`. This cluster runs containerd 2.3:
+verify `config_path` and the effective value rather than assuming a config-file
+line is enough.
 
 > **Disk note:** disabling `discard_unpacked_layers` retains layer tarballs on
 > disk. That is what Spegel serves from, but ensure kubelet image GC stays
@@ -151,13 +169,16 @@ The chart is wired into the app-of-apps (`apps/values.yaml`): project
 
 Keys not listed here fall through to the upstream chart defaults — see its
 helm-docs generated [values reference][upstream-values] for the full surface.
-All keys are validated by `values.schema.json`.
+All keys are validated by `values.schema.json`. `validate-helm.sh` lints and
+renders the chart with the production `values.yaml`; `values-kind.yaml` is
+applied by the kind e2e run (`hack/e2e/run-app.sh`) and is covered there, not
+by `validate-helm.sh`.
 
 [upstream-values]: https://github.com/spegel-org/spegel/blob/main/charts/spegel/README.md
 
 | Key | Default here | Purpose |
 |---|---|---|
-| `spegel.image.tag` / `digest` | unset | Inherit the chart's digest-pinned v0.8.1 image; upgrade via `Chart.yaml` |
+| `spegel.image.tag` / `digest` | unset | Inherit the chart's digest-pinned v0.8.1 image; upgrade via `Chart.yaml`. A set digest must be a full `sha256:` digest; an empty digest override is rejected |
 | `spegel.tolerations` | control-plane, master, `CriticalAddonsOnly`, catch-alls | DaemonSet coverage of every node |
 | `spegel.priorityClassName` | `system-node-critical` | Never evicted in favour of workloads |
 | `spegel.updateStrategy` | `RollingUpdate`, `maxUnavailable: 1` | One node at a time keeps a mirror candidate per image |
@@ -167,7 +188,7 @@ All keys are validated by `values.schema.json`.
 | `spegel.livenessProbe.enabled` | `true` | `/livez`; startupProbe already allows 3m for DHT bootstrap |
 | `spegel.networkPolicy.enabled` | `true` | DHT gossip limited to Spegel peers |
 | `spegel.basicAuthSecretName` | empty | Set on multi-tenant clusters; the NodePort is otherwise unauthenticated |
-| `spegel.spegel.mirroredRegistries` | docker.io, ghcr.io, quay.io, registry.k8s.io, gcr.io, mirror.gcr.io | Must be non-empty on Kubespray (see §1.2) |
+| `spegel.spegel.mirroredRegistries` | docker.io, ghcr.io, quay.io, registry.k8s.io, gcr.io, mirror.gcr.io | Must be non-empty on Kubespray (see §1.2); entries require an `http(s)://` scheme |
 | `spegel.spegel.prependExisting` | `true` | Keep Kubespray-rendered certs.d entries as fallbacks |
 | `spegel.spegel.resolveTags` + `registryFilters` | `true` + `:latest$` | Digest-pinning with mutable tags excluded |
 | `spegel.spegel.containerd*` | Kubespray defaults (see file header) | Socket, namespace, certs.d path, content store |
@@ -182,16 +203,17 @@ All keys are validated by `values.schema.json`.
 ### 4.1 Node-level containerd settings
 
 ```bash
-# On any node (via the bastion/SSH):
+# On any node (via the bastion/SSH). A single config file is not conclusive:
+# containerd may import other files and keeps the parsed config until restarted.
 grep -E 'config_path|discard_unpacked_layers' /etc/containerd/config.toml
-# containerd < 2.1 must print:  discard_unpacked_layers = false
-# containerd >= 2.1 may omit the line entirely (default false)
+# containerd 2.3 may still print discard_unpacked_layers; if present it must be false.
+# containerd >= 2.1 may also omit the line entirely (default false).
 # Expect: config_path = "/etc/containerd/certs.d"
 
 # Effective runtime config as seen through CRI:
 crictl info | jq '.config' | grep -iE 'discard|registryConfigPath'
 
-# Definitive check of the daemon's parsed config:
+# Definitive check of the daemon's parsed config (imports applied, after restart):
 containerd config dump | grep -E 'discard_unpacked_layers|config_path'
 
 # Content store must actually hold blobs (grows as images are pulled):
@@ -208,8 +230,9 @@ kubectl -n spegel get daemonset,pods -o wide
 # Expect: DESIRED == node count, all pods Running/Ready, one per node incl.
 # control-plane members.
 
-# Spegel refuses to start on misconfigured nodes — a clean rollout is itself
-# a compatibility check, but confirm:
+# A clean rollout proves the DaemonSet starts; on containerd 2.4+ Spegel also
+# refuses to start when the CRI reports discard_unpacked_layers enabled. On
+# 2.3 that is not a startup check, so verify the effective config in §4.1.
 kubectl -n spegel logs -l app.kubernetes.io/name=spegel --tail=50 | grep -iE 'error|fail'
 ```
 
@@ -267,10 +290,13 @@ curl -s localhost:9090/metrics | grep -E \
 
 kubectl -n spegel logs "$MIRROR_POD" --tail=50
 
-# Node-side corroboration: the mirror entry written by the init container
-kubectl -n spegel exec "$MIRROR_POD" -c configuration -- \
-  cat /etc/containerd/certs.d/docker.io/hosts.toml 2>/dev/null || \
-  ssh <MIRROR_NODE> cat /etc/containerd/certs.d/docker.io/hosts.toml
+# Node-side corroboration: the mirror entry written by the init container.
+# The `configuration` init container has completed, so `kubectl exec -c
+# configuration` cannot work; read the file from the node instead.
+ssh <MIRROR_NODE> sudo cat /etc/containerd/certs.d/docker.io/hosts.toml
+# Or use a debug pod on the node (host root is mounted at /host):
+#   kubectl debug node/<MIRROR_NODE> --profile=sysadmin -- \
+#     cat /host/etc/containerd/certs.d/docker.io/hosts.toml
 #   [host.'http://<nodeIP>:30020']  ← Spegel first, existing/upper entries after
 
 # Optional airtight proof: sniff for upstream egress on node B during a
@@ -296,8 +322,8 @@ spegel_advertised_keys                                # keys advertised per node
 | Pod Security Admission | `spegel` namespace labelled `privileged` (enforce/audit/warn, in `apps/values.yaml`) | Spegel needs hostPath access to the containerd socket and content store; an explicit label beats relying on the unlabeled namespace default |
 | DHT isolation | `networkPolicy.enabled: true` | Limits libp2p gossip to Spegel peers, mitigating rogue peers advertising incorrect digests (v0.8 opt-in) |
 | Image pinning | upstream chart pins `ghcr.io/spegel-org/spegel@sha256:bdc1d14e…` | Helm best practice: no floating tags; inherited by leaving `image.tag`/`image.digest` unset |
-| Chart pinning | exact dependency version + `Chart.lock` OCI digest | Argo CD verifies the built dependency against the lock digest; deliberate deviation from Helm's `~` range advice for supply-chain reproducibility |
-| Chart signature | cosign signatures published per release | Verify before adopting a new pin: `cosign verify ghcr.io/spegel-org/helm-charts/spegel:<version> --certificate-identity-regexp 'https://github\.com/spegel-org/spegel/\.github/workflows/.*' --certificate-oidc-issuer https://token.actions.githubusercontent.com` |
+| Chart pinning | exact dependency version in `Chart.yaml`/`Chart.lock` | The lock's `digest` is a hash of the dependency set (`sha256:7dbb02c2…`), not the OCI manifest digest of the chart artifact (`sha256:0f6685e1…` for 0.8.1). Argo CD does not compare the artifact against that lock digest, and the version tag is mutable; the exact version pin is reproducible intent, not content integrity. |
+| Chart signature | cosign signatures published per release | Use cosign to verify the artifact itself before adopting a new pin: `cosign verify ghcr.io/spegel-org/helm-charts/spegel:<version> --certificate-identity-regexp 'https://github\.com/spegel-org/spegel/\.github/workflows/.*' --certificate-oidc-issuer https://token.actions.githubusercontent.com` |
 | Registry exposure | `basicAuthSecretName: ""` | The NodePort is reachable by anything that can reach a node IP; set a secret on multi-tenant clusters (docs: Multi-tenant Credentials) |
 | Mutable tags | `registryFilters: [":latest$"]` | Prevents `latest` from being pinned to the first digest seen; such tags stay client-resolved, layers still served P2P |
 | Container runtime | `readOnlyRootFilesystem: true` (upstream default); container runs as root | Root is required for the containerd socket and content store; capabilities are intentionally left untouched |
@@ -311,4 +337,4 @@ spegel_advertised_keys                                # keys advertised per node
 |---|---|
 | [`Chart.yaml`](Chart.yaml) | Wrapper chart pinning `oci://ghcr.io/spegel-org/helm-charts/spegel` 0.8.1 |
 | [`values.yaml`](values.yaml) | Production values (scheduling, ports, ServiceMonitor, containerd paths) |
-| [`values.schema.json`](values.schema.json) | Draft-07 schema validating all values (incl. upstream pass-through surface) in CI |
+| [`values.schema.json`](values.schema.json) | Draft-07 schema for chart values (production render in CI; kind overrides exercised by e2e) |

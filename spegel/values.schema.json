@@ -50,12 +50,12 @@
             },
             "tag": {
               "type": "string",
-              "description": "Image tag; defaults to the chart appVersion when empty."
+              "description": "Image tag; defaults to the chart appVersion when empty. Leave unset to inherit the upstream digest pin. The upstream chart supplies an empty default and Helm validates coalesced values, so non-empty cannot be enforced here without rejecting that default."
             },
             "digest": {
               "type": "string",
-              "pattern": "^(sha256:[a-f0-9]{64})?$",
-              "description": "Pin the image by digest; takes precedence over the tag when set, e.g. \"sha256:0123...\". Leave unset to inherit the upstream chart's digest-pinned image."
+              "pattern": "^sha256:[a-f0-9]{64}$",
+              "description": "Pin the image by digest. Optional, but when set it must be a full \"sha256:<64 lowercase hex>\" digest; an empty value is rejected. Takes precedence over the tag."
             },
             "pullPolicy": {
               "type": "string",
@@ -233,12 +233,18 @@
               "additionalProperties": false,
               "properties": {
                 "maxSurge": {
-                  "type": "integer",
-                  "minimum": 0
+                  "oneOf": [
+                    { "type": "integer", "minimum": 0 },
+                    { "type": "string", "pattern": "^[0-9]+%$" }
+                  ],
+                  "description": "Maximum extra pods above the desired count: a non-negative integer or a percentage string such as \"10%\"."
                 },
                 "maxUnavailable": {
-                  "type": "integer",
-                  "minimum": 0
+                  "oneOf": [
+                    { "type": "integer", "minimum": 0 },
+                    { "type": "string", "pattern": "^[0-9]+%$" }
+                  ],
+                  "description": "Maximum pods unavailable during an update: a non-negative integer or a percentage string such as \"10%\"."
                 }
               }
             }
@@ -325,13 +331,21 @@
             },
             "mirroredRegistries": {
               "type": "array",
-              "items": { "type": "string", "minLength": 1 },
-              "description": "Registries for which mirror configuration is written. Must be non-empty on Kubespray: an empty list writes only a _default/hosts.toml catch-all, which per-registry hosts.toml files rendered by Kubespray take precedence over."
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "^https?://"
+              },
+              "description": "Registries for which mirror configuration is written. Each entry must include an http:// or https:// scheme; a bare host makes Spegel's init container fail. Must be non-empty on Kubespray: an empty list writes only a _default/hosts.toml catch-all, which per-registry hosts.toml files rendered by Kubespray take precedence over."
             },
             "additionalMirrorTargets": {
               "type": "array",
-              "items": { "type": "string", "minLength": 1 },
-              "description": "Fallback registries (e.g. a pull-through cache) appended after the P2P mesh and existing certs.d mirrors."
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "^https?://"
+              },
+              "description": "Fallback registries (e.g. a pull-through cache) appended after the P2P mesh and existing certs.d mirrors. Each entry must include an http:// or https:// scheme."
             },
             "prependExisting": {
               "type": "boolean",
@@ -400,7 +414,7 @@
         "verticalPodAutoscaler": {
           "type": "object",
           "additionalProperties": true,
-          "description": "Optional Vertical Pod Autoscaler for the DaemonSet; not enabled in this deployment."
+          "description": "Optional Vertical Pod Autoscaler for the DaemonSet; disabled by default. Upstream renders it when enabled and autoscaling.k8s.io/v1 is available. The spegel AppProject whitelists autoscaling.k8s.io/VerticalPodAutoscaler."
         },
         "livenessProbe": {
           "type": "object",
