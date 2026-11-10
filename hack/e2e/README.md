@@ -105,12 +105,15 @@ sync. No runner-specific check code is needed.
 The `spegel` probe verifies behaviour end to end: pod A pulls a busybox image
 that is cached nowhere in the fresh kind cluster (upstream pull, advertised by
 the DHT), pod B is forced onto a different node by pod anti-affinity, and the
-probe asserts that the aggregate Spegel mirror-hit counter increases — the
-signature of a peer-to-peer serve. The probe image is pulled before that
-baseline, so its own pull cannot satisfy the assertion. It depends on the
-containerd mirror patch in `kind.yaml` (`config_path` plus
-`discard_unpacked_layers = false`), which is why the patch lives in the cluster
-config and not in the chart.
+probe asserts that the mirror-hit counter for the tested registry (`docker.io`
+for the configured image) increases by at least two cache hits. Requiring a
+manifest plus a blob hit means a manifest-only response cannot satisfy the
+assertion. The probe image is pulled before that baseline, so its own pull
+cannot satisfy the assertion, and the runner clears the cold test image from
+every node before the probe so a reused cluster cannot satisfy it from stale
+containerd content. It depends on the containerd mirror patch in `kind.yaml`
+(`config_path` plus `discard_unpacked_layers = false`), which is why the patch
+lives in the cluster config and not in the chart.
 
 Helm's own `helm.sh/hook: test` tests are only executed by `helm test`, and
 Argo CD does not map the Helm test hooks. Mapping `post-install`/`post-upgrade`

@@ -2,7 +2,8 @@
 {{- $probeNamespace := required "e2e.probeNamespace is required when e2e.enabled is true" .Values.e2e.probeNamespace }}
 {{- $probeImage := required "e2e.probeImage is required when e2e.enabled is true" .Values.e2e.probeImage }}
 {{- $pullImage := required "e2e.pullImage is required when e2e.enabled is true" .Values.e2e.pullImage }}
-{{- $selector := printf "app.kubernetes.io/name=%s,app.kubernetes.io/instance=%s" (include "spegel.name" .) .Release.Name }}
+{{- $spegelName := include "spegel.name" (dict "Chart" .Chart "Values" .Values.spegel) }}
+{{- $selector := printf "app.kubernetes.io/name=%s,app.kubernetes.io/instance=%s,app.kubernetes.io/component=spegel" $spegelName .Release.Name }}
 # The probe's RBAC resources are normal resources, not PostSync hooks: Argo CD
 # evaluates hook-succeeded for passive resources with different lifecycle
 # semantics than Helm, so keep them alive for the Job.
@@ -38,8 +39,9 @@ subjects:
 ---
 # Proves cross-node P2P serving: pod A pulls an image cached nowhere in the
 # cluster, pod B is forced onto a different node by anti-affinity, and the
-# probe asserts that the Spegel mirror-hit counter increases. The probe image
-# is pulled before the baseline is taken, so it cannot satisfy that assertion.
+# probe asserts that the mirror-hit counter for the tested registry increases
+# by at least a manifest plus a blob. The probe image is pulled before the
+# baseline is taken, so it cannot satisfy that assertion.
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -50,6 +52,8 @@ metadata:
     helm.sh/hook-weight: "10"
     helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
 spec:
+  # Loop budgets: pod deletes 2x15s, pod A 60x2s, readiness 30x2s, settle 2s,
+  # pod B 60x2s and mirror hits 20x2s fit below this deadline.
   activeDeadlineSeconds: 420
   backoffLimit: 0
   template:
@@ -89,6 +93,10 @@ spec:
               value: {{ $probeNamespace | quote }}
             - name: PULL_IMAGE
               value: {{ $pullImage | quote }}
+            - name: REGISTRY_PORT
+              value: {{ .Values.spegel.service.registry.port | quote }}
+            - name: METRICS_PORT
+              value: {{ .Values.spegel.service.metrics.port | quote }}
             - name: SPEGEL_SELECTOR
               value: {{ $selector | quote }}
             - name: NODE_NAME
@@ -106,7 +114,18 @@ spec:
               PULLS="${API}/api/v1/namespaces/${NAMESPACE}/pods"
               SPEGELS="${API}/api/v1/namespaces/${NAMESPACE}/pods?labelSelector=${SPEGEL_SELECTOR}"
               PULL_MANIFEST="${PULL_IMAGE##*@}"
-              PULL_REPOSITORY="${PULL_IMAGE#docker.io/}"
+
+              # Resolve the tested registry from the image reference so the
+              # metric assertion selects the registry Spegel records for it.
+              case "${PULL_IMAGE}" in
+                */*) PULL_REGISTRY="${PULL_IMAGE%%/*}" ;;
+                *) PULL_REGISTRY="docker.io" ;;
+              esac
+              case "${PULL_REGISTRY}" in
+                *.*|*:*|localhost) ;;
+                *) PULL_REGISTRY="docker.io" ;;
+              esac
+              PULL_REPOSITORY="${PULL_IMAGE#"${PULL_REGISTRY}/"}"
               PULL_REPOSITORY="${PULL_REPOSITORY%%@*}"
               PULL_REPOSITORY="${PULL_REPOSITORY%:*}"
 
@@ -116,56 +135,112 @@ spec:
                   -H "Content-Type: application/json" "$@"
               }
 
+              # Status-only request; -f would hide the code on error responses.
+              api_status() {
+                curl -sS -o /dev/null -w '%{http_code}' --max-time 15 \
+                  --cacert "${SA}/ca.crt" \
+                  -H "Authorization: Bearer ${TOKEN}" \
+                  -H "Content-Type: application/json" "$@" 2>/dev/null || true
+              }
+
               pod_phase() {
-                api "${PULLS}/$1" |
+                local pod="$1" body phase
+                body="$(api "${PULLS}/${pod}")" || return 2
+                phase="$(printf '%s\n' "${body}" |
                   grep -o '"phase"[[:space:]]*:[[:space:]]*"[A-Za-z]*"' |
-                  head -n1 | cut -d'"' -f4
+                  head -n1 | cut -d'"' -f4 || true)"
+                [ -n "${phase}" ] || return 1
+                printf '%s\n' "${phase}"
               }
 
               wait_phase() {
-                pod="$1"; want="$2"; phase=""
-                for _ in $(seq 1 90); do
-                  phase="$(pod_phase "$pod" || true)"
-                  printf '%s: %s\n' "$pod" "${phase:-Pending}"
-                  [ "$phase" = "$want" ] && return 0
-                  [ "$phase" = "Failed" ] && return 1
+                local pod="$1" want="$2" phase attempt rc
+                for attempt in $(seq 1 60); do
+                  if phase="$(pod_phase "${pod}")"; then
+                    printf '%s: %s (%s/60)\n' "${pod}" "${phase}" "${attempt}"
+                    [ "${phase}" = "${want}" ] && return 0
+                    if [ "${phase}" = "Failed" ]; then
+                      echo "pod ${pod} entered Failed while waiting for ${want}" >&2
+                      return 1
+                    fi
+                  else
+                    rc=$?
+                    if [ "${rc}" -eq 1 ]; then
+                      printf '%s: no phase reported yet (%s/60)\n' "${pod}" "${attempt}"
+                    else
+                      printf '%s: Kubernetes API read failed (%s/60)\n' "${pod}" "${attempt}"
+                    fi
+                  fi
                   sleep 2
                 done
+                echo "pod ${pod} did not reach ${want} within 120s" >&2
                 return 1
               }
 
               spegel_ip_on_node() {
-                local node="$1"
-                api "${SPEGELS}&fieldSelector=spec.nodeName%3D${node}" |
+                local node="$1" body ip
+                body="$(api "${SPEGELS}&fieldSelector=spec.nodeName%3D${node}")" || return 2
+                ip="$(printf '%s\n' "${body}" |
                   grep -o '"podIP"[[:space:]]*:[[:space:]]*"[^"]*"' |
-                  head -n1 | cut -d'"' -f4
+                  head -n1 | cut -d'"' -f4 || true)"
+                [ -n "${ip}" ] || return 1
+                printf '%s\n' "${ip}"
               }
 
               mirror_hits() {
-                total=0
-                ips="$(api "${SPEGELS}" |
+                local total=0 seen=0 body ips ip values value found
+                body="$(api "${SPEGELS}")" || return 2
+                ips="$(printf '%s\n' "${body}" |
                   grep -o '"podIP"[[:space:]]*:[[:space:]]*"[^"]*"' |
-                  cut -d'"' -f4)" || return 1
+                  cut -d'"' -f4 || true)"
+                [ -n "${ips}" ] || {
+                  echo "no Spegel pod IPs found; cannot read mirror counters" >&2
+                  return 1
+                }
                 for ip in ${ips}; do
-                  value="$(curl -fsS --max-time 10 "http://${ip}:9090/metrics" |
-                    awk 'index($0, "spegel_mirror_requests_total{") == 1 &&
-                         index($0, "cache=\"hit\"") { sum += $NF }
-                         END { printf "%d\n", sum }')" || return 1
+                  values="$(curl -fsS --max-time 10 \
+                    "http://${ip}:${METRICS_PORT}/metrics" |
+                    awk -v registry="${PULL_REGISTRY}" '
+                      index($0, "spegel_mirror_requests_total{") == 1 &&
+                      index($0, "registry=\"" registry "\"") > 0 &&
+                      index($0, "cache=\"hit\"") > 0 {
+                        sum += $NF
+                        seen = 1
+                      }
+                      END { printf "%d %d\n", sum, seen }')" || {
+                    echo "could not scrape Spegel metrics on ${ip}" >&2
+                    return 1
+                  }
+                  value="${values%% *}"
+                  found="${values##* }"
                   total=$((total + value))
+                  seen=$((seen + found))
                 done
+                [ "${seen}" -gt 0 ] || {
+                  echo "no spegel_mirror_requests_total{registry=\"${PULL_REGISTRY}\",cache=\"hit\"} series on any Spegel pod" >&2
+                  return 1
+                }
                 printf '%s\n' "${total}"
               }
 
               delete_pod() {
-                local pod="$1"
+                local pod="$1" status
                 api -X DELETE "${PULLS}/${pod}?gracePeriodSeconds=0" >/dev/null 2>&1 || true
-                for _ in $(seq 1 30); do
-                  if ! api "${PULLS}/${pod}" >/dev/null 2>&1; then
-                    return 0
-                  fi
+                for _ in $(seq 1 15); do
+                  status="$(api_status "${PULLS}/${pod}")"
+                  case "${status}" in
+                    404)
+                      return 0
+                      ;;
+                    200)
+                      ;;
+                    *)
+                      printf 'GET pod %s returned HTTP %s; retrying\n' "${pod}" "${status:-none}" >&2
+                      ;;
+                  esac
                   sleep 1
                 done
-                echo "pod ${pod} did not terminate" >&2
+                echo "pod ${pod} was still present after 15s (last HTTP status ${status:-none})" >&2
                 return 1
               }
 
@@ -176,9 +251,13 @@ spec:
               # Pin pod A to a node other than the probe's node, so the probe
               # node's Spegel must resolve the manifest over the DHT rather than
               # from its local content store.
-              spegel_nodes="$(api "${SPEGELS}" |
+              if ! spegel_pods="$(api "${SPEGELS}")"; then
+                echo "could not list Spegel pods through the Kubernetes API" >&2
+                exit 1
+              fi
+              spegel_nodes="$(printf '%s\n' "${spegel_pods}" |
                 grep -o '"nodeName"[[:space:]]*:[[:space:]]*"[^"]*"' |
-                cut -d'"' -f4)"
+                cut -d'"' -f4 || true)"
               pod_a_node=""
               for node in ${spegel_nodes}; do
                 if [ "${node}" != "${NODE_NAME}" ]; then
@@ -187,32 +266,37 @@ spec:
                 fi
               done
               [ -n "${pod_a_node}" ] || {
-                echo "need a second node with a Spegel instance" >&2
+                echo "need a second node with a Spegel instance; found nodes: ${spegel_nodes:-none}" >&2
                 exit 1
               }
               # Pod A: cached nowhere on this node, so its pull goes upstream;
               # Spegel on that node advertises the layers once they are stored.
               printf 'Creating pod A (upstream pull) on %s with %s\n' "${pod_a_node}" "${PULL_IMAGE}"
               api -X POST "${PULLS}" --data-binary @- >/dev/null <<JSON
-              {"apiVersion":"v1","kind":"Pod","metadata":{"name":"e2e-spegel-pull-a","labels":{"e2e.spegel.io/pull":"a"}},"spec":{"nodeName":"${pod_a_node}","restartPolicy":"Never","tolerations":[{"operator":"Exists"}],"containers":[{"name":"pull","image":"${PULL_IMAGE}","imagePullPolicy":"Always","command":["/bin/sh","-ec","sleep 300"]}]}}
+              {"apiVersion":"v1","kind":"Pod","metadata":{"name":"e2e-spegel-pull-a","labels":{"e2e.spegel.io/pull":"a"}},"spec":{"nodeName":"${pod_a_node}","restartPolicy":"Never","tolerations":[{"operator":"Exists"}],"containers":[{"name":"pull","image":"${PULL_IMAGE}","imagePullPolicy":"Always","command":["/bin/sh","-ec","sleep 600"]}]}}
               JSON
               wait_phase e2e-spegel-pull-a Running
 
               # Resolve pod A's manifest through the probe node's Spegel. A
               # successful peer fetch proves the DHT has the new content before
               # pod B is created; it is included in the mirror-hit baseline.
-              probe_spegel_ip="$(spegel_ip_on_node "${NODE_NAME}" || true)"
-              [ -n "${probe_spegel_ip}" ] || {
-                echo "no Spegel pod IP on ${NODE_NAME}" >&2
+              rc=0
+              probe_spegel_ip="$(spegel_ip_on_node "${NODE_NAME}")" || rc=$?
+              if [ "${rc}" -ne 0 ]; then
+                if [ "${rc}" -eq 2 ]; then
+                  echo "could not list Spegel pods on ${NODE_NAME} through the Kubernetes API" >&2
+                else
+                  echo "no Spegel pod IP on ${NODE_NAME}" >&2
+                fi
                 exit 1
-              }
+              fi
               printf "Waiting for Spegel on %s to resolve pod A's manifest\n" "${probe_spegel_ip}"
               ready=0
-              for _ in $(seq 1 60); do
+              for _ in $(seq 1 30); do
                 if curl -fsS --max-time 5 -o /dev/null \
-                  "http://${probe_spegel_ip}:5000/v2/${PULL_REPOSITORY}/manifests/${PULL_MANIFEST}?ns=docker.io"; then
+                  "http://${probe_spegel_ip}:${REGISTRY_PORT}/v2/${PULL_REPOSITORY}/manifests/${PULL_MANIFEST}?ns=${PULL_REGISTRY}"; then
                   ready=1
-                  printf 'Spegel on %s resolved the manifest from the peer\n' "${probe_spegel_ip}"
+                  printf 'Spegel on %s resolved the manifest\n' "${probe_spegel_ip}"
                   break
                 fi
                 sleep 2
@@ -222,11 +306,12 @@ spec:
                 exit 1
               }
 
-              # Baseline mirror hits after pod A's pull and the readiness query
-              # and before pod B, so any later increase belongs to pod B. The
-              # probe image was pulled before this baseline and cannot contribute.
+              # Spegel increments the counter in a defer, so let the readiness
+              # request settle before taking the baseline. The probe image was
+              # pulled before this baseline and cannot contribute to it.
+              sleep 2
               hits_before="$(mirror_hits)" || {
-                echo "could not read Spegel mirror counters" >&2
+                echo "could not read Spegel mirror counters for ${PULL_REGISTRY}" >&2
                 exit 1
               }
 
@@ -238,22 +323,29 @@ spec:
               JSON
               wait_phase e2e-spegel-pull-b Succeeded
 
-              # A mirror hit after pod B's pull proves the second node was
-              # served peer-to-peer. The probe image was pulled before the
-              # baseline above, so it cannot contribute to this increase.
+              # Pod B needs both the manifest and at least one blob from the
+              # peer, so require two hits. A manifest-only proxy hit, or a
+              # registry that was not the tested one, cannot satisfy this.
               printf "Checking Spegel mirror counters for pod B's pull\n"
               hit=0
-              for _ in $(seq 1 30); do
-                hits_after="$(mirror_hits)"
-                if [ "${hits_after}" -gt "${hits_before}" ]; then
-                  hit=1
-                  printf 'Spegel mirror hits increased from %s to %s\n' "${hits_before}" "${hits_after}"
-                  break
+              hits_after=""
+              wanted=$((hits_before + 2))
+              for _ in $(seq 1 20); do
+                if hits_after="$(mirror_hits)"; then
+                  if [ "${hits_after}" -ge "${wanted}" ]; then
+                    hit=1
+                    printf 'Spegel mirror hits for %s increased from %s to %s\n' "${PULL_REGISTRY}" "${hits_before}" "${hits_after}"
+                    break
+                  fi
+                  printf 'mirror hits for %s are %s; need at least %s (manifest plus blob); retrying\n' "${PULL_REGISTRY}" "${hits_after}" "${wanted}"
+                else
+                  echo "could not read Spegel mirror counters; retrying" >&2
                 fi
                 sleep 2
               done
               [ "${hit}" = 1 ] || {
-                echo "no Spegel mirror hit was recorded for pod B" >&2
+                echo "expected at least two ${PULL_REGISTRY} mirror hits (manifest plus blob) after pod B's pull" >&2
+                echo "baseline was ${hits_before}; last observation ${hits_after:-unavailable}" >&2
                 exit 1
               }
 
