@@ -19,6 +19,23 @@
 # helm_repositories optionally lists Helm chart repositories that CI must
 # register before rendering charts with `helm dependency build`. Argo CD
 # resolves its own chart sources, so this is only used by repository checks.
+#
+# requires_fresh_image marks an app whose probe needs the configured
+# `e2e.pullImage` from values-kind.yaml absent from every kind node. The runner
+# removes it on every run, reused clusters included. Pair it with retry_limit: 0
+# when a retry would reuse the pulled image and invalidate the probe.
+#
+# requires_containerd_config verifies on every node that the containerd patch
+# from kind.yaml (mirror config_path and isolated content sharing) is present.
+#
+# retry_limit overrides E2E_RETRY_LIMIT for the app. timeout_seconds overrides
+# E2E_TIMEOUT_SECONDS for the app.
+#
+# stale_probe_resources optionally names the namespace, resources and pod label
+# selectors that must be removed before a cold-image app is redeployed. Probes
+# can create pods directly (not through Argo CD), and deleting an Application
+# can leave its post-delete hook resources behind; either kind of leftover can
+# keep the image in use or confuse a probe's own pod selection.
 helm_repositories:
   - name: quickwit
     url: https://helm.quickwit.io
@@ -77,8 +94,25 @@ apps:
         namespace: kube-system
         name: sealed-secrets-controller
   # The PostSync probe verifies cross-node P2P layer serving against the
-  # containerd mirror patch configured in kind.yaml.
-  spegel: {}
+  # containerd mirror patch configured in kind.yaml. It needs the pull image
+  # absent from every node, and an Argo CD retry would reuse the image pulled
+  # by the failed attempt, so retries are disabled for this app.
+  spegel:
+    requires_fresh_image: true
+    retry_limit: 0
+    requires_containerd_config: true
+    # Pods A and B are created through the Kubernetes API by the probe, not by
+    # Argo CD. A failed run can leave them running and keep the pull image in
+    # use. Deleting the previous Application also leaves the chart's post-delete
+    # cleanup DaemonSet and wait pod behind; those pods match the probe's own
+    # Spegel selector, so remove them too before redeploying.
+    stale_probe_resources:
+      namespace: spegel
+      resource_names:
+        - daemonset/spegel-cleanup
+      pod_label_selectors:
+        - e2e.spegel.io/pull
+        - app.kubernetes.io/component in (cleanup,cleanup-wait)
   traefik:
     requires:
       - prometheus-operator

@@ -40,13 +40,28 @@ REUSE_CLUSTER=1 ./hack/e2e/run-app.sh spegel
 
 `REUSE_CLUSTER=1` requires the cluster to exist and skips the cleanup
 deletion. The runner still reapplies Argo CD and the Application manifests, so
-the tested revision is always the current checkout. It disables root auto-sync
-and deletes the previously selected child Applications before recreating them,
-so stale sync operations and managed resources do not leak between runs.
-Namespaces are left in place. Use the same `CLUSTER_NAME` (default
-`e2e-<app>`) when reusing a cluster. Reuse does not reset node images or
-containerd content; recreate the cluster when validating cold-image behavior.
-Tear it down with:
+the tested revision is always the current checkout. It disables root auto-sync,
+deletes every child Application (stale Applications first, then the current
+dependency chain in reverse order), and fails loudly if an Application cannot
+be deleted. Namespaces are left in place. Use the same `CLUSTER_NAME` (default
+`e2e-<app>`) when reusing a cluster. `REUSE_CLUSTER` and `KEEP_CLUSTER` accept
+`1`/`true`/`yes` and `0`/`false`/`no`, case-insensitively.
+
+The runner establishes the node preconditions on every run, fresh or reused.
+For an app with `requires_fresh_image` (currently `spegel`), it first removes
+resources declared under `stale_probe_resources`: post-delete hook resources
+that the previous Application deletion left behind, and force-deleted pods
+matching the configured selectors (probe-created pods and leaked cleanup-hook
+pods). It waits for them to disappear so their containers cannot keep the image
+in use. It then removes the image from `.e2e.pullImage` in the app's
+`values-kind.yaml` from every kind node. For an app with
+`requires_containerd_config`, it verifies that
+`/etc/containerd/config.toml` on every node has the mirror `config_path`, does
+not set `discard_unpacked_layers = true`, and sets
+`content_sharing_policy = "isolated"`. Argo CD retries use the app's
+`retry_limit`; cold-image probes set `0` because a retry would reuse the image
+pulled by the failed attempt. If the containerd check fails, recreate the
+cluster so the patch from `kind.yaml` is applied. Tear it down with:
 
 ```bash
 kind delete cluster --name e2e-spegel
@@ -65,7 +80,11 @@ REUSE_CLUSTER=1 \
 
 CI keeps the defaults: a fresh cluster, `E2E_RETRY_LIMIT=20`,
 `E2E_RETRY_MAX_DURATION=5m`, `E2E_TIMEOUT_SECONDS=600`, and
-`E2E_REFRESH_TIMEOUT_SECONDS=120`, so coverage is unchanged.
+`E2E_REFRESH_TIMEOUT_SECONDS=120`, so coverage is unchanged. `E2E_RETRY_LIMIT`
+and `E2E_TIMEOUT_SECONDS` are defaults only: an app's explicit `retry_limit` or
+`timeout_seconds` in `apps.yaml` takes precedence (`monitoring` uses 900).
+`E2E_RETRY_MAX_DURATION` must be a Go duration such as `30s` or `5m`, and
+`E2E_RETRY_LIMIT` must not have leading zeros.
 
 ## Currently covered
 
@@ -118,9 +137,11 @@ lives in the cluster config and not in the chart.
 Helm's own `helm.sh/hook: test` tests are only executed by `helm test`, and
 Argo CD does not map the Helm test hooks. Mapping `post-install`/`post-upgrade`
 to Argo CD's `PostSync` is the supported equivalent. The probes therefore use
-`helm.sh/hook: post-install,post-upgrade`, are idempotent, have a bounded
-`activeDeadlineSeconds`, and use `before-hook-creation,hook-succeeded` cleanup.
-They test behaviour, not just Argo CD's resource-health status.
+`helm.sh/hook: post-install,post-upgrade`, `before-hook-creation,hook-succeeded`
+cleanup, and a bounded `activeDeadlineSeconds`. They test behaviour, not just
+Argo CD's resource-health status. A probe must either be idempotent or declare
+its cold-start preconditions in `apps.yaml`; an Argo CD retry cannot recreate a
+cold image that a failed attempt already pulled.
 
 Kustomize apps can use `overlays/kind` for environment-specific composition;
 `monitoring/overlays/kind` selects the production-free Prometheus base.
