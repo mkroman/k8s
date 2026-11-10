@@ -3,25 +3,20 @@
 {{- $probeImage := required "e2e.probeImage is required when e2e.enabled is true" .Values.e2e.probeImage }}
 {{- $pullImage := required "e2e.pullImage is required when e2e.enabled is true" .Values.e2e.pullImage }}
 {{- $selector := printf "app.kubernetes.io/name=%s,app.kubernetes.io/instance=%s" (include "spegel.name" .) .Release.Name }}
+# The probe's RBAC resources are normal resources, not PostSync hooks: Argo CD
+# evaluates hook-succeeded for passive resources immediately, which can delete
+# the Role/RoleBinding before the Job in a later hook wave uses them.
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: e2e-spegel-probe
   namespace: {{ $probeNamespace }}
-  annotations:
-    helm.sh/hook: post-install,post-upgrade
-    helm.sh/hook-weight: "5"
-    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: e2e-spegel-probe
   namespace: {{ $probeNamespace }}
-  annotations:
-    helm.sh/hook: post-install,post-upgrade
-    helm.sh/hook-weight: "5"
-    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
 rules:
   - apiGroups: [""]
     resources: ["pods"]
@@ -32,10 +27,6 @@ kind: RoleBinding
 metadata:
   name: e2e-spegel-probe
   namespace: {{ $probeNamespace }}
-  annotations:
-    helm.sh/hook: post-install,post-upgrade
-    helm.sh/hook-weight: "5"
-    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
