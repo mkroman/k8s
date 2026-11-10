@@ -1,0 +1,427 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "spegel chart values",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["spegel"],
+  "properties": {
+    "e2e": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "E2E-only PostSync probes; enabled by values-kind.yaml in the kind e2e environment, never in production.",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Deploy the P2P pull-test probe Job and its RBAC."
+        },
+        "probeNamespace": {
+          "type": "string",
+          "description": "Namespace the probe Job runs in."
+        },
+        "probeImage": {
+          "type": "string",
+          "description": "Shell + curl image for the probe; talks to the Kubernetes API and Spegel metrics endpoints."
+        },
+        "pullImage": {
+          "type": "string",
+          "description": "Image whose two-node pull proves P2P serving; must live on a registry Spegel mirrors (docker.io)."
+        }
+      }
+    },
+    "spegel": {
+      "type": "object",
+      "description": "Values passed to the upstream spegel chart (oci://ghcr.io/spegel-org/helm-charts/spegel).",
+      "additionalProperties": false,
+      "properties": {
+        "global": {
+          "type": "object",
+          "description": "Helm-internal global values coalesced into every subchart namespace."
+        },
+        "image": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["repository"],
+          "properties": {
+            "repository": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Image repository."
+            },
+            "tag": {
+              "type": "string",
+              "description": "Image tag; defaults to the chart appVersion when empty."
+            },
+            "digest": {
+              "type": "string",
+              "default": "",
+              "pattern": "^(sha256:[a-f0-9]{64})?$",
+              "description": "Pin the image by digest; takes precedence over the tag when set, e.g. \"sha256:0123...\". Chart 0.8.1 ships digest-pinned."
+            },
+            "pullPolicy": {
+              "type": "string",
+              "enum": ["Always", "IfNotPresent", "Never"],
+              "description": "Image pull policy."
+            }
+          }
+        },
+        "imagePullSecrets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" }
+            }
+          }
+        },
+        "nameOverride": {
+          "type": "string",
+          "description": "Override the name of the chart."
+        },
+        "fullnameOverride": {
+          "type": "string",
+          "description": "Override the full release name."
+        },
+        "namespaceOverride": {
+          "type": "string",
+          "description": "Override the namespace the spegel resources are installed into."
+        },
+        "serviceAccount": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "annotations": {
+              "type": "object",
+              "additionalProperties": { "type": "string" }
+            },
+            "name": {
+              "type": "string",
+              "description": "Service account name; generated from the release name when empty."
+            }
+          }
+        },
+        "daemonsetAnnotations": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "description": "Annotations to add to the DaemonSet."
+        },
+        "podAnnotations": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "description": "Annotations to add to the pod."
+        },
+        "podSecurityContext": {
+          "type": "object",
+          "description": "Pod-level security context."
+        },
+        "revisionHistoryLimit": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of old DaemonSet revisions to retain for rollback."
+        },
+        "securityContext": {
+          "type": "object",
+          "description": "Container security context. The upstream default enables readOnlyRootFilesystem."
+        },
+        "service": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Service exposure. Ports must not collide with Kubespray host services (kube-apiserver 6443, etcd 2379/2380, kubelet 10250, ...) and nodePort must stay inside kube_apiserver_node_port_range (default 30000-32767).",
+          "properties": {
+            "registry": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "nodeIp": {
+                  "type": "string",
+                  "description": "Override the NODE_IP environment variable; defaults to status.hostIP."
+                },
+                "port": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 65535,
+                  "description": "In-pod registry listener port (also the NodePort Service's cluster port)."
+                },
+                "nodePort": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 65535,
+                  "description": "NodePort that containerd mirror configs target (http://<nodeIP>:<nodePort>)."
+                },
+                "annotations": {
+                  "type": "object",
+                  "additionalProperties": { "type": "string" }
+                }
+              }
+            },
+            "router": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "port": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 65535,
+                  "description": "libp2p DHT listener port (TCP and UDP/QUIC)."
+                }
+              }
+            },
+            "metrics": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "port": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 65535,
+                  "description": "Prometheus /metrics and /debug/web listener port."
+                },
+                "annotations": {
+                  "type": "object",
+                  "additionalProperties": { "type": "string" }
+                }
+              }
+            },
+            "bootstrap": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "annotations": {
+                  "type": "object",
+                  "additionalProperties": { "type": "string" }
+                }
+              }
+            },
+            "cleanup": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "port": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 65535,
+                  "description": "Port exposing the cleanup probe used by the post-delete hook."
+                },
+                "annotations": {
+                  "type": "object",
+                  "additionalProperties": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "resources": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Resource requests and limits. GOMEMLIMIT is derived from limits.memory by the chart."
+        },
+        "nodeSelector": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "description": "Node selector for pod assignment; must cover the entire cluster."
+        },
+        "updateStrategy": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "DaemonSet update strategy; rolling one node at a time keeps a mirror candidate per image in the DHT.",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["RollingUpdate", "OnDelete"]
+            },
+            "rollingUpdate": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "maxSurge": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "maxUnavailable": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            }
+          }
+        },
+        "tolerations": {
+          "type": "array",
+          "description": "Tolerations so the DaemonSet also runs on Kubespray control-plane nodes."
+        },
+        "affinity": {
+          "type": "object",
+          "description": "Affinity settings for pod assignment."
+        },
+        "commonLabels": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "description": "Labels applied to all rendered resources."
+        },
+        "clusterDomain": {
+          "type": "string",
+          "description": "Cluster domain for the DNS bootstrap service; Kubespray default is cluster.local."
+        },
+        "serviceMonitor": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Prometheus Operator ServiceMonitor for the metrics Service.",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Create the ServiceMonitor resource."
+            },
+            "interval": {
+              "type": "string",
+              "description": "Prometheus scrape interval."
+            },
+            "scrapeTimeout": {
+              "type": "string",
+              "description": "Prometheus scrape timeout."
+            },
+            "labels": {
+              "type": "object",
+              "additionalProperties": { "type": "string" },
+              "description": "ServiceMonitor discovery labels, e.g. metrics.uplink.io/monitor: prometheus."
+            },
+            "relabelings": {
+              "type": "array",
+              "description": "Relabeling rules applied to target metadata."
+            },
+            "metricRelabelings": {
+              "type": "array",
+              "description": "Relabeling rules applied to samples before ingestion."
+            }
+          }
+        },
+        "networkPolicy": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Limits libp2p router traffic to Spegel peers; registry and metrics listeners stay open.",
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "default": false,
+              "description": "Create the NetworkPolicy."
+            }
+          }
+        },
+        "priorityClassName": {
+          "type": "string",
+          "description": "Priority class for the pod; system-node-critical matches node-critical agents (CNI/CRI plugins)."
+        },
+        "basicAuthSecretName": {
+          "type": "string",
+          "description": "Name of a secret with basic auth credentials protecting the registry."
+        },
+        "spegel": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Spegel application settings (the upstream chart's own `spegel` block).",
+          "properties": {
+            "logLevel": {
+              "type": "string",
+              "enum": ["DEBUG", "INFO", "WARN", "ERROR"],
+              "description": "Minimum log level to output."
+            },
+            "mirroredRegistries": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 },
+              "description": "Registries for which mirror configuration is written. Must be non-empty on Kubespray: an empty list writes only a _default/hosts.toml catch-all, which per-registry hosts.toml files rendered by Kubespray take precedence over."
+            },
+            "additionalMirrorTargets": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 },
+              "description": "Fallback registries (e.g. a pull-through cache) appended after the P2P mesh and existing certs.d mirrors."
+            },
+            "prependExisting": {
+              "type": "boolean",
+              "description": "Prepend Spegel in front of existing certs.d host entries instead of replacing them; required while Kubespray manages containerd_registries_mirrors."
+            },
+            "mirrorResolveRetries": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Maximum number of mirrors to attempt per request."
+            },
+            "mirrorResolveTimeout": {
+              "type": "string",
+              "description": "Maximum duration spent finding a mirror (Go duration string)."
+            },
+            "containerdSock": {
+              "type": "string",
+              "description": "Path to the containerd socket; Kubespray default /run/containerd/containerd.sock."
+            },
+            "containerdNamespace": {
+              "type": "string",
+              "description": "containerd namespace where images are stored; CRI uses k8s.io."
+            },
+            "containerdRegistryConfigPath": {
+              "type": "string",
+              "description": "Path to containerd mirror configuration; Kubespray default /etc/containerd/certs.d."
+            },
+            "containerdContentPath": {
+              "type": "string",
+              "description": "Path to the containerd content store, mounted read-only; Kubespray default /var/lib/containerd/io.containerd.content.v1.content."
+            },
+            "containerdMirrorAdd": {
+              "type": "boolean",
+              "description": "Let the init container write the certs.d mirror configuration on each node."
+            },
+            "resolveTags": {
+              "type": "boolean",
+              "description": "Resolve tags to digests so cached manifests can be reused across nodes."
+            },
+            "registryFilters": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Regular expressions filtering which tags/registries are resolved; empty resolves all."
+            },
+            "persistence": {
+              "type": "object",
+              "additionalProperties": false,
+              "description": "Host persistence for the libp2p host key so nodes keep stable DHT identities across restarts.",
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "path": {
+                  "type": "string",
+                  "description": "Mount path inside the container."
+                },
+                "hostPath": {
+                  "type": "string",
+                  "description": "Path on the host mounted into the container."
+                }
+              }
+            },
+            "debugWebEnabled": {
+              "type": "boolean",
+              "description": "Enable the instance stats page at /debug/web on the metrics port; used by the verification runbook."
+            }
+          }
+        },
+        "verticalPodAutoscaler": {
+          "type": "object",
+          "additionalProperties": true,
+          "description": "Optional Vertical Pod Autoscaler for the DaemonSet; not enabled in this deployment."
+        },
+        "livenessProbe": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean",
+              "description": "Add a /livez liveness probe to the registry listener."
+            }
+          }
+        },
+        "extraVolumes": {
+          "type": "array",
+          "description": "Additional volumes appended to the DaemonSet pod."
+        },
+        "extraInitContainers": {
+          "type": "array",
+          "description": "Additional init containers run before Spegel's configuration init container."
+        }
+      }
+    }
+  }
+}

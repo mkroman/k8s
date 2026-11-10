@@ -1,0 +1,18 @@
+apiVersion: v2
+name: spegel
+description: Stateless cluster-local P2P OCI registry mirror (Spegel)
+type: application
+
+# This is a wrapper chart that pins the upstream OCI chart. Bump the
+# dependency version below to upgrade Spegel (`helm dependency update`).
+version: 0.1.0
+appVersion: "0.8.1"
+
+# Spegel v0.8.x officially supports Kubernetes >= 1.35 (the registry Service
+# uses trafficDistribution) and containerd >= 2.2.
+kubeVersion: ">=1.35.0-0"
+
+dependencies:
+  - name: spegel
+    version: 0.8.1
+    repository: oci://ghcr.io/spegel-org/helm-charts

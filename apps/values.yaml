@@ -251,6 +251,36 @@ projects:
       - group: admissionregistration.k8s.io
         kind: MutatingWebhookConfiguration
 
+  - name: spegel
+    description: "Spegel — stateless cluster-local P2P OCI registry mirror"
+    destinations:
+      - namespace: spegel
+    sourceRepos:
+      - https://github.com/mkroman/k8s
+    # Opt out of the default namespace blacklist (which forbids NetworkPolicy,
+    # ResourceQuota and LimitRange) with an explicit allowlist of what the
+    # chart deploys: the DHT NetworkPolicy requires it. Pod covers the
+    # post-delete cleanup hook, Job/Role/RoleBinding the kind e2e probe.
+    namespaceResourceWhitelist:
+      - group: ""
+        kind: Pod
+      - group: ""
+        kind: Service
+      - group: ""
+        kind: ServiceAccount
+      - group: apps
+        kind: DaemonSet
+      - group: batch
+        kind: Job
+      - group: networking.k8s.io
+        kind: NetworkPolicy
+      - group: rbac.authorization.k8s.io
+        kind: Role
+      - group: rbac.authorization.k8s.io
+        kind: RoleBinding
+      - group: monitoring.coreos.com
+        kind: ServiceMonitor
+
   - name: traefik
     description: "Traefik ingress controller"
     destinations:
@@ -366,6 +396,17 @@ namespaces:
   - name: renovate
   - name: rwx-redis-prod
   - name: rwx-openwebui-prod
+  - name: spegel
+    labels:
+      # Spegel runs privileged by design (hostPath containerd socket, content
+      # store, certs.d writes); make the exception explicit instead of relying
+      # on the unlabeled namespace default.
+      pod-security.kubernetes.io/enforce: privileged
+      pod-security.kubernetes.io/enforce-version: latest
+      pod-security.kubernetes.io/audit: privileged
+      pod-security.kubernetes.io/audit-version: latest
+      pod-security.kubernetes.io/warn: privileged
+      pod-security.kubernetes.io/warn-version: latest
   - name: traefik
   - name: vector
   - name: zeta-dev
@@ -604,6 +645,27 @@ newApplications:
     source:
       repoURL: https://github.com/mkroman/k8s
       path: sealed-secrets
+
+  - name: spegel
+    project: spegel
+    destination:
+      namespace: spegel
+    source:
+      repoURL: https://github.com/mkroman/k8s
+      path: spegel
+    syncPolicy:
+      automated:
+        prune: true
+        selfHeal: true
+      syncOptions:
+        - ApplyOutOfSyncOnly=true
+        - ServerSideApply=true
+      retry:
+        limit: 5
+        backoff:
+          duration: 5s
+          factor: 2
+          maxDuration: 3m
 
   - name: traefik
     project: traefik

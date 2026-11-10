@@ -1,0 +1,6 @@
+dependencies:
+- name: spegel
+  repository: oci://ghcr.io/spegel-org/helm-charts
+  version: 0.8.1
+digest: sha256:7dbb02c29390aa46ab3fcb66c9f02d7b8b984368f4cf6f7c5015bdb7a8c0386c
+generated: "2026-11-10T05:19:04.019268895+01:00"
