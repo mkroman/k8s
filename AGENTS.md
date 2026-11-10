@@ -98,6 +98,10 @@ This repository does not ship Ansible or Kubespray playbooks. Document required
 containerd/Kubernetes settings in the relevant chart README and leave node
 preparation to the cluster operator.
 
+The current cluster runs containerd 2.3. `discard_unpacked_layers` was removed
+there and defaults to false; verify `config_path`/certs.d instead of setting
+the legacy variable.
+
 ## Chart conventions
 
 - Wrapper charts pin their upstream dependency in `Chart.yaml`/`Chart.lock`.

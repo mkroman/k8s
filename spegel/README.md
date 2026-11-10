@@ -26,7 +26,7 @@ cluster.
 Audited against upstream docs
 ([spegel.dev](https://spegel.dev/docs/getting-started/#compatibility),
 [containerd hosts.md](https://github.com/containerd/containerd/blob/main/docs/hosts.md))
-for **this cluster: Kubernetes 1.36, containerd ≥ 2.2**.
+for **this cluster: Kubernetes 1.36, containerd 2.3**.
 
 Spegel v0.8.x (the pinned chart) officially requires **Kubernetes ≥ 1.35**
 (the registry Service uses `trafficDistribution`) and **containerd ≥ 2.2**
@@ -37,16 +37,17 @@ satisfied here. Older deployments (e.g. Kubespray v2.25 with containerd
 Spegel's startup self-checks enforce two containerd requirements:
 
 1. `config_path` must be set (registry host configuration via `certs.d`)
-2. `discard_unpacked_layers` must **not** be enabled
+2. `discard_unpacked_layers` must **not** be enabled (containerd < 2.1 only)
 
 [spegel-releases]: https://spegel.dev/docs/releases/
 [spegel-v080]: https://spegel.dev/blog/spegel-v0.8.0/
 
-### 1.1 Layer retention — `discard_unpacked_layers` ✅ requires override (v2.25)
+### 1.1 Layer retention — `discard_unpacked_layers` (containerd < 2.1 only)
 
 Why the default breaks Spegel: Kubespray sets
-`containerd_discard_unpacked_layers: true` to save disk. With it enabled,
-containerd's garbage collector deletes layer blobs from the content store
+`containerd_discard_unpacked_layers: true` to save disk on older containerd
+releases. With it enabled, containerd's garbage collector deletes layer blobs
+from the content store
 (`/var/lib/containerd/io.containerd.content.v1.content`) as soon as they are
 unpacked into the overlayfs snapshotter. Spegel serves peers by streaming
 blobs **directly out of that content store** — once discarded there is nothing
@@ -57,10 +58,13 @@ cannot write the fix itself: disabling it requires a containerd restart).
 | Kubespray version | Default containerd | `discard_unpacked_layers` rendered? | Spegel impact |
 |---|---|---|---|
 | v2.25.x | 1.7.16 | **Yes, `= true`** | ❌ breaks Spegel — override required |
-| v2.26.x / master | ≥ 2.1 (2.3.7) | No — option removed in containerd 2.1, default `false` | ✅ works, override kept as belt-and-braces |
+| v2.26.x / master | ≥ 2.1 (2.3.x) | No — option removed in containerd 2.1, default `false` | ✅ no action needed |
 
-Fix: set `containerd_discard_unpacked_layers: false` in the Kubespray
-containerd configuration for every node.
+Fix: on containerd < 2.1, set `containerd_discard_unpacked_layers: false` in
+the Kubespray containerd configuration for every node. This cluster runs
+containerd 2.3, where the option no longer exists and layers are retained by
+default; no override is needed. Verify `config_path` and the certs.d ownership
+below instead.
 
 > **Disk note:** disabling `discard_unpacked_layers` retains layer tarballs on
 > disk. That is what Spegel serves from, but ensure kubelet image GC stays
@@ -118,8 +122,8 @@ Kubespray: `containerd_storage_dir: /var/lib/containerd` →
   `spegel-bootstrap` Service with `publishNotReadyAddresses: true` — no host
   firewall changes required; DHT traffic flows over pod IPs through the CNI.
 
-**Verdict:** Kubespray is green — after the `discard_unpacked_layers`
-override and the two value tweaks above, Spegel works unmodified.
+**Verdict:** Kubespray is green — after verifying `config_path`/certs.d and
+the two value tweaks above, Spegel works unmodified on containerd 2.3.
 
 ---
 
