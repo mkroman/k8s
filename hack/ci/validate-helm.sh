@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 #
-# Render every Helm chart and validate the manifests with kubeconform.
+# Render Helm charts and validate the manifests with kubeconform.
+#
+# Usage:
+#   ./hack/ci/validate-helm.sh [CHART ...]
+#
+# With chart arguments, only those repository-relative chart directories are
+# validated. With no arguments, every chart is validated.
 #
 # Charts are copied to a temporary directory so dependency builds never
 # modify the checkout. All charts are attempted so one broken chart does not
@@ -131,7 +137,18 @@ main() {
   trap cleanup EXIT
   mkdir -p "${TEMP_DIR}/charts" "${TEMP_DIR}/rendered"
 
-  mapfile -t charts < <(collect_charts)
+  if (($# > 0)); then
+    charts=("$@")
+    for chart in "${charts[@]}"; do
+      if [[ ! -f "${REPO_ROOT}/${chart}/Chart.yaml" ]]; then
+        printf '::error title=Helm validation::%s is not a chart directory.\n' \
+          "${chart}" >&2
+        return 1
+      fi
+    done
+  else
+    mapfile -t charts < <(collect_charts)
+  fi
 
   if ((${#charts[@]} == 0)); then
     printf 'No Helm charts found.\n'

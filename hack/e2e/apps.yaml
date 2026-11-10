@@ -76,6 +76,9 @@ apps:
         kind: PodMonitor
         namespace: kube-system
         name: sealed-secrets-controller
+  # The PostSync probe verifies cross-node P2P layer serving against the
+  # containerd mirror patch configured in kind.yaml.
+  spegel: {}
   traefik:
     requires:
       - prometheus-operator

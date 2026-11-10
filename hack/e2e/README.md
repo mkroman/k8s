@@ -25,6 +25,48 @@ Argo CD reads the checkout from a local Git daemon, so the test deploys the
 exact commit under test, including a pull request's merge commit. No
 prerequisite CRDs are copied or applied by hand.
 
+## Local iteration
+
+The first run creates the kind cluster and installs Argo CD, which dominates
+local cycle time. Keep that cluster and reuse it for subsequent runs:
+
+```bash
+# First run: create the cluster and leave it behind.
+KEEP_CLUSTER=1 ./hack/e2e/run-app.sh spegel
+
+# Subsequent runs: skip cluster creation and reuse the installation.
+REUSE_CLUSTER=1 ./hack/e2e/run-app.sh spegel
+```
+
+`REUSE_CLUSTER=1` requires the cluster to exist and skips the cleanup
+deletion. The runner still reapplies Argo CD and the Application manifests, so
+the tested revision is always the current checkout. It disables root auto-sync
+and deletes the previously selected child Applications before recreating them,
+so stale sync operations and managed resources do not leak between runs.
+Namespaces are left in place. Use the same `CLUSTER_NAME` (default
+`e2e-<app>`) when reusing a cluster. Reuse does not reset node images or
+containerd content; recreate the cluster when validating cold-image behavior.
+Tear it down with:
+
+```bash
+kind delete cluster --name e2e-spegel
+```
+
+For faster failure feedback while iterating, lower the local budgets:
+
+```bash
+REUSE_CLUSTER=1 \
+  E2E_RETRY_LIMIT=1 \
+  E2E_RETRY_MAX_DURATION=30s \
+  E2E_TIMEOUT_SECONDS=300 \
+  E2E_REFRESH_TIMEOUT_SECONDS=60 \
+  ./hack/e2e/run-app.sh spegel
+```
+
+CI keeps the defaults: a fresh cluster, `E2E_RETRY_LIMIT=20`,
+`E2E_RETRY_MAX_DURATION=5m`, `E2E_TIMEOUT_SECONDS=600`, and
+`E2E_REFRESH_TIMEOUT_SECONDS=120`, so coverage is unchanged.
+
 ## Currently covered
 
 | Application | Source | Prerequisites |
@@ -38,6 +80,7 @@ prerequisite CRDs are copied or applied by hand.
 | `monitoring` | Kustomize | `prometheus-operator`; asserts the control-plane scrape targets are up |
 | `prometheus-operator` | Kustomize | `cert-manager`; asserts its ServiceMonitor is deployed |
 | `sealed-secrets` | Kustomize | `prometheus-operator`; asserts its PodMonitor is deployed |
+| `spegel` | Helm, OCI dependencies | none; ServiceMonitor disabled in kind; PostSync probe runs a two-node P2P pull test |
 | `traefik` | Helm | `prometheus-operator` |
 | `vector-agent` | Helm | `prometheus-operator` |
 | `vector-aggregator` | Helm | `prometheus-operator` |
@@ -58,6 +101,16 @@ NetworkPolicy, and runs a control request against Grafana's health endpoint.
 The Jobs are enabled from `values-kind.yaml`; Argo CD maps the Helm hook
 annotations to its own PostSync hooks, so a failed probe fails the Application
 sync. No runner-specific check code is needed.
+
+The `spegel` probe verifies behaviour end to end: pod A pulls a busybox image
+that is cached nowhere in the fresh kind cluster (upstream pull, advertised by
+the DHT), pod B is forced onto a different node by pod anti-affinity, and the
+probe asserts that the aggregate Spegel mirror-hit counter increases — the
+signature of a peer-to-peer serve. The probe image is pulled before that
+baseline, so its own pull cannot satisfy the assertion. It depends on the
+containerd mirror patch in `kind.yaml` (`config_path` plus
+`discard_unpacked_layers = false`), which is why the patch lives in the cluster
+config and not in the chart.
 
 Helm's own `helm.sh/hook: test` tests are only executed by `helm test`, and
 Argo CD does not map the Helm test hooks. Mapping `post-install`/`post-upgrade`

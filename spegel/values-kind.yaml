@@ -1,0 +1,24 @@
+# yaml-language-server: $schema=values.schema.json
+# Kind-specific overrides for the Spegel e2e Application.
+#
+# Prometheus Operator CRDs are not deployed for this app, so the
+# ServiceMonitor cannot be applied. The PostSync probe (templates/e2e/) runs a
+# two-node pull test that proves image layers are served peer-to-peer.
+spegel:
+  serviceMonitor:
+    enabled: false
+
+e2e:
+  enabled: true
+  probeNamespace: "spegel"
+  # Alpine-based curl image pulled through Google's Docker Hub mirror (repo
+  # convention, see grafana/values-kind.yaml); the probe talks to the
+  # Kubernetes API and the Spegel metrics endpoints with curl only.
+  probeImage: "mirror.gcr.io/curlimages/curl:8.14.1@sha256:9a1ed35addb45476afa911696297f8e115993df459278ed036182dd2cd22b67b"
+  # The pull-test image must live on a registry Spegel mirrors — keep it on
+  # docker.io. The probe asserts an increase in the aggregate Spegel mirror-hit
+  # counter after pod B's pull; the probe image is pulled before that baseline,
+  # so its own pull cannot contribute. The image is cached nowhere in a fresh
+  # kind cluster, so pod A pulls upstream and pod B must be served by a peer.
+  # Digest verified against registry-1.docker.io.
+  pullImage: "docker.io/library/busybox:1.37.0@sha256:a7dbc319b1438115a207e11930dc4bb3e643dcb3ec0bdd694bb36cd8fad289ec"

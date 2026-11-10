@@ -45,6 +45,7 @@ Helm chart for Applications sourced from external Git repositories.
 | quickwit                    | [`quickwit`](quickwit/)                         | [![App Status](https://argo-cd.infra.rwx.im/api/badge?name=quickwit)](https://argo-cd.infra.rwx.im/applications/quickwit) |
 | redis                       | [`redis`](redis/)                               | [![App Status](https://argo-cd.infra.rwx.im/api/badge?name=redis)](https://argo-cd.infra.rwx.im/applications/redis) |
 | sealed-secrets              | [`sealed-secrets`](sealed-secrets/)              | [![App Status](https://argo-cd.infra.rwx.im/api/badge?name=sealed-secrets)](https://argo-cd.infra.rwx.im/applications/sealed-secrets) |
+| spegel                      | [`spegel`](spegel/)                              | [![App Status](https://argo-cd.infra.rwx.im/api/badge?name=spegel)](https://argo-cd.infra.rwx.im/applications/spegel) |
 | traefik                     | [`traefik`](traefik/)                           | [![App Status](https://argo-cd.infra.rwx.im/api/badge?name=traefik)](https://argo-cd.infra.rwx.im/applications/traefik) |
 | vector-agent                | [`vector`](vector/)                             | [![App Status](https://argo-cd.infra.rwx.im/api/badge?name=vector-agent)](https://argo-cd.infra.rwx.im/applications/vector-agent) |
 | vector-aggregator           | [`vector`](vector/)                             | [![App Status](https://argo-cd.infra.rwx.im/api/badge?name=vector-aggregator)](https://argo-cd.infra.rwx.im/applications/vector-aggregator) |
