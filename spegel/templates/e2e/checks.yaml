@@ -1,0 +1,204 @@
+{{- if .Values.e2e.enabled }}
+{{- $probeNamespace := required "e2e.probeNamespace is required when e2e.enabled is true" .Values.e2e.probeNamespace }}
+{{- $probeImage := required "e2e.probeImage is required when e2e.enabled is true" .Values.e2e.probeImage }}
+{{- $pullImage := required "e2e.pullImage is required when e2e.enabled is true" .Values.e2e.pullImage }}
+{{- $selector := printf "app.kubernetes.io/name=%s,app.kubernetes.io/instance=%s" (include "spegel.name" .) .Release.Name }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: e2e-spegel-probe
+  namespace: {{ $probeNamespace }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "5"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: e2e-spegel-probe
+  namespace: {{ $probeNamespace }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "5"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["create", "delete", "get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: e2e-spegel-probe
+  namespace: {{ $probeNamespace }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "5"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: e2e-spegel-probe
+subjects:
+  - kind: ServiceAccount
+    name: e2e-spegel-probe
+    namespace: {{ $probeNamespace }}
+---
+# Proves that image layers are served peer-to-peer: pod A pulls an image that
+# is cached nowhere in the cluster (upstream pull, then advertised by the
+# DHT), and pod B — forced onto a different node by pod anti-affinity — must
+# have its pull served by a Spegel instance, visible as a non-zero
+# spegel_mirror_last_success_timestamp_seconds on the metrics endpoints.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: e2e-spegel-p2p
+  namespace: {{ $probeNamespace }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "10"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  activeDeadlineSeconds: 420
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: spegel
+        app.kubernetes.io/component: e2e-probe
+    spec:
+      serviceAccountName: e2e-spegel-probe
+      automountServiceAccountToken: true
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: probe
+          image: {{ $probeImage | quote }}
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          env:
+            - name: NAMESPACE
+              value: {{ $probeNamespace | quote }}
+            - name: PULL_IMAGE
+              value: {{ $pullImage | quote }}
+            - name: SPEGEL_SELECTOR
+              value: {{ $selector | quote }}
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              set -eu
+              API="https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT_HTTPS}"
+              SA="/var/run/secrets/kubernetes.io/serviceaccount"
+              TOKEN="$(cat "${SA}/token")"
+              PULLS="${API}/api/v1/namespaces/${NAMESPACE}/pods"
+              SPEGELS="${API}/api/v1/namespaces/${NAMESPACE}/pods?labelSelector=${SPEGEL_SELECTOR}"
+
+              api() {
+                curl -fsS --max-time 15 --cacert "${SA}/ca.crt" \
+                  -H "Authorization: Bearer ${TOKEN}" \
+                  -H "Content-Type: application/json" "$@"
+              }
+
+              pod_phase() {
+                api "${PULLS}/$1" |
+                  grep -o '"phase":"[A-Za-z]*"' | head -n1 | cut -d'"' -f4
+              }
+
+              wait_phase() {
+                pod="$1"; want="$2"; phase=""
+                for _ in $(seq 1 90); do
+                  phase="$(pod_phase "$pod" || true)"
+                  printf '%s: %s\n' "$pod" "${phase:-Pending}"
+                  [ "$phase" = "$want" ] && return 0
+                  [ "$phase" = "Failed" ] && return 1
+                  sleep 2
+                done
+                return 1
+              }
+
+              # Remove leftovers from an earlier hook run so anti-affinity and
+              # the "cached nowhere" precondition hold.
+              api -X DELETE "${PULLS}/e2e-spegel-pull-a" >/dev/null 2>&1 || true
+              api -X DELETE "${PULLS}/e2e-spegel-pull-b" >/dev/null 2>&1 || true
+
+              # Pod A: cached nowhere, so its pull goes upstream; Spegel
+              # advertises the layers once containerd stores them.
+              printf 'Creating pod A (upstream pull) with %s\n' "${PULL_IMAGE}"
+              api -X POST "${PULLS}" --data-binary @- >/dev/null <<JSON
+              {"apiVersion":"v1","kind":"Pod","metadata":{"name":"e2e-spegel-pull-a","labels":{"e2e.spegel.io/pull":"a"}},"spec":{"restartPolicy":"Never","tolerations":[{"operator":"Exists"}],"containers":[{"name":"pull","image":"${PULL_IMAGE}","imagePullPolicy":"Always","command":["/bin/sh","-ec","sleep 20"]}]}}
+              JSON
+              wait_phase e2e-spegel-pull-a Running
+
+              # Wait until at least one Spegel instance advertises the keys
+              # from pod A's pull, so pod B's resolve cannot race the DHT.
+              printf 'Waiting for Spegel to advertise the layers\n'
+              advertised=0
+              for _ in $(seq 1 60); do
+                ips="$(api "${SPEGELS}" |
+                  grep -o '"podIP":"[^"]*"' | cut -d'"' -f4)"
+                for ip in $ips; do
+                  if curl -fsS --max-time 10 "http://${ip}:9090/metrics" |
+                    awk '/^spegel_advertised_keys/ { exit !($2+0 > 0) }'; then
+                    advertised=1
+                    printf 'Spegel instance %s advertises keys\n' "$ip"
+                    break
+                  fi
+                done
+                [ "$advertised" = 1 ] && break
+                sleep 2
+              done
+              [ "$advertised" = 1 ] || {
+                echo "no Spegel instance advertised the pulled layers"
+                exit 1
+              }
+
+              # Pod B: required anti-affinity against pod A forces a different
+              # node, so its pull cannot be satisfied from a local cache.
+              printf 'Creating pod B (mirror pull) with %s\n' "${PULL_IMAGE}"
+              api -X POST "${PULLS}" --data-binary @- >/dev/null <<JSON
+              {"apiVersion":"v1","kind":"Pod","metadata":{"name":"e2e-spegel-pull-b","labels":{"e2e.spegel.io/pull":"b"}},"spec":{"restartPolicy":"Never","tolerations":[{"operator":"Exists"}],"affinity":{"podAntiAffinity":{"requiredDuringSchedulingIgnoredDuringExecution":[{"labelSelector":{"matchLabels":{"e2e.spegel.io/pull":"a"}},"topologyKey":"kubernetes.io/hostname"}]}}},"containers":[{"name":"pull","image":"${PULL_IMAGE}","imagePullPolicy":"Always","command":["/bin/sh","-ec","true"]}]}}
+              JSON
+              wait_phase e2e-spegel-pull-b Succeeded
+
+              # A non-zero last-success timestamp proves an instance served a
+              # mirror request; only pod B's pull could have been one.
+              printf 'Checking Spegel metrics for a served mirror request\n'
+              hit=0
+              ips="$(api "${SPEGELS}" |
+                grep -o '"podIP":"[^"]*"' | cut -d'"' -f4)"
+              for ip in $ips; do
+                if curl -fsS --max-time 10 "http://${ip}:9090/metrics" |
+                  awk '/^spegel_mirror_last_success_timestamp_seconds / { exit !($2+0 > 0) }'; then
+                  hit=1
+                  printf 'Spegel instance %s served a mirror pull\n' "$ip"
+                  break
+                fi
+              done
+              [ "$hit" = 1 ] || {
+                echo "no Spegel instance served the second pull peer-to-peer"
+                exit 1
+              }
+
+              api -X DELETE "${PULLS}/e2e-spegel-pull-a" >/dev/null
+              api -X DELETE "${PULLS}/e2e-spegel-pull-b" >/dev/null
+              echo "P2P image serving verified"
+{{- end }}

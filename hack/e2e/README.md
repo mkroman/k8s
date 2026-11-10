@@ -38,6 +38,7 @@ prerequisite CRDs are copied or applied by hand.
 | `monitoring` | Kustomize | `prometheus-operator`; asserts the control-plane scrape targets are up |
 | `prometheus-operator` | Kustomize | `cert-manager`; asserts its ServiceMonitor is deployed |
 | `sealed-secrets` | Kustomize | `prometheus-operator`; asserts its PodMonitor is deployed |
+| `spegel` | Helm, OCI dependencies | none; ServiceMonitor disabled in kind; PostSync probe runs a two-node P2P pull test |
 | `traefik` | Helm | `prometheus-operator` |
 | `vector-agent` | Helm | `prometheus-operator` |
 | `vector-aggregator` | Helm | `prometheus-operator` |
@@ -58,6 +59,15 @@ NetworkPolicy, and runs a control request against Grafana's health endpoint.
 The Jobs are enabled from `values-kind.yaml`; Argo CD maps the Helm hook
 annotations to its own PostSync hooks, so a failed probe fails the Application
 sync. No runner-specific check code is needed.
+
+The `spegel` probe verifies behaviour end to end: pod A pulls a busybox image
+that is cached nowhere in the cluster (upstream pull, advertised by the DHT),
+pod B is forced onto a different node by pod anti-affinity, and the probe
+asserts a Spegel instance reports a non-zero
+`spegel_mirror_last_success_timestamp_seconds` — the signature of a
+peer-to-peer layer serve. It depends on the containerd mirror patch in
+`kind.yaml` (`config_path` plus `discard_unpacked_layers = false`), which is
+why the patch lives in the cluster config and not in the chart.
 
 Helm's own `helm.sh/hook: test` tests are only executed by `helm test`, and
 Argo CD does not map the Helm test hooks. Mapping `post-install`/`post-upgrade`

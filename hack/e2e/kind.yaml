@@ -21,3 +21,17 @@ kubeadmConfigPatches:
     controllerManager:
       extraArgs:
         bind-address: 0.0.0.0
+
+# Spegel e2e: route registry pulls through the local mirror and keep layer
+# blobs in the content store. This is the exact patch Spegel's own
+# integration tests use; version = 2 makes containerd 2.x convert the legacy
+# plugin IDs. Harmless for every other application.
+containerdConfigPatches:
+  - |-
+    version = 2
+    [plugins."io.containerd.grpc.v1.cri".registry]
+      config_path = "/etc/containerd/certs.d"
+    [plugins."io.containerd.grpc.v1.cri".containerd]
+      discard_unpacked_layers = false
+    [plugins."io.containerd.metadata.v1.bolt"]
+      content_sharing_policy = "isolated"
