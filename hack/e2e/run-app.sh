@@ -15,6 +15,9 @@
 #   ./hack/e2e/run-app.sh APP
 #
 # Set KEEP_CLUSTER=1 to leave the cluster behind for debugging.
+# Set REUSE_CLUSTER=1 to reuse an existing kind cluster (skips kind create).
+# E2E_RETRY_LIMIT, E2E_RETRY_MAX_DURATION, E2E_TIMEOUT_SECONDS and
+# E2E_REFRESH_TIMEOUT_SECONDS shorten local failure feedback loops.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -37,6 +40,11 @@ APP="${1:-${APP:-}}"
 CLUSTER_NAME="${CLUSTER_NAME:-e2e-${APP}}"
 GIT_DAEMON_PORT="${GIT_DAEMON_PORT:-9418}"
 KIND_NODE_IMAGE="${KIND_NODE_IMAGE:-}"
+REUSE_CLUSTER="${REUSE_CLUSTER:-0}"
+E2E_RETRY_LIMIT="${E2E_RETRY_LIMIT:-20}"
+E2E_RETRY_MAX_DURATION="${E2E_RETRY_MAX_DURATION:-5m}"
+E2E_TIMEOUT_SECONDS="${E2E_TIMEOUT_SECONDS:-600}"
+E2E_REFRESH_TIMEOUT_SECONDS="${E2E_REFRESH_TIMEOUT_SECONDS:-120}"
 TEMP_DIR="$(mktemp -d)"
 GIT_DAEMON_PID=""
 PORT_FORWARD_PID=""
@@ -248,10 +256,11 @@ build_apps() {
     # A child app can be created immediately after its dependency's CRDs, before
     # Argo CD's API discovery cache has seen them. Retry long enough for the
     # cache to refresh instead of exhausting the production retry budget.
-    entry="$(jq '
+    entry="$(jq --argjson retry_limit "${E2E_RETRY_LIMIT}" \
+      --arg retry_max "${E2E_RETRY_MAX_DURATION}" '
       def retry: {
-        limit: 20,
-        backoff: {duration: "5s", factor: 2, maxDuration: "5m"}
+        limit: $retry_limit,
+        backoff: {duration: "5s", factor: 2, maxDuration: $retry_max}
       };
       if .syncPolicy then
         .syncPolicy.retry = retry
@@ -647,6 +656,13 @@ main() {
   [[ -r "${KIND_CONFIG}" ]] || die "missing kind config: ${KIND_CONFIG}"
   [[ -r "${ROOT_APP_TEMPLATE}" ]] || die "missing root Application template"
 
+  [[ "${E2E_RETRY_LIMIT}" =~ ^[0-9]+$ ]] ||
+    die "E2E_RETRY_LIMIT must be a non-negative integer"
+  [[ "${E2E_TIMEOUT_SECONDS}" =~ ^[1-9][0-9]*$ ]] ||
+    die "E2E_TIMEOUT_SECONDS must be a positive integer"
+  [[ "${E2E_REFRESH_TIMEOUT_SECONDS}" =~ ^[1-9][0-9]*$ ]] ||
+    die "E2E_REFRESH_TIMEOUT_SECONDS must be a positive integer"
+
   yq -o=json '.' "${VALUES_FILE}" >"${TEMP_DIR}/apps-values.json"
   resolve_app "${app}" 0
 
@@ -664,14 +680,19 @@ main() {
     die "the local Git daemon did not start"
 
   printf '::group::Create kind cluster\n'
-  if [[ -n "${KIND_NODE_IMAGE}" ]]; then
+  if [[ "${REUSE_CLUSTER}" == "1" ]]; then
+    kind get clusters | grep -qx "${CLUSTER_NAME}" ||
+      die "REUSE_CLUSTER=1 but kind cluster ${CLUSTER_NAME} does not exist"
+    printf 'Reusing kind cluster %s\n' "${CLUSTER_NAME}"
+  elif [[ -n "${KIND_NODE_IMAGE}" ]]; then
     kind create cluster --name "${CLUSTER_NAME}" --config "${KIND_CONFIG}" \
       --image "${KIND_NODE_IMAGE}" --wait 180s
+    CLUSTER_CREATED=1
   else
     kind create cluster --name "${CLUSTER_NAME}" --config "${KIND_CONFIG}" \
       --wait 180s
+    CLUSTER_CREATED=1
   fi
-  CLUSTER_CREATED=1
   kubectl config use-context "kind-${CLUSTER_NAME}" >/dev/null
   # The Argo CD CLI loads argocd-cm from the kubeconfig context's default
   # namespace in core mode. kind contexts default to "default", so pin the
@@ -697,9 +718,12 @@ main() {
 
   printf '::group::Wait for Applications\n'
   for app in "${ORDER[@]}"; do
-    timeout_seconds="$(yq -r ".apps[\"${app}\"].timeout_seconds // 600" "${CONFIG_FILE}")"
+    timeout_seconds="$(yq -r ".apps[\"${app}\"].timeout_seconds // 0" "${CONFIG_FILE}")"
+    if [[ "${timeout_seconds}" == "0" || "${timeout_seconds}" == "null" ]]; then
+      timeout_seconds="${E2E_TIMEOUT_SECONDS}"
+    fi
     wait_for_project "${app}" "$(app_entry "${app}" | jq -r '.project // "default"')"
-    refresh_application "${app}" 120
+    refresh_application "${app}" "${E2E_REFRESH_TIMEOUT_SECONDS}"
     wait_for_application "${app}" "${revision}" "${timeout_seconds}"
   done
   printf '::endgroup::\n'
@@ -716,7 +740,7 @@ main() {
   done
   printf '::endgroup::\n'
 
-  wait_for_root_sync "${revision}" 600
+  wait_for_root_sync "${revision}" "${E2E_TIMEOUT_SECONDS}"
   argocd app list --core -N argocd
 }
 

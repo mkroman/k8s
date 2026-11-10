@@ -25,6 +25,43 @@ Argo CD reads the checkout from a local Git daemon, so the test deploys the
 exact commit under test, including a pull request's merge commit. No
 prerequisite CRDs are copied or applied by hand.
 
+## Local iteration
+
+The first run creates the kind cluster and installs Argo CD, which dominates
+local cycle time. Keep that cluster and reuse it for subsequent runs:
+
+```bash
+# First run: create the cluster and leave it behind.
+KEEP_CLUSTER=1 ./hack/e2e/run-app.sh spegel
+
+# Subsequent runs: skip cluster creation and reuse the installation.
+REUSE_CLUSTER=1 ./hack/e2e/run-app.sh spegel
+```
+
+`REUSE_CLUSTER=1` requires the cluster to exist and skips the cleanup
+deletion. The runner still reapplies Argo CD and the Application manifests, so
+the tested revision is always the current checkout. Use the same
+`CLUSTER_NAME` (default `e2e-<app>`) when reusing a cluster. Tear it down with:
+
+```bash
+kind delete cluster --name e2e-spegel
+```
+
+For faster failure feedback while iterating, lower the local budgets:
+
+```bash
+REUSE_CLUSTER=1 \
+  E2E_RETRY_LIMIT=1 \
+  E2E_RETRY_MAX_DURATION=30s \
+  E2E_TIMEOUT_SECONDS=300 \
+  E2E_REFRESH_TIMEOUT_SECONDS=60 \
+  ./hack/e2e/run-app.sh spegel
+```
+
+CI keeps the defaults: a fresh cluster, `E2E_RETRY_LIMIT=20`,
+`E2E_RETRY_MAX_DURATION=5m`, `E2E_TIMEOUT_SECONDS=600`, and
+`E2E_REFRESH_TIMEOUT_SECONDS=120`, so coverage is unchanged.
+
 ## Currently covered
 
 | Application | Source | Prerequisites |

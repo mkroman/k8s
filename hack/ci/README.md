@@ -72,7 +72,8 @@ Run from anywhere in the repository:
 ./hack/ci/lint-yaml.sh
 ./hack/ci/validate-dashboards.py
 ./hack/ci/validate-kustomize.sh
-./hack/ci/validate-helm.sh
+./hack/ci/validate-helm.sh           # every chart
+./hack/ci/validate-helm.sh spegel    # one chart, useful while iterating
 ```
 
 ## Workflows
