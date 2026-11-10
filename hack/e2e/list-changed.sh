@@ -4,9 +4,10 @@
 #
 # The result is a GitHub Actions matrix. A dedicated application is selected
 # when its source path or its own Application values changed. Changes shared by
-# every Application (the chart templates) select every e2e-enabled application.
-# Changes to the Argo CD bootstrap or this harness select nothing; use
-# workflow_dispatch to exercise those separately.
+# every Application (the chart templates) and changes to the shared e2e runner
+# or kind node configuration select every e2e-enabled application. Changes to
+# the Argo CD bootstrap still select nothing; use workflow_dispatch to exercise
+# those separately.
 #
 # Usage:
 #   ./hack/e2e/list-changed.sh [BASE_REF] [HEAD_REF]
@@ -250,6 +251,11 @@ main() {
           apps/templates/application.argo-cd.yaml)
             # Only affects the Argo CD self-management Application.
             ;;
+          hack/e2e/kind.yaml | hack/e2e/run-app.sh)
+            # The node containerd configuration and the runner are shared by
+            # every application, so they must exercise the whole e2e matrix.
+            shared_changed=1
+            ;;
           apps/templates/* | apps/Chart.yaml | apps/.helmignore)
             shared_changed=1
             ;;
@@ -301,7 +307,7 @@ main() {
   fi
 
   if ((shared_changed)); then
-    printf 'A shared apps chart file changed; selecting every configured app.\n'
+    printf 'A shared apps chart or e2e harness file changed; selecting every configured app.\n'
   fi
   if ((${#selected[@]} > 0)); then
     printf 'Selected apps: %s\n' "${selected[*]}"

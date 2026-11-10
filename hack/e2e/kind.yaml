@@ -23,12 +23,14 @@ kubeadmConfigPatches:
         bind-address: 0.0.0.0
 
 # Spegel e2e: route registry pulls through the local mirror and keep layer
-# blobs in the content store. This is the exact patch Spegel's own
-# integration tests use; version = 2 makes containerd 2.x convert the legacy
-# plugin IDs. Harmless for every other application.
+# blobs in the content store. This is the patch Spegel's own integration tests
+# use, minus the `version` selector. kind merges a patch only when its
+# `version` is absent or matches the base containerd config version; a
+# mismatched patch is skipped silently. The current kind node image writes a
+# version 2 config, so the legacy plugin IDs below apply as-is. Revisit those
+# IDs if kind moves to a newer config version. Harmless for every other app.
 containerdConfigPatches:
   - |-
-    version = 2
     [plugins."io.containerd.grpc.v1.cri".registry]
       config_path = "/etc/containerd/certs.d"
     [plugins."io.containerd.grpc.v1.cri".containerd]

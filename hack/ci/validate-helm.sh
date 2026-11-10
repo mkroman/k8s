@@ -6,7 +6,9 @@
 #   ./hack/ci/validate-helm.sh [CHART ...]
 #
 # With chart arguments, only those repository-relative chart directories are
-# validated. With no arguments, every chart is validated.
+# validated. Arguments may use a leading "./" or a trailing "/". Absolute
+# paths and paths that escape the repository are rejected. With no arguments,
+# every chart is validated.
 #
 # Charts are copied to a temporary directory so dependency builds never
 # modify the checkout. All charts are attempted so one broken chart does not
@@ -41,6 +43,61 @@ collect_charts() {
     dirname "${file}"
   done < <(git -C "${REPO_ROOT}" ls-files '*Chart.yaml') |
     sort -u
+}
+
+normalize_chart() {
+  local chart="$1"
+  local component index
+  local -a components=()
+  local -a normalized=()
+
+  if [[ "${chart}" == /* ]]; then
+    printf '::error title=Helm validation::%s is an absolute path; pass a repository-relative chart directory.\n' \
+      "${chart}" >&2
+    return 1
+  fi
+
+  local IFS='/'
+  read -r -a components <<<"${chart}"
+  for component in "${components[@]}"; do
+    case "${component}" in
+      '' | '.')
+        ;;
+      '..')
+        if ((${#normalized[@]} == 0)); then
+          printf '::error title=Helm validation::%s escapes the repository; chart arguments must stay below %s.\n' \
+            "${chart}" "${REPO_ROOT}" >&2
+          return 1
+        fi
+        index=$((${#normalized[@]} - 1))
+        unset "normalized[${index}]"
+        ;;
+      *)
+        normalized+=("${component}")
+        ;;
+    esac
+  done
+
+  if ((${#normalized[@]} == 0)); then
+    printf '::error title=Helm validation::%s is not a chart directory.\n' \
+      "${chart}" >&2
+    return 1
+  fi
+
+  printf '%s\n' "${normalized[*]}"
+}
+
+chart_release_name() {
+  local chart="$1"
+  local name="${chart//\//-}"
+
+  if [[ ! "${name}" =~ ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$ ]]; then
+    printf '::error title=Helm validation::%s does not map to a valid Helm release name: %s\n' \
+      "${chart}" "${name}" >&2
+    return 1
+  fi
+
+  printf '%s\n' "${name}"
 }
 
 add_chart_repositories() {
@@ -131,20 +188,29 @@ run_kubeconform() {
 
 main() {
   local -a charts=()
-  local chart name
+  local -A seen_charts=()
+  local -A chart_names=()
+  local chart name normalized
 
   TEMP_DIR="$(mktemp -d)"
   trap cleanup EXIT
   mkdir -p "${TEMP_DIR}/charts" "${TEMP_DIR}/rendered"
 
   if (($# > 0)); then
-    charts=("$@")
-    for chart in "${charts[@]}"; do
-      if [[ ! -f "${REPO_ROOT}/${chart}/Chart.yaml" ]]; then
+    for chart in "$@"; do
+      normalized="$(normalize_chart "${chart}")" || return 1
+      if [[ -n "${seen_charts[${normalized}]:-}" ]]; then
+        printf 'Skipping duplicate chart argument: %s\n' "${normalized}" >&2
+        continue
+      fi
+      seen_charts["${normalized}"]=1
+
+      if [[ ! -f "${REPO_ROOT}/${normalized}/Chart.yaml" ]]; then
         printf '::error title=Helm validation::%s is not a chart directory.\n' \
-          "${chart}" >&2
+          "${normalized}" >&2
         return 1
       fi
+      charts+=("${normalized}")
     done
   else
     mapfile -t charts < <(collect_charts)
@@ -154,6 +220,16 @@ main() {
     printf 'No Helm charts found.\n'
     return 0
   fi
+
+  for chart in "${charts[@]}"; do
+    name="$(chart_release_name "${chart}")" || return 1
+    if [[ -n "${chart_names[${name}]:-}" ]]; then
+      printf '::error title=Helm validation::%s and %s both map to Helm release name %s; validate them separately.\n' \
+        "${chart_names[${name}]}" "${chart}" "${name}" >&2
+      return 1
+    fi
+    chart_names["${name}"]="${chart}"
+  done
 
   for chart in "${charts[@]}"; do
     add_chart_repositories "${chart}"
@@ -167,7 +243,7 @@ main() {
   fi
 
   for chart in "${charts[@]}"; do
-    name="$(printf '%s' "${chart}" | tr '/' '-')"
+    name="$(chart_release_name "${chart}")"
 
     printf '::group::helm %s\n' "${chart}"
     if ! render_chart "${chart}" "${name}"; then
