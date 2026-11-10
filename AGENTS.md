@@ -48,10 +48,21 @@ REUSE_CLUSTER=1 ./hack/e2e/run-app.sh spegel
 ```
 
 - `REUSE_CLUSTER=1` requires an existing kind cluster named `e2e-<app>` (or
-  `CLUSTER_NAME=...`) and skips cluster creation and cleanup deletion.
-- Reuse mode disables root auto-sync and deletes the previously selected child
-  Applications before reapplying them, so stale sync operations and resources
-  do not leak between runs. Namespaces stay in place.
+  `CLUSTER_NAME=...`) and skips cluster creation and cleanup deletion. Both
+  `REUSE_CLUSTER` and `KEEP_CLUSTER` accept 1/true/yes or 0/false/no.
+- Reuse mode disables root auto-sync, deletes every child Application (stale
+  apps first, then the current chain in reverse order), and fails if any
+  Application cannot be deleted. Namespaces stay in place.
+- The runner removes `e2e.pullImage` from `values-kind.yaml` on every kind node
+  for apps with `requires_fresh_image`, on fresh and reused clusters alike.
+  Before that it removes resources declared under `stale_probe_resources`
+  (post-delete hook leftovers and force-deleted probe/cleanup pods) and waits
+  for them to disappear, so stale containers cannot pin the image or confuse
+  the probe. It verifies the `kind.yaml` containerd patch for apps with
+  `requires_containerd_config`; recreate the cluster if that check fails.
+- Argo CD uses an app's `retry_limit` when set (Spegel uses 0 because a retry
+  cannot recreate a cold image) and otherwise the runner's `E2E_RETRY_LIMIT`.
+  An app's `timeout_seconds` overrides `E2E_TIMEOUT_SECONDS`.
 - Argo CD and the Applications are reapplied every run; the tested revision is
   always the current checkout.
 - Tear down with `kind delete cluster --name e2e-spegel`.
@@ -70,7 +81,9 @@ REUSE_CLUSTER=1 \
 CI keeps the defaults: fresh cluster, `E2E_RETRY_LIMIT=20`,
 `E2E_RETRY_MAX_DURATION=5m`, `E2E_TIMEOUT_SECONDS=600`, and
 `E2E_REFRESH_TIMEOUT_SECONDS=120`. Do not lower these in CI; the faster
-settings are for local iterations only.
+settings are for local iterations only. `E2E_RETRY_MAX_DURATION` must be a Go
+duration such as `30s` or `5m`, and `E2E_RETRY_LIMIT` must not have leading
+zeros.
 
 ## E2E probe notes
 

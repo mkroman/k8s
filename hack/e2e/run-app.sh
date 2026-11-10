@@ -16,8 +16,10 @@
 #
 # Set KEEP_CLUSTER=1 to leave the cluster behind for debugging.
 # Set REUSE_CLUSTER=1 to reuse an existing kind cluster (skips kind create).
+# Both accept 1/true/yes and 0/false/no, case-insensitively.
 # E2E_RETRY_LIMIT, E2E_RETRY_MAX_DURATION, E2E_TIMEOUT_SECONDS and
-# E2E_REFRESH_TIMEOUT_SECONDS shorten local failure feedback loops.
+# E2E_REFRESH_TIMEOUT_SECONDS shorten local failure feedback loops. An app's
+# explicit timeout_seconds or retry_limit in apps.yaml takes precedence.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -41,6 +43,7 @@ CLUSTER_NAME="${CLUSTER_NAME:-e2e-${APP}}"
 GIT_DAEMON_PORT="${GIT_DAEMON_PORT:-9418}"
 KIND_NODE_IMAGE="${KIND_NODE_IMAGE:-}"
 REUSE_CLUSTER="${REUSE_CLUSTER:-0}"
+KEEP_CLUSTER="${KEEP_CLUSTER:-0}"
 E2E_RETRY_LIMIT="${E2E_RETRY_LIMIT:-20}"
 E2E_RETRY_MAX_DURATION="${E2E_RETRY_MAX_DURATION:-5m}"
 E2E_TIMEOUT_SECONDS="${E2E_TIMEOUT_SECONDS:-600}"
@@ -85,6 +88,22 @@ trap cleanup EXIT
 die() {
   printf '::error title=Argo CD e2e::%s\n' "$*" >&2
   exit 1
+}
+
+# Normalize the boolean spellings a developer is likely to use. The runner
+# compares the result with "1", so "TRUE" or "yes" cannot silently disable
+# reuse or cleanup.
+normalize_bool() {
+  local name="$1"
+  local value="$2"
+
+  case "${value,,}" in
+    1 | true | yes) printf '1\n' ;;
+    0 | false | no | "") printf '0\n' ;;
+    *)
+      die "${name} must be one of 1/true/yes or 0/false/no (got: ${value})"
+      ;;
+  esac
 }
 
 require_tool() {
@@ -146,20 +165,54 @@ diagnose() {
 }
 
 reset_e2e_applications() {
-  local app
+  local app output
+  local index
+  local applications_json
+  local -a delete_order=()
+  local -a failed=()
 
   # Reuse mode must not inherit an in-progress or failed sync from the
-  # previous run. Disable root auto-sync while deleting the selected child
-  # Applications, then let the freshly applied root Application recreate
-  # them. Namespaces stay in place, so a failed delete cannot leave the
-  # next sync without its destination namespace.
-  kubectl -n argocd patch application e2e --type=merge \
-    -p '{"spec":{"syncPolicy":{"automated":null}},"operation":null}' \
-    >/dev/null 2>&1 || true
-  for app in "${ORDER[@]}"; do
-    kubectl -n argocd delete application "${app}" --ignore-not-found \
-      --wait=true --timeout=300s >/dev/null 2>&1 || true
+  # previous run. Disable root auto-sync while deleting every child
+  # Application, then let the freshly applied root Application recreate only
+  # the selected chain. Namespaces stay in place, so a failed delete cannot
+  # leave the next sync without its destination namespace.
+  if kubectl -n argocd get application e2e >/dev/null 2>&1; then
+    kubectl -n argocd patch application e2e --type=merge \
+      -p '{"spec":{"syncPolicy":{"automated":null}},"operation":null}' \
+      >/dev/null ||
+      die "could not disable auto-sync on root Application e2e"
+  fi
+
+  # The cluster is e2e-only, so every Application other than the root belongs
+  # to this or an earlier selection. Delete unknown/stale Applications first
+  # and then the current chain in reverse dependency order (selected app
+  # before its prerequisites).
+  applications_json="$(kubectl -n argocd get applications -o json)" ||
+    die "could not list Applications in the argocd namespace"
+
+  while IFS= read -r app; do
+    [[ -n "${app}" ]] || continue
+    [[ -z "${ORDERED[${app}]:-}" ]] || continue
+    delete_order+=("${app}")
+  done < <(jq -r '.items[].metadata.name | select(. != "e2e")' \
+    <<<"${applications_json}" | sort)
+
+  for ((index = ${#ORDER[@]} - 1; index >= 0; index--)); do
+    delete_order+=("${ORDER[index]}")
   done
+
+  for app in "${delete_order[@]}"; do
+    if output="$(kubectl -n argocd delete application "${app}" \
+      --ignore-not-found --wait=true --timeout=300s 2>&1)"; then
+      printf 'Cleared Application %s\n' "${app}"
+    else
+      printf 'Could not delete Application %s: %s\n' "${app}" "${output}" >&2
+      failed+=("${app}")
+    fi
+  done
+
+  ((${#failed[@]} == 0)) ||
+    die "could not delete stale Applications: ${failed[*]}"
 }
 
 install_argo_cd() {
@@ -238,10 +291,31 @@ kind_source_path() {
   fi
 }
 
+# Read the image an app's probe expects to be absent. It is declared once, in
+# the kind values, so the runner and the chart cannot drift.
+app_pull_image() {
+  local app="$1"
+  local entry path overlay values_file image
+
+  entry="$(app_entry "${app}")"
+  [[ -n "${entry}" ]] || die "app ${app} is not defined in apps/values.yaml"
+  path="$(jq -r '.source.path // .name' <<<"${entry}")"
+  overlay="$(kind_source_path "${path}")"
+  values_file="${REPO_ROOT}/${overlay}/values-kind.yaml"
+
+  [[ -r "${values_file}" ]] ||
+    die "app ${app} requires a cold pull image, but ${values_file#"${REPO_ROOT}/"} is missing"
+  image="$(yq -r '.e2e.pullImage // ""' "${values_file}")"
+  [[ -n "${image}" && "${image}" != "null" ]] ||
+    die "app ${app} requires a cold pull image, but .e2e.pullImage is not set in ${values_file#"${REPO_ROOT}/"}"
+
+  printf '%s\n' "${image}"
+}
+
 build_apps() {
   local revision="$1"
   local repo_url="$2"
-  local app entry path overlay wave
+  local app entry path overlay wave retry_limit
   local -a entries=()
 
   for app in "${ORDER[@]}"; do
@@ -270,10 +344,19 @@ build_apps() {
       end
     ' <<<"${entry}")"
 
+    retry_limit="$(yq -r ".apps[\"${app}\"].retry_limit // \"\"" "${CONFIG_FILE}")"
+    if [[ -z "${retry_limit}" || "${retry_limit}" == "null" ]]; then
+      retry_limit="${E2E_RETRY_LIMIT}"
+    fi
+    [[ "${retry_limit}" =~ ^(0|[1-9][0-9]*)$ ]] ||
+      die "retry_limit for ${app} must be a non-negative integer without leading zeros"
+
     # A child app can be created immediately after its dependency's CRDs, before
     # Argo CD's API discovery cache has seen them. Retry long enough for the
     # cache to refresh instead of exhausting the production retry budget.
-    entry="$(jq --argjson retry_limit "${E2E_RETRY_LIMIT}" \
+    # Cold-image probes declare retry_limit: 0 because a retry reuses node
+    # state and cannot recreate the probe's preconditions.
+    entry="$(jq --argjson retry_limit "${retry_limit}" \
       --arg retry_max "${E2E_RETRY_MAX_DURATION}" '
       def retry: {
         limit: $retry_limit,
@@ -303,6 +386,198 @@ build_apps() {
   printf '%s\n' "${entries[@]}" | jq -s -c '.'
 }
 
+image_not_found() {
+  # Match image-specific messages only. A missing crictl binary also reports
+  # "not found", which must fall through to the ctr fallback instead of being
+  # mistaken for an absent image.
+  grep -qiE 'no such image|image .*not found|image .*does not exist' <<<"$1"
+}
+
+remove_image_from_node() {
+  local node="$1"
+  local image="$2"
+  local crictl_output ctr_output
+
+  if crictl_output="$(docker exec "${node}" crictl rmi "${image}" 2>&1)"; then
+    printf 'Removed cold-start image %s from %s\n' "${image}" "${node}"
+    return 0
+  fi
+  if image_not_found "${crictl_output}"; then
+    printf 'Cold-start image %s is already absent from %s\n' \
+      "${image}" "${node}"
+    return 0
+  fi
+
+  # crictl depends on /etc/crictl.yaml pointing at the CRI socket. Fall back to
+  # containerd's own client when the node's CRI endpoint is not configured the
+  # way crictl expects. --sync removes the image's content synchronously, so a
+  # fallback does not leave cold layers behind.
+  if ctr_output="$(docker exec "${node}" ctr -n k8s.io images rm --sync "${image}" 2>&1)"; then
+    printf 'Removed cold-start image %s from %s with ctr\n' "${image}" "${node}"
+    return 0
+  fi
+  if image_not_found "${ctr_output}"; then
+    printf 'Cold-start image %s is already absent from %s\n' \
+      "${image}" "${node}"
+    return 0
+  fi
+
+  printf 'crictl: %s\n' "${crictl_output}" >&2
+  printf 'ctr: %s\n' "${ctr_output}" >&2
+  die "could not remove cold-start image ${image} from kind node ${node}; remove it manually or recreate the cluster"
+}
+
+# Probes can create pods outside Argo CD's resource ownership, and deleting a
+# child Application can leave its post-delete hook workloads behind. Both kinds
+# of stale state can pin the pull image or confuse the probe's pod discovery,
+# so remove them using metadata from apps.yaml before touching node images.
+cleanup_stale_probe_resources() {
+  local app namespace resources selectors resource selector pods remaining
+  local output
+
+  for app in "${ORDER[@]}"; do
+    namespace="$(yq -r \
+      ".apps[\"${app}\"].stale_probe_resources.namespace // \"\"" \
+      "${CONFIG_FILE}")"
+    [[ -n "${namespace}" ]] || continue
+
+    resources="$(yq -r \
+      ".apps[\"${app}\"].stale_probe_resources.resource_names[]?" \
+      "${CONFIG_FILE}")"
+    selectors="$(yq -r \
+      ".apps[\"${app}\"].stale_probe_resources.pod_label_selectors[]?" \
+      "${CONFIG_FILE}")"
+    [[ -n "${resources}" || -n "${selectors}" ]] ||
+      die "stale_probe_resources for ${app} must set resource_names or pod_label_selectors"
+
+    if ! kubectl get namespace "${namespace}" >/dev/null 2>&1; then
+      printf 'Namespace %s does not exist; no stale probe resources for %s\n' \
+        "${namespace}" "${app}"
+      continue
+    fi
+
+    while IFS= read -r resource; do
+      [[ -n "${resource}" ]] || continue
+      if output="$(kubectl -n "${namespace}" delete "${resource}" \
+        --ignore-not-found --wait=true --timeout=120s 2>&1)"; then
+        [[ -z "${output}" ]] || printf '%s\n' "${output}"
+      else
+        printf '%s\n' "${output}" >&2
+        die "could not delete stale probe resource ${resource} for ${app}"
+      fi
+    done <<<"${resources}"
+
+    while IFS= read -r selector; do
+      [[ -n "${selector}" ]] || continue
+      pods="$(kubectl -n "${namespace}" get pods -l "${selector}" -o name)" ||
+        die "could not list stale probe pods for ${app} in namespace ${namespace}"
+      [[ -n "${pods}" ]] || continue
+
+      printf 'Deleting stale probe pods for %s (%s):\n%s\n' \
+        "${app}" "${selector}" "${pods}"
+      kubectl -n "${namespace}" delete pod -l "${selector}" \
+        --ignore-not-found --grace-period=0 --force --wait=true --timeout=60s \
+        >/dev/null ||
+        die "could not delete stale probe pods for ${app} in namespace ${namespace}"
+
+      # --wait returns when the API accepted the deletion, but a forced pod can
+      # remain visible briefly and kubelet still has to tear down its container.
+      remaining=""
+      for _ in $(seq 1 60); do
+        remaining="$(
+          kubectl -n "${namespace}" get pods -l "${selector}" -o name 2>/dev/null ||
+            true
+        )"
+        [[ -z "${remaining}" ]] && break
+        sleep 1
+      done
+      [[ -z "${remaining}" ]] ||
+        die "stale probe pods for ${app} did not terminate: ${remaining//$'\n'/, }"
+    done <<<"${selectors}"
+
+    printf 'Stale probe resources for %s are gone\n' "${app}"
+  done
+}
+
+# A cold-image test is only meaningful when the image is absent from every
+# node. This runs for fresh and reused clusters alike: a fresh cluster normally
+# has nothing to remove, while a reused one must not inherit the previous run's
+# cache.
+remove_cold_start_images() {
+  local app image node node_list
+
+  for app in "${ORDER[@]}"; do
+    [[ "$(yq -r ".apps[\"${app}\"].requires_fresh_image // false" \
+      "${CONFIG_FILE}")" == "true" ]] || continue
+
+    image="$(app_pull_image "${app}")"
+    node_list="$(kind get nodes --name "${CLUSTER_NAME}")" ||
+      die "could not list nodes for kind cluster ${CLUSTER_NAME}"
+    [[ -n "${node_list}" ]] ||
+      die "kind cluster ${CLUSTER_NAME} has no nodes"
+
+    printf '::group::Remove cold-start image for %s\n' "${app}"
+    while IFS= read -r node; do
+      [[ -n "${node}" ]] || continue
+      remove_image_from_node "${node}" "${image}"
+    done <<<"${node_list}"
+    printf '::endgroup::\n'
+  done
+}
+
+# Verify the node configuration a probe depends on. A reused cluster can
+# predate a kind.yaml change, so never assume the patch is present just because
+# the cluster exists.
+verify_containerd_config() {
+  local app config node node_list
+  local -a failures=()
+
+  for app in "${ORDER[@]}"; do
+    [[ "$(yq -r ".apps[\"${app}\"].requires_containerd_config // false" \
+      "${CONFIG_FILE}")" == "true" ]] || continue
+
+    node_list="$(kind get nodes --name "${CLUSTER_NAME}")" ||
+      die "could not list nodes for kind cluster ${CLUSTER_NAME}"
+    [[ -n "${node_list}" ]] ||
+      die "kind cluster ${CLUSTER_NAME} has no nodes"
+
+    while IFS= read -r node; do
+      [[ -n "${node}" ]] || continue
+      if ! config="$(docker exec "${node}" cat /etc/containerd/config.toml 2>&1)"; then
+        printf '%s\n' "${config}" >&2
+        die "could not read /etc/containerd/config.toml on kind node ${node}"
+      fi
+
+      if ! grep -Eq \
+        '^[[:space:]]*config_path[[:space:]]*=[[:space:]]*"/etc/containerd/certs\.d"' \
+        <<<"${config}"; then
+        failures+=("${node}: config_path is not /etc/containerd/certs.d")
+      fi
+      if grep -Eq \
+        '^[[:space:]]*discard_unpacked_layers[[:space:]]*=[[:space:]]*true([[:space:]]|$)' \
+        <<<"${config}"; then
+        failures+=("${node}: discard_unpacked_layers is true")
+      fi
+      # The bolt metadata plugin section exists on the containerd versions
+      # kind ships; only require the setting when that section is applicable.
+      if grep -q 'io\.containerd\.metadata\.v1\.bolt' <<<"${config}" &&
+        ! grep -Eq \
+          '^[[:space:]]*content_sharing_policy[[:space:]]*=[[:space:]]*"isolated"' \
+          <<<"${config}"; then
+        failures+=("${node}: content_sharing_policy is not isolated")
+      fi
+      if ((${#failures[@]} == 0)); then
+        printf 'Verified containerd config for %s on %s\n' "${app}" "${node}"
+      fi
+    done <<<"${node_list}"
+
+    if ((${#failures[@]} > 0)); then
+      printf 'Containerd config required by %s is missing:\n' "${app}" >&2
+      printf '  %s\n' "${failures[@]}" >&2
+      die "recreate the kind cluster so hack/e2e/kind.yaml is applied, then rerun"
+    fi
+  done
+}
 
 build_projects() {
   local repo_url="$1"
@@ -479,7 +754,7 @@ wait_for_application() {
   local app="$1"
   local revision="$2"
   local timeout_seconds="$3"
-  local start elapsed remaining application_json health
+  local start elapsed remaining application_json health operation_phase
 
   start="$(date +%s)"
 
@@ -515,11 +790,28 @@ wait_for_application() {
     )"
     if [[ -n "${application_json}" ]]; then
       health="$(jq -r '.status.health.status // "Unknown"' <<<"${application_json}")"
-      printf 'Application %s: health=%s\n' "${app}" "${health}"
-      if [[ "${health}" == "Healthy" ]]; then
-        require_app_revision "${app}" "${revision}"
-        return 0
-      fi
+      operation_phase="$(
+        jq -r '.status.operationState.phase // ""' <<<"${application_json}"
+      )"
+      printf 'Application %s: health=%s operation=%s\n' \
+        "${app}" "${health}" "${operation_phase:-none}"
+
+      case "${operation_phase}" in
+        Failed | Error)
+          diagnose
+          die "Application ${app} sync operation ${operation_phase}: $(jq -r '.status.operationState.message // "no message"' <<<"${application_json}")"
+          ;;
+        Running | Terminating)
+          # PostSync hooks, including e2e probes, run during the operation.
+          # Do not treat resource health alone as success: wait for the hook.
+          ;;
+        *)
+          if [[ "${health}" == "Healthy" ]]; then
+            require_app_revision "${app}" "${revision}"
+            return 0
+          fi
+          ;;
+      esac
     fi
 
     sleep 5
@@ -660,6 +952,9 @@ main() {
   local app="$1"
   local revision repo_url timeout_seconds apps_json projects_json
 
+  REUSE_CLUSTER="$(normalize_bool REUSE_CLUSTER "${REUSE_CLUSTER}")"
+  KEEP_CLUSTER="$(normalize_bool KEEP_CLUSTER "${KEEP_CLUSTER}")"
+
   require_tool docker
   require_tool git
   require_tool jq
@@ -673,8 +968,10 @@ main() {
   [[ -r "${KIND_CONFIG}" ]] || die "missing kind config: ${KIND_CONFIG}"
   [[ -r "${ROOT_APP_TEMPLATE}" ]] || die "missing root Application template"
 
-  [[ "${E2E_RETRY_LIMIT}" =~ ^[0-9]+$ ]] ||
-    die "E2E_RETRY_LIMIT must be a non-negative integer"
+  [[ "${E2E_RETRY_LIMIT}" =~ ^(0|[1-9][0-9]*)$ ]] ||
+    die "E2E_RETRY_LIMIT must be a non-negative integer without leading zeros"
+  [[ "${E2E_RETRY_MAX_DURATION}" =~ ^[0-9]+(ms|s|m|h)$ ]] ||
+    die "E2E_RETRY_MAX_DURATION must be a Go duration such as 30s or 5m"
   [[ "${E2E_TIMEOUT_SECONDS}" =~ ^[1-9][0-9]*$ ]] ||
     die "E2E_TIMEOUT_SECONDS must be a positive integer"
   [[ "${E2E_REFRESH_TIMEOUT_SECONDS}" =~ ^[1-9][0-9]*$ ]] ||
@@ -724,6 +1021,14 @@ main() {
     reset_e2e_applications
     printf '::endgroup::\n'
   fi
+
+  # Establish the node preconditions before Argo CD can create the probe, and
+  # do it for fresh clusters too so the same checks guard both paths. Pods left
+  # by a failed probe and hook workloads left by the reset must go first: they
+  # can pin the image or match the probe's own pod selector.
+  cleanup_stale_probe_resources
+  remove_cold_start_images
+  verify_containerd_config
 
   repo_url="git://$(gateway_ip):${GIT_DAEMON_PORT}/repo.git"
   [[ "${repo_url}" != "git://:"* ]] || die "could not determine the kind gateway IP"
