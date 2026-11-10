@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=values.schema.json
 # Kind-specific overrides for the Spegel e2e Application.
 #
 # Prometheus Operator CRDs are not deployed for this app, so the
@@ -9,7 +10,7 @@ spegel:
 
 e2e:
   enabled: true
-  probeNamespace: spegel
+  probeNamespace: "spegel"
   # Alpine-based curl image pulled through Google's Docker Hub mirror (repo
   # convention, see grafana/values-kind.yaml); the probe talks to the
   # Kubernetes API and the Spegel metrics endpoints with curl only.

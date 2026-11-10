@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=values.schema.json
 # Wrapper chart values for Spegel — stateless cluster-local P2P OCI registry
 # mirror.
 #
@@ -29,7 +30,7 @@ spegel:
   # -- Node selector. Spegel only serves layers present on its own node, so
   #    the DaemonSet must cover every node.
   nodeSelector:
-    kubernetes.io/os: linux
+    kubernetes.io/os: "linux"
 
   # -- Tolerations for the Kubespray control-plane taints (plus catch-alls for
   #    custom taints) so the DaemonSet also covers control-plane nodes.
@@ -92,7 +93,7 @@ spegel:
     scrapeTimeout: "30s"
     # Discovery label of the cluster Prometheus (all namespaces).
     labels:
-      metrics.uplink.io/monitor: prometheus
+      metrics.uplink.io/monitor: "prometheus"
 
   # -- /livez liveness probe; the chart's startupProbe already allows 3m for
   #    DHT bootstrap.
