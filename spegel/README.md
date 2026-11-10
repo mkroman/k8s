@@ -59,15 +59,19 @@ cannot write the fix itself: disabling it requires a containerd restart).
 | v2.25.x | 1.7.16 | **Yes, `= true`** | ❌ breaks Spegel — override required |
 | v2.26.x / master | ≥ 2.1 (2.3.7) | No — option removed in containerd 2.1, default `false` | ✅ works, override kept as belt-and-braces |
 
-Fix: [`kubespray/group_vars/all/containerd.yml`](kubespray/group_vars/all/containerd.yml):
+Fix: set `containerd_discard_unpacked_layers: false` in the Kubespray
+containerd configuration for every node.
 
-```yaml
-containerd_discard_unpacked_layers: false
-```
+> **Disk note:** disabling `discard_unpacked_layers` retains layer tarballs on
+> disk. That is what Spegel serves from, but ensure kubelet image GC stays
+> enabled — Spegel has no GC of its own and relies on kubelet eviction
+> thresholds to reclaim space ([upstream FAQ][faq-disk]).
+
+[faq-disk]: https://spegel.dev/docs/faq/#why-is-my-node-running-out-of-disk-space
 
 ### 1.2 Registry config path (`certs.d`) ✅ matches out of the box
 
-Kubespray's `config.toml.j2` renders:
+Kubespray renders:
 
 ```toml
 [plugins."io.containerd.cri.v1.images".registry]
@@ -79,18 +83,17 @@ the DaemonSet host-mounts that directory into its config init container.
 **No value changes needed** — the defaults are spelled out explicitly in
 [`values.yaml`](values.yaml) so a future Kubespray change fails loudly.
 
-**Interaction with `containerd_registries_mirrors`:** Kubespray renders this
-variable into `/etc/containerd/certs.d/<prefix>/hosts.toml` (verified:
-`roles/container-engine/containerd/tasks/main.yml`). Two coexistence modes:
+**Interaction with Kubespray-managed mirrors:** Kubespray renders
+`containerd_registries_mirrors` into
+`/etc/containerd/certs.d/<prefix>/hosts.toml`. Keep that list empty when
+Spegel owns `certs.d`, or leave `spegel.prependExisting: true` so existing
+entries are preserved as fallbacks. If an external renderer rewrites
+`hosts.toml` without the Spegel entry, that node bypasses Spegel until its
+Spegel pod restarts.
 
-| Mode | Config | Behaviour |
-|---|---|---|
-| **Recommended** | `containerd_registries_mirrors: []` in group_vars | Spegel solely owns `certs.d`. Stock Kubespray entry is only a docker.io passthrough (`registry-1.docker.io`) that Spegel already falls back to — nothing is lost. |
-| **Keep Kubespray mirrors** | leave list, `spegel.prependExisting: true` (set in values.yaml) | Spegel reads existing `hosts.toml` and **prepends** its local mirror, preserving Kubespray entries as fallbacks: *local peer → Kubespray mirror → upstream*. Caveat: an Ansible re-run re-renders the files without the Spegel line until that node's Spegel pod restarts. |
-
-⚠️ Do **not** leave `mirroredRegistries` empty on Kubespray *while*
-`containerd_registries_mirrors` is set: an empty list makes Spegel write only
-a `_default/hosts.toml` catch-all, and containerd gives per-registry
+⚠️ Do **not** leave `mirroredRegistries` empty while per-registry
+`hosts.toml` files exist: an empty list makes Spegel write only a
+`_default/hosts.toml` catch-all, and containerd gives per-registry
 directories precedence over `_default` — so docker.io pulls would bypass
 Spegel entirely. The values file therefore lists the registries explicitly.
 
@@ -120,46 +123,13 @@ override and the two value tweaks above, Spegel works unmodified.
 
 ---
 
-## 2. Node preparation (Ansible)
-
-1. Copy [`kubespray/group_vars/all/containerd.yml`](kubespray/group_vars/all/containerd.yml)
-   into the Kubespray checkout as `inventory/<cluster>/group_vars/all/containerd.yml`.
-2. Copy [`kubespray/playbooks/prepare-containerd-spegel.yml`](kubespray/playbooks/prepare-containerd-spegel.yml)
-   into `<kubespray>/playbooks/`.
-
-```bash
-cd <kubespray>
-
-# Rolling application — one node at a time, containerd restarts only where
-# the config actually changed:
-ansible-playbook -i inventory/<cluster>/hosts.yaml -b \
-  playbooks/prepare-containerd-spegel.yml
-
-# Or restrict to specific nodes first (recommended for the canary):
-ansible-playbook -i inventory/<cluster>/hosts.yaml -b \
-  --limit "worker-1" playbooks/prepare-containerd-spegel.yml
-```
-
-> Alternative: run the stock `playbooks/cluster.yml` /
-> `playbooks/upgrade-cluster.yml` after committing the group_vars — same
-> result, heavier execution.
->
-> **Disk note:** disabling `discard_unpacked_layers` retains layer tarballs on
-> disk. That is what Spegel serves from, but ensure kubelet image GC stays
-> enabled (Kubespray default) — Spegel has no GC of its own and relies on
-> kubelet eviction thresholds to reclaim space ([upstream FAQ][faq-disk]).
-
-[faq-disk]: https://spegel.dev/docs/faq/#why-is-my-node-running-out-of-disk-space
-
----
-
-## 3. Deployment
+## 2. Deployment
 
 ### Helm CLI (one-off / testing)
 
 ```bash
-helm upgrade --install spegel oci://ghcr.io/spegel-org/helm-charts/spegel \
-  --version 0.8.1 \
+helm dependency build spegel
+helm upgrade --install spegel ./spegel \
   --create-namespace --namespace spegel \
   -f spegel/values.yaml
 ```
@@ -173,7 +143,7 @@ The chart is wired into the app-of-apps (`apps/values.yaml`): project
 
 ---
 
-## 4. Values
+## 3. Values
 
 Keys not listed here fall through to the upstream chart defaults — see its
 helm-docs generated [values reference][upstream-values] for the full surface.
@@ -183,7 +153,7 @@ All keys are validated by `values.schema.json`.
 
 | Key | Default here | Purpose |
 |---|---|---|
-| `spegel.image.tag` / `digest` | empty | Inherit the chart's digest-pinned v0.8.1 image; upgrade via `Chart.yaml` |
+| `spegel.image.tag` / `digest` | unset | Inherit the chart's digest-pinned v0.8.1 image; upgrade via `Chart.yaml` |
 | `spegel.tolerations` | control-plane, master, `CriticalAddonsOnly`, catch-alls | DaemonSet coverage of every node |
 | `spegel.priorityClassName` | `system-node-critical` | Never evicted in favour of workloads |
 | `spegel.updateStrategy` | `RollingUpdate`, `maxUnavailable: 1` | One node at a time keeps a mirror candidate per image |
@@ -203,7 +173,7 @@ All keys are validated by `values.schema.json`.
 
 ---
 
-## 5. Verification runbook
+## 4. Verification runbook
 
 ### 4.1 Node-level containerd settings
 
@@ -225,12 +195,7 @@ du -sh /var/lib/containerd/io.containerd.content.v1.content
 ctr -n k8s.io -a /run/containerd/containerd.sock content ls | head
 ```
 
-Across the whole fleet (from the Ansible control node):
-
-```bash
-ansible k8s_cluster -i inventory/<cluster>/hosts.yaml -b -m shell -a \
-  "grep -E 'discard_unpacked_layers|config_path' /etc/containerd/config.toml"
-```
+Repeat the same checks on every node.
 
 ### 4.2 DaemonSet health & peer discovery
 
@@ -302,7 +267,7 @@ kubectl -n spegel logs "$MIRROR_POD" --tail=50
 kubectl -n spegel exec "$MIRROR_POD" -c configuration -- \
   cat /etc/containerd/certs.d/docker.io/hosts.toml 2>/dev/null || \
   ssh <MIRROR_NODE> cat /etc/containerd/certs.d/docker.io/hosts.toml
-#   [host.'http://<nodeIP>:30020']  ← Spegel first, Kubespray/upper entries after
+#   [host.'http://<nodeIP>:30020']  ← Spegel first, existing/upper entries after
 
 # Optional airtight proof: sniff for upstream egress on node B during a
 # mirrored pull — silence means everything came from a peer:
@@ -320,13 +285,13 @@ spegel_advertised_keys                                # keys advertised per node
 
 ---
 
-## 6. Security posture
+## 5. Security posture
 
 | Control | Setting | Rationale |
 |---|---|---|
 | Pod Security Admission | `spegel` namespace labelled `privileged` (enforce/audit/warn, in `apps/values.yaml`) | Spegel needs hostPath access to the containerd socket and content store; an explicit label beats relying on the unlabeled namespace default |
 | DHT isolation | `networkPolicy.enabled: true` | Limits libp2p gossip to Spegel peers, mitigating rogue peers advertising incorrect digests (v0.8 opt-in) |
-| Image pinning | upstream chart pins `ghcr.io/spegel-org/spegel@sha256:bdc1d14e…` | Helm best practice: no floating tags; inherited by leaving `image.tag`/`image.digest` empty |
+| Image pinning | upstream chart pins `ghcr.io/spegel-org/spegel@sha256:bdc1d14e…` | Helm best practice: no floating tags; inherited by leaving `image.tag`/`image.digest` unset |
 | Chart pinning | exact dependency version + `Chart.lock` OCI digest | Argo CD verifies the built dependency against the lock digest; deliberate deviation from Helm's `~` range advice for supply-chain reproducibility |
 | Chart signature | cosign signatures published per release | Verify before adopting a new pin: `cosign verify ghcr.io/spegel-org/helm-charts/spegel:<version> --certificate-identity-regexp 'https://github\.com/spegel-org/spegel/\.github/workflows/.*' --certificate-oidc-issuer https://token.actions.githubusercontent.com` |
 | Registry exposure | `basicAuthSecretName: ""` | The NodePort is reachable by anything that can reach a node IP; set a secret on multi-tenant clusters (docs: Multi-tenant Credentials) |
@@ -343,5 +308,3 @@ spegel_advertised_keys                                # keys advertised per node
 | [`Chart.yaml`](Chart.yaml) | Wrapper chart pinning `oci://ghcr.io/spegel-org/helm-charts/spegel` 0.8.1 |
 | [`values.yaml`](values.yaml) | Production values (scheduling, ports, ServiceMonitor, containerd paths) |
 | [`values.schema.json`](values.schema.json) | Draft-07 schema validating all values (incl. upstream pass-through surface) in CI |
-| [`kubespray/group_vars/all/containerd.yml`](kubespray/group_vars/all/containerd.yml) | Ansible overrides: layer retention + certs.d ownership |
-| [`kubespray/playbooks/prepare-containerd-spegel.yml`](kubespray/playbooks/prepare-containerd-spegel.yml) | Rolling one-shot node prep playbook |

@@ -45,11 +45,10 @@ subjects:
     name: e2e-spegel-probe
     namespace: {{ $probeNamespace }}
 ---
-# Proves that image layers are served peer-to-peer: pod A pulls an image that
-# is cached nowhere in the cluster (upstream pull, then advertised by the
-# DHT), and pod B — forced onto a different node by pod anti-affinity — must
-# have its pull served by a Spegel instance, visible as a non-zero
-# spegel_mirror_last_success_timestamp_seconds on the metrics endpoints.
+# Proves cross-node P2P serving: pod A pulls an image cached nowhere in the
+# cluster, pod B is forced onto a different node by anti-affinity, and the
+# probe asserts that the Spegel mirror-hit counter increases. The probe image
+# is pulled before the baseline is taken, so it cannot satisfy that assertion.
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -101,11 +100,15 @@ spec:
               value: {{ $pullImage | quote }}
             - name: SPEGEL_SELECTOR
               value: {{ $selector | quote }}
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
           command:
             - /bin/sh
             - -ec
             - |
-              set -eu
+              set -euo pipefail
               API="https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT_HTTPS}"
               SA="/var/run/secrets/kubernetes.io/serviceaccount"
               TOKEN="$(cat "${SA}/token")"
@@ -135,39 +138,108 @@ spec:
                 return 1
               }
 
-              # Remove leftovers from an earlier hook run so anti-affinity and
-              # the "cached nowhere" precondition hold.
-              api -X DELETE "${PULLS}/e2e-spegel-pull-a" >/dev/null 2>&1 || true
-              api -X DELETE "${PULLS}/e2e-spegel-pull-b" >/dev/null 2>&1 || true
+              spegel_ip_on_node() {
+                local node="$1"
+                api "${SPEGELS}&fieldSelector=spec.nodeName%3D${node}" |
+                  grep -o '"podIP":"[^"]*"' | head -n1 | cut -d'"' -f4
+              }
 
-              # Pod A: cached nowhere, so its pull goes upstream; Spegel
-              # advertises the layers once containerd stores them.
-              printf 'Creating pod A (upstream pull) with %s\n' "${PULL_IMAGE}"
+              metric_value() {
+                local ip="$1" metric="$2"
+                curl -fsS --max-time 10 "http://${ip}:9090/metrics" |
+                  awk -v metric="${metric}" \
+                    '$1 == metric { print $2; found = 1 } END { exit !found }'
+              }
+
+              mirror_hits() {
+                total=0
+                ips="$(api "${SPEGELS}" |
+                  grep -o '"podIP":"[^"]*"' | cut -d'"' -f4)" || return 1
+                for ip in ${ips}; do
+                  value="$(curl -fsS --max-time 10 "http://${ip}:9090/metrics" |
+                    awk 'index($0, "spegel_mirror_requests_total{") == 1 &&
+                         index($0, "cache=\"hit\"") { sum += $NF }
+                         END { printf "%d\n", sum }')" || return 1
+                  total=$((total + value))
+                done
+                printf '%s\n' "${total}"
+              }
+
+              delete_pod() {
+                local pod="$1"
+                api -X DELETE "${PULLS}/${pod}?gracePeriodSeconds=0" >/dev/null 2>&1 || true
+                for _ in $(seq 1 30); do
+                  if ! api "${PULLS}/${pod}" >/dev/null 2>&1; then
+                    return 0
+                  fi
+                  sleep 1
+                done
+                echo "pod ${pod} did not terminate" >&2
+                return 1
+              }
+
+              # Reuse the fixed pod names only after the old objects are gone.
+              delete_pod e2e-spegel-pull-a
+              delete_pod e2e-spegel-pull-b
+
+              # Pin pod A to a node other than the probe's node, so the
+              # advertised-key baseline is not affected by the probe image.
+              spegel_nodes="$(api "${SPEGELS}" |
+                grep -o '"nodeName":"[^"]*"' | cut -d'"' -f4)"
+              pod_a_node=""
+              for node in ${spegel_nodes}; do
+                if [ "${node}" != "${NODE_NAME}" ]; then
+                  pod_a_node="${node}"
+                  break
+                fi
+              done
+              [ -n "${pod_a_node}" ] || {
+                echo "need a second node with a Spegel instance" >&2
+                exit 1
+              }
+              pod_a_spegel_ip="$(spegel_ip_on_node "${pod_a_node}" || true)"
+              [ -n "${pod_a_spegel_ip}" ] || {
+                echo "no Spegel pod IP on ${pod_a_node}" >&2
+                exit 1
+              }
+
+              keys_before="$(metric_value "${pod_a_spegel_ip}" spegel_advertised_keys)" || {
+                echo "could not read spegel_advertised_keys from ${pod_a_spegel_ip}" >&2
+                exit 1
+              }
+
+              # Pod A: cached nowhere on this node, so its pull goes upstream;
+              # Spegel on that node advertises the layers once they are stored.
+              printf 'Creating pod A (upstream pull) on %s with %s\n' "${pod_a_node}" "${PULL_IMAGE}"
               api -X POST "${PULLS}" --data-binary @- >/dev/null <<JSON
-              {"apiVersion":"v1","kind":"Pod","metadata":{"name":"e2e-spegel-pull-a","labels":{"e2e.spegel.io/pull":"a"}},"spec":{"restartPolicy":"Never","tolerations":[{"operator":"Exists"}],"containers":[{"name":"pull","image":"${PULL_IMAGE}","imagePullPolicy":"Always","command":["/bin/sh","-ec","sleep 20"]}]}}
+              {"apiVersion":"v1","kind":"Pod","metadata":{"name":"e2e-spegel-pull-a","labels":{"e2e.spegel.io/pull":"a"}},"spec":{"nodeName":"${pod_a_node}","restartPolicy":"Never","tolerations":[{"operator":"Exists"}],"containers":[{"name":"pull","image":"${PULL_IMAGE}","imagePullPolicy":"Always","command":["/bin/sh","-ec","sleep 300"]}]}}
               JSON
               wait_phase e2e-spegel-pull-a Running
 
-              # Wait until at least one Spegel instance advertises the keys
-              # from pod A's pull, so pod B's resolve cannot race the DHT.
-              printf 'Waiting for Spegel to advertise the layers\n'
+              # Wait for the Spegel instance on pod A's node to advertise the
+              # new keys. A global non-zero gauge is not sufficient: every node
+              # already advertises its cached system images.
+              printf 'Waiting for Spegel on %s to advertise the pulled layers\n' "${pod_a_node}"
               advertised=0
               for _ in $(seq 1 60); do
-                ips="$(api "${SPEGELS}" |
-                  grep -o '"podIP":"[^"]*"' | cut -d'"' -f4)"
-                for ip in $ips; do
-                  if curl -fsS --max-time 10 "http://${ip}:9090/metrics" |
-                    awk '/^spegel_advertised_keys/ { exit !($2+0 > 0) }'; then
-                    advertised=1
-                    printf 'Spegel instance %s advertises keys\n' "$ip"
-                    break
-                  fi
-                done
-                [ "$advertised" = 1 ] && break
+                if metric_value "${pod_a_spegel_ip}" spegel_advertised_keys |
+                  awk -v base="${keys_before}" '$1+0 > base { exit 0 } END { exit 1 }'; then
+                  advertised=1
+                  printf 'Spegel instance %s advertises the new keys\n' "${pod_a_spegel_ip}"
+                  break
+                fi
                 sleep 2
               done
-              [ "$advertised" = 1 ] || {
-                echo "no Spegel instance advertised the pulled layers"
+              [ "${advertised}" = 1 ] || {
+                echo "Spegel on ${pod_a_node} did not advertise pod A's layers" >&2
+                exit 1
+              }
+
+              # Baseline mirror hits after pod A's pull and before pod B, so
+              # any later increase belongs to pod B. The probe image was pulled
+              # before this baseline and cannot contribute.
+              hits_before="$(mirror_hits)" || {
+                echo "could not read Spegel mirror counters" >&2
                 exit 1
               }
 
@@ -179,26 +251,26 @@ spec:
               JSON
               wait_phase e2e-spegel-pull-b Succeeded
 
-              # A non-zero last-success timestamp proves an instance served a
-              # mirror request; only pod B's pull could have been one.
-              printf 'Checking Spegel metrics for a served mirror request\n'
+              # A mirror hit after pod B's pull proves the second node was
+              # served peer-to-peer. The probe image was pulled before the
+              # baseline above, so it cannot contribute to this increase.
+              printf "Checking Spegel mirror counters for pod B's pull\n"
               hit=0
-              ips="$(api "${SPEGELS}" |
-                grep -o '"podIP":"[^"]*"' | cut -d'"' -f4)"
-              for ip in $ips; do
-                if curl -fsS --max-time 10 "http://${ip}:9090/metrics" |
-                  awk '/^spegel_mirror_last_success_timestamp_seconds / { exit !($2+0 > 0) }'; then
+              for _ in $(seq 1 30); do
+                hits_after="$(mirror_hits)"
+                if [ "${hits_after}" -gt "${hits_before}" ]; then
                   hit=1
-                  printf 'Spegel instance %s served a mirror pull\n' "$ip"
+                  printf 'Spegel mirror hits increased from %s to %s\n' "${hits_before}" "${hits_after}"
                   break
                 fi
+                sleep 2
               done
-              [ "$hit" = 1 ] || {
-                echo "no Spegel instance served the second pull peer-to-peer"
+              [ "${hit}" = 1 ] || {
+                echo "no Spegel mirror hit was recorded for pod B" >&2
                 exit 1
               }
 
-              api -X DELETE "${PULLS}/e2e-spegel-pull-a" >/dev/null
-              api -X DELETE "${PULLS}/e2e-spegel-pull-b" >/dev/null
+              delete_pod e2e-spegel-pull-a
+              delete_pod e2e-spegel-pull-b
               echo "P2P image serving verified"
 {{- end }}

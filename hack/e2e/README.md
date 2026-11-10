@@ -61,13 +61,14 @@ annotations to its own PostSync hooks, so a failed probe fails the Application
 sync. No runner-specific check code is needed.
 
 The `spegel` probe verifies behaviour end to end: pod A pulls a busybox image
-that is cached nowhere in the cluster (upstream pull, advertised by the DHT),
-pod B is forced onto a different node by pod anti-affinity, and the probe
-asserts a Spegel instance reports a non-zero
-`spegel_mirror_last_success_timestamp_seconds` — the signature of a
-peer-to-peer layer serve. It depends on the containerd mirror patch in
-`kind.yaml` (`config_path` plus `discard_unpacked_layers = false`), which is
-why the patch lives in the cluster config and not in the chart.
+that is cached nowhere in the fresh kind cluster (upstream pull, advertised by
+the DHT), pod B is forced onto a different node by pod anti-affinity, and the
+probe asserts that the aggregate Spegel mirror-hit counter increases — the
+signature of a peer-to-peer serve. The probe image is pulled before that
+baseline, so its own pull cannot satisfy the assertion. It depends on the
+containerd mirror patch in `kind.yaml` (`config_path` plus
+`discard_unpacked_layers = false`), which is why the patch lives in the cluster
+config and not in the chart.
 
 Helm's own `helm.sh/hook: test` tests are only executed by `helm test`, and
 Argo CD does not map the Helm test hooks. Mapping `post-install`/`post-upgrade`

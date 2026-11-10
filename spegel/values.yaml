@@ -13,13 +13,10 @@ spegel:
   image:
     # -- Image for the DaemonSet and the certs.d config init container.
     repository: "ghcr.io/spegel-org/spegel"
-    # -- Image tag; empty inherits the chart appVersion. Upgrade via Chart.yaml.
-    tag: ""
-    # -- Image digest; empty inherits the digest pinned by chart 0.8.1.
-    #    Takes precedence over `tag` when set.
-    digest: ""
     # -- Image pull policy.
     pullPolicy: "IfNotPresent"
+    # `tag` and `digest` are intentionally omitted: the upstream chart ships a
+    # digest-pinned image. Upgrade via Chart.yaml.
 
   # -- Node selector. Spegel serves only layers present on its own node, so
   #    the DaemonSet must cover every node.

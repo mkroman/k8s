@@ -54,9 +54,8 @@
             },
             "digest": {
               "type": "string",
-              "default": "",
               "pattern": "^(sha256:[a-f0-9]{64})?$",
-              "description": "Pin the image by digest; takes precedence over the tag when set, e.g. \"sha256:0123...\". Chart 0.8.1 ships digest-pinned."
+              "description": "Pin the image by digest; takes precedence over the tag when set, e.g. \"sha256:0123...\". Leave unset to inherit the upstream chart's digest-pinned image."
             },
             "pullPolicy": {
               "type": "string",
