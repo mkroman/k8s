@@ -3,10 +3,15 @@ apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: argo-cd
-  namespace: argocd
+  namespace: {{ .Values.argocdNamespace }}
+  annotations:
+    # Argo CD self-management is not part of the platform gate; workload
+    # health is alerted on directly. Keeping it ignored stops a repo-server
+    # restart from turning the root catalogue Degraded.
+    argocd.argoproj.io/ignore-healthcheck: "true"
 spec:
   destination:
-    namespace: argocd
+    namespace: {{ .Values.argocdNamespace }}
     server: {{ .Values.spec.destination.server }}
   project: production
   source:
@@ -17,6 +22,13 @@ spec:
     automated:
       prune: false
       selfHeal: true
+    retry:
+      limit: 10
+      refresh: true
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 5m
     syncOptions:
     - ApplyOutOfSyncOnly=true
     - ServerSideApply=true

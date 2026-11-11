@@ -60,7 +60,30 @@ spec:
           {{- if $quickwit.Values.bootstrap.indexes.command }}
           command: {{- toYaml $quickwit.Values.bootstrap.indexes.command | nindent 12 }}
           {{- else }}
-          command: ["/bin/bash","-c","quickwit index describe --index {{ $indexId }} --endpoint ${QW_CLUSTER_ENDPOINT} || quickwit index create --index-config {{ $indexId }}.yaml --endpoint ${QW_CLUSTER_ENDPOINT}"]
+          # PostSync hook: the metastore (Postgres) may still be starting when
+          # this runs. Argo CD does not automatically retry a failed sync for
+          # the same revision, so poll for up to 10 minutes instead of failing
+          # the whole Application permanently.
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -eu
+              endpoint="${QW_CLUSTER_ENDPOINT}"
+              attempt=0
+              while [ "${attempt}" -lt 120 ]; do
+                attempt=$((attempt + 1))
+                if quickwit index describe --index {{ $indexId | quote }} --endpoint "${endpoint}" >/dev/null 2>&1; then
+                  exit 0
+                fi
+                if quickwit index create --index-config {{ printf "%s.yaml" $indexId | quote }} --endpoint "${endpoint}" >/dev/null 2>&1; then
+                  echo "created index {{ $indexId }}" >&2
+                  exit 0
+                fi
+                sleep 5
+              done
+              echo "index {{ $indexId }} not ready after 10 minutes" >&2
+              exit 1
           {{- end }}
           env:
             {{- include "quickwit.environment" $quickwit | nindent 12 }}

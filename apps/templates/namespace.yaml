@@ -3,6 +3,11 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: {{ required "Namespace must have a .name" .name | quote }}
+  annotations:
+    # Namespaces exist before any AppProject or Application, and confirm-prune
+    # keeps a future prune of the catalogue from silently deleting one.
+    argocd.argoproj.io/sync-wave: "-20"
+    argocd.argoproj.io/sync-options: Prune=confirm
   {{- with .labels }}
   labels:
     {{- toYaml . | nindent 4 }}

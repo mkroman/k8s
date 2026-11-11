@@ -1,2 +1,8 @@
 resources:
   - ./manifests/install-v3.6.1.yaml
+
+patches:
+  # Restore the Application health check used by app-of-apps sync-wave gating.
+  # Kept in the base so the production overlay and the e2e install behave the
+  # same way.
+  - path: ./patches/configmap.argocd-cm-application-health.yaml

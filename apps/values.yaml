@@ -434,6 +434,21 @@ namespaces:
   - name: zeta-magistr
   - name: zeta-prod
 
+# Applications are ordered in two layers:
+#
+#   -20  Namespaces            (apps/templates/namespace.yaml)
+#   -10  AppProjects           (apps/templates/appproject.yaml)
+#    -1  Platform gate         (CRD/operator providers, `ignoreHealthcheck: false`)
+#     0  Everything else
+#
+# Platform-gate apps propagate health to the root, so Argo CD waits for them to
+# be Synced and Healthy before applying wave 0. Wave 0 apps set
+# `argocd.argoproj.io/ignore-healthcheck`, so a single degraded workload can
+# neither stall the catalogue nor turn the root Application Degraded; their
+# convergence relies on the default retry policy and the Argo CD alerts in
+# monitoring/prometheus. Every application also gets a default retry policy
+# (limit 10, refresh on new revisions) and SkipDryRunOnMissingResource, unless
+# `useDefaultSyncPolicy: false`.
 newApplications:
   - name: agentgateway
     project: agentgateway
@@ -443,23 +458,16 @@ newApplications:
       repoURL: https://github.com/mkroman/k8s
       path: agentgateway
     syncPolicy:
-      automated:
-        prune: true
-        selfHeal: true
       syncOptions:
-        - ApplyOutOfSyncOnly=true
         # The CRDs from the agentgateway-crds dependency are part of this
         # release and too large for client-side apply.
         - ServerSideApply=true
-      retry:
-        limit: 5
-        backoff:
-          duration: 5s
-          factor: 2
-          maxDuration: 3m
 
   - name: cert-manager
     project: cert-manager
+    ignoreHealthcheck: false
+    annotations:
+      argocd.argoproj.io/sync-wave: "-1"
     source:
       repoURL: https://github.com/mkroman/k8s
       path: cert-manager
@@ -481,45 +489,35 @@ newApplications:
 
   - name: cloudnative-pg
     project: cloudnative-pg
+    ignoreHealthcheck: false
+    annotations:
+      argocd.argoproj.io/sync-wave: "-1"
     destination:
       namespace: cnpg-system
     source:
       repoURL: https://github.com/mkroman/k8s
       path: cloudnative-pg
     syncPolicy:
-      automated:
-        prune: true
-        selfHeal: true
       syncOptions:
-        - ApplyOutOfSyncOnly=true
         # We need to use server-side apply because the CRD metadata is too large.
         - ServerSideApply=true
 
-  # Gateway API CRDs must be installed before the agentgateway control plane,
-  # hence the earlier sync wave.
+  # Gateway API CRDs are consumed by the agentgateway control plane, so this
+  # app is part of the platform gate.
   - name: gateway-api
+    project: agentgateway
+    ignoreHealthcheck: false
     annotations:
       argocd.argoproj.io/sync-wave: "-1"
-    project: agentgateway
     destination:
       namespace: agentgateway-system
     source:
       repoURL: https://github.com/mkroman/k8s
       path: gateway-api
     syncPolicy:
-      automated:
-        prune: true
-        selfHeal: true
       syncOptions:
-        - ApplyOutOfSyncOnly=true
         # The CRD metadata is too large for client-side apply.
         - ServerSideApply=true
-      retry:
-        limit: 5
-        backoff:
-          duration: 5s
-          factor: 2
-          maxDuration: 3m
 
   - name: grafana
     project: monitoring
@@ -629,23 +627,20 @@ newApplications:
 
   - name: prometheus-operator
     project: prometheus-operator
+    ignoreHealthcheck: false
+    annotations:
+      argocd.argoproj.io/sync-wave: "-1"
     destination:
       namespace: prometheus-operator
     source:
       repoURL: https://github.com/mkroman/k8s
       path: prometheus-operator
     syncPolicy:
-      automated:
-        prune: true
-        selfHeal: true
       syncOptions:
-        - ApplyOutOfSyncOnly=true
         # We need to use server-side apply because the CRD metadata is too large.
         - ServerSideApply=true
 
   - name: quickwit
-    annotations:
-      argocd.argoproj.io/sync-wave: "2"
     project: quickwit
     destination:
       namespace: quickwit-prod
@@ -669,6 +664,9 @@ newApplications:
 
   - name: sealed-secrets
     project: sealed-secrets
+    ignoreHealthcheck: false
+    annotations:
+      argocd.argoproj.io/sync-wave: "-1"
     destination:
       namespace: kube-system
     source:
@@ -683,21 +681,14 @@ newApplications:
       repoURL: https://github.com/mkroman/k8s
       path: spegel
     syncPolicy:
-      automated:
-        prune: true
-        selfHeal: true
       syncOptions:
-        - ApplyOutOfSyncOnly=true
         - ServerSideApply=true
-      retry:
-        limit: 5
-        backoff:
-          duration: 5s
-          factor: 2
-          maxDuration: 3m
 
   - name: traefik
     project: traefik
+    ignoreHealthcheck: false
+    annotations:
+      argocd.argoproj.io/sync-wave: "-1"
     destination:
       namespace: traefik
     source:
@@ -727,8 +718,6 @@ newApplications:
           - values-aggregator.yaml
 
   - name: zeta
-    annotations:
-      argocd.argoproj.io/sync-wave: "2"
     project: zeta
     destination:
       namespace: zeta-prod
@@ -740,8 +729,6 @@ newApplications:
           - values-prod.yaml
 
   - name: zeta-magistr
-    annotations:
-      argocd.argoproj.io/sync-wave: "2"
     project: zeta
     destination:
       namespace: zeta-magistr

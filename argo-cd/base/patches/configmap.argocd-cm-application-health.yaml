@@ -1,0 +1,66 @@
+# Health check for the Application CRD.
+#
+# Argo CD removed its built-in Application health assessment in v1.8
+# (argoproj/argo-cd#3781) because parent Applications inherited child health by
+# default. App-of-apps relies on child Application health for sync-wave gating,
+# so restore it here, scoped by the `argocd.argoproj.io/ignore-healthcheck`
+# annotation that apps/templates/newapplications.yaml puts on every non-platform
+# Application. Only the platform gate propagates health to the root.
+#
+# The script deliberately avoids the Lua string library and does not enable
+# the standard libraries: Argo CD's error condition types are a fixed set of
+# suffix-Error values.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-cm
+  labels:
+    app.kubernetes.io/name: argocd-cm
+    app.kubernetes.io/part-of: argocd
+data:
+  resource.customizations.health.argoproj.io_Application: |
+    hs = {}
+    hs.status = "Progressing"
+    hs.message = ""
+    if obj.status ~= nil then
+      local status = obj.status
+
+      -- Any controller error condition means the Application is degraded.
+      if status.conditions ~= nil then
+        for _, condition in ipairs(status.conditions) do
+          if condition.type == "DeletionError" or
+             condition.type == "InvalidSpecError" or
+             condition.type == "ComparisonError" or
+             condition.type == "SyncError" or
+             condition.type == "UnknownError" then
+            hs.status = "Degraded"
+            hs.message = condition.message or ""
+            return hs
+          end
+        end
+      end
+
+      if status.health ~= nil then
+        hs.status = status.health.status
+        hs.message = status.health.message or ""
+
+        -- Healthy but not Synced is not done; keep the wave waiting. This
+        -- also covers an Application whose status still describes an older
+        -- targetRevision.
+        if hs.status == "Healthy" and
+           (status.sync == nil or status.sync.status ~= "Synced") then
+          hs.status = "Progressing"
+          hs.message = "Waiting for sync"
+        end
+
+        if status.sync ~= nil and status.sync.comparedTo ~= nil and
+           status.sync.comparedTo.source ~= nil and
+           status.sync.comparedTo.source.targetRevision ~= nil and
+           obj.spec ~= nil and obj.spec.source ~= nil and
+           status.sync.comparedTo.source.targetRevision ~= obj.spec.source.targetRevision then
+          hs.status = "Progressing"
+          hs.message = "Waiting for new targetRevision"
+        end
+      end
+    end
+    return hs
