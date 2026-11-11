@@ -169,6 +169,22 @@ projects:
     sourceRepos:
       - https://github.com/mkroman/k8s
 
+  - name: node-feature-discovery
+    description: "Node Feature Discovery — hardware and OS feature labels for nodes"
+    destinations:
+      - namespace: node-feature-discovery
+    sourceRepos:
+      - https://github.com/mkroman/k8s
+    clusterResourceWhitelist:
+      - group: apiextensions.k8s.io
+        kind: CustomResourceDefinition
+      - group: nfd.k8s-sigs.io
+        kind: NodeFeatureRule
+      - group: rbac.authorization.k8s.io
+        kind: ClusterRole
+      - group: rbac.authorization.k8s.io
+        kind: ClusterRoleBinding
+
   - name: open-webui
     description: "Self-hosted LLM chat interface (Open WebUI)"
     destinations:
@@ -395,6 +411,7 @@ namespaces:
   - name: mosquitto
   - name: mqtt2prometheus
   - name: nats
+  - name: node-feature-discovery
   - name: prometheus-operator
   - name: quickwit-prod
   - name: renovate
@@ -584,6 +601,14 @@ newApplications:
     source:
       repoURL: https://github.com/mkroman/k8s
       path: nats
+
+  - name: node-feature-discovery
+    project: node-feature-discovery
+    destination:
+      namespace: node-feature-discovery
+    source:
+      repoURL: https://github.com/mkroman/k8s
+      path: node-feature-discovery
 
   - name: open-webui
     project: open-webui

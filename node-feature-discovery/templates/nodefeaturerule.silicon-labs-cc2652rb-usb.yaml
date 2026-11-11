@@ -1,0 +1,26 @@
+{{- if .Values.nodeFeatureRules.enabled }}
+apiVersion: nfd.k8s-sigs.io/v1alpha1
+kind: NodeFeatureRule
+metadata:
+  name: silicon-labs-cc2652rb-usb
+spec:
+  rules:
+    - name: "cc2652rb zigbee coordinator"
+      labels:
+        feature.node.kubernetes.io/zigbee-coordinator: "true"
+      matchFeatures:
+        - feature: usb.device
+          matchExpressions:
+            vendor:
+              op: In
+              value:
+                - "10c4"
+            device:
+              op: In
+              value:
+                - "ea60"
+            serial:
+              op: In
+              value:
+                - "00_12_4B_00_21_A8_EC_9C"
+{{- end }}

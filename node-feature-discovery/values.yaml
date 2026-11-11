@@ -1,0 +1,38 @@
+# Wrapper chart values for Node Feature Discovery (NFD).
+#
+# Upstream chart keys are nested under `node-feature-discovery:`; omitted keys
+# fall through to the upstream defaults.
+#
+# NFD discovers hardware and OS features on each node and publishes them as
+# node labels, annotations and extended resources. Deploy it only once per
+# cluster: multiple NFD releases can conflict on node labels.
+
+# NodeFeatureRule resources bundled with this wrapper chart. Set enabled to
+# false to omit all bundled rules, for example when they are managed elsewhere.
+nodeFeatureRules:
+  enabled: true
+
+node-feature-discovery:
+  worker:
+    # NFD labels only the nodes its worker DaemonSet runs on. This is a home
+    # lab where control-plane nodes also run workloads, so cover them too.
+    tolerations:
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+        effect: NoSchedule
+      - key: node-role.kubernetes.io/master
+        operator: Exists
+        effect: NoSchedule
+
+  # Let the cluster Prometheus scrape nfd-master, nfd-worker and nfd-gc.
+  prometheus:
+    enable: true
+    scrapeInterval: 30s
+    labels:
+      metrics.uplink.io/monitor: prometheus
+
+  # The topology updater is intentionally left disabled. It requires the
+  # NodeResourceTopology CRD and kubelet pod-resources access, and only
+  # benefits topology-aware schedulers, which this cluster does not run.
+  topologyUpdater:
+    enable: false
