@@ -73,7 +73,7 @@ normalized_app() {
   local app="$2"
 
   yq -o=json -I=0 \
-    ".newApplications[]? | select(.name == \"${app}\")" "${values_file}" |
+    ".applications[]? | select(.name == \"${app}\")" "${values_file}" |
     jq -S -c .
 }
 
@@ -98,7 +98,7 @@ app_project() {
   local values_file="$1"
   local app="$2"
 
-  yq -r ".newApplications[]? | select(.name == \"${app}\") | .project // \"default\"" \
+  yq -r ".applications[]? | select(.name == \"${app}\") | .project // \"default\"" \
     "${values_file}"
 }
 
@@ -106,7 +106,7 @@ app_path() {
   local values_file="$1"
   local app="$2"
 
-  yq -r ".newApplications[]? | select(.name == \"${app}\") | .source.path // .name" \
+  yq -r ".applications[]? | select(.name == \"${app}\") | .source.path // .name" \
     "${values_file}"
 }
 
@@ -114,7 +114,7 @@ app_destination_namespace() {
   local values_file="$1"
   local app="$2"
 
-  yq -r ".newApplications[]? | select(.name == \"${app}\") |
+  yq -r ".applications[]? | select(.name == \"${app}\") |
     .destination.namespace // .name" "${values_file}"
 }
 
@@ -131,7 +131,7 @@ app_value_files() {
   local values_file="$1"
   local app="$2"
 
-  yq -r ".newApplications[]? | select(.name == \"${app}\") |
+  yq -r ".applications[]? | select(.name == \"${app}\") |
     (.source.helm.valueFiles // [])[]" "${values_file}"
 }
 
@@ -215,9 +215,9 @@ main() {
 
     if [[ -s "${TEMP_DIR}/base-values.yaml" ]]; then
       yq -o=json '.' "${TEMP_DIR}/base-values.yaml" >"${TEMP_DIR}/base-values.json"
-      head_global="$(jq -S -c 'del(.newApplications, .projects, .namespaces, .applications, .argoCDApplication)' \
+      head_global="$(jq -S -c 'del(.applications, .projects, .namespaces, .argoCDApplication)' \
         "${TEMP_DIR}/head-values.json")"
-      base_global="$(jq -S -c 'del(.newApplications, .projects, .namespaces, .applications, .argoCDApplication)' \
+      base_global="$(jq -S -c 'del(.applications, .projects, .namespaces, .argoCDApplication)' \
         "${TEMP_DIR}/base-values.json")"
       [[ "${head_global}" == "${base_global}" ]] || shared_changed=1
     else

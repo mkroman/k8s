@@ -11,6 +11,8 @@ metadata:
     {{- toYaml .finalizers | nindent 4 }}
   {{- else if not (eq .useDefaultFinalizers false) }}
   finalizers:
+    # Argo CD only recognises this exact unqualified project finalizer, so it
+    # cannot use the qualified foreground variant without breaking deletion.
     - resources-finalizer.argocd.argoproj.io
   {{- end }}
 spec:

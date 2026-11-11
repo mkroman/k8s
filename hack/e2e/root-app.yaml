@@ -4,7 +4,7 @@ metadata:
   name: e2e
   namespace: argocd
   finalizers:
-    - resources-finalizer.argocd.argoproj.io
+    - resources-finalizer.argocd.argoproj.io/foreground
 spec:
   project: e2e
   source:
@@ -16,7 +16,6 @@ spec:
         applications: []
         argoCDApplication:
           enabled: false
-        newApplications: []
         projects: []
   destination:
     server: https://kubernetes.default.svc

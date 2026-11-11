@@ -13,10 +13,6 @@ spec:
     repoURL: https://github.com/mkroman/k8s
     targetRevision: HEAD
 
-applications:
-  - name: k8s-meta-apps
-  - name: k8s-rwx-apps
-
 # -- List of Argo CD projects.
 projects:
   - name: agentgateway
@@ -463,6 +459,7 @@ namespaces:
   - name: grafana
   - name: longhorn-system
   - name: monitoring
+  - name: magistr-prod
   - name: mosquitto
   - name: mqtt2prometheus
   - name: nats
@@ -501,7 +498,7 @@ namespaces:
       pod-security.kubernetes.io/warn: privileged
       pod-security.kubernetes.io/warn-version: latest
 
-newApplications:
+applications:
   - name: agentgateway
     project: agentgateway
     destination:
@@ -598,9 +595,10 @@ newApplications:
 
   - name: longhorn
     finalizers:
-      - resources-finalizer.argocd.argoproj.io
+      - resources-finalizer.argocd.argoproj.io/foreground
       # The pre-delete-finalizer hook is necessary because of how longhorn deploys
-      # jobs on hooks.
+      # jobs on hooks. Argo CD only recognises these unqualified names, so they
+      # still trigger Kubernetes' finalizer warning.
       - pre-delete-finalizer.argocd.argoproj.io
       - pre-delete-finalizer.argocd.argoproj.io/cleanup
     project: longhorn

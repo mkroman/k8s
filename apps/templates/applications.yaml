@@ -1,4 +1,4 @@
-{{- range .Values.newApplications }}
+{{- range .Values.applications }}
 {{- $appName := .name }}
 ---
 apiVersion: argoproj.io/v1alpha1
@@ -15,7 +15,9 @@ metadata:
     {{- .finalizers | default list | toYaml | nindent 4 }}
   {{- else if ne .useDefaultFinalizers false }}
   finalizers:
-    - resources-finalizer.argocd.argoproj.io
+    # The qualified foreground finalizer matches the default cascading
+    # deletion behaviour without triggering Kubernetes' finalizer warning.
+    - resources-finalizer.argocd.argoproj.io/foreground
   {{- end }}
 spec:
   project: {{ .project | default "default" | quote }}

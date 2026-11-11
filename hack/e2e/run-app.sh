@@ -303,7 +303,7 @@ app_entry() {
   local app="$1"
 
   jq -c --arg app "${app}" \
-    '.newApplications[] | select(.name == $app)' "${TEMP_DIR}/apps-values.json"
+    '.applications[] | select(.name == $app)' "${TEMP_DIR}/apps-values.json"
 }
 
 kind_source_path() {
@@ -664,7 +664,7 @@ render_root_app() {
   values_json="$(jq -cn \
     --argjson apps "${apps_json}" \
     --argjson projects "${projects_json}" \
-    '{newApplications: $apps, projects: $projects}')"
+    '{applications: $apps, projects: $projects}')"
 
   REPO_URL="${repo_url}" REVISION="${revision}" VALUES_JSON="${values_json}" \
     yq '.spec.source.repoURL = strenv(REPO_URL) |
