@@ -1111,7 +1111,14 @@ ensure_namespace() {
   if kubectl get namespace "${namespace}" >/dev/null 2>&1; then
     return 0
   fi
-  kubectl create namespace "${namespace}" >/dev/null
+  if ! kubectl create namespace "${namespace}" >/dev/null 2>&1; then
+    # The applications chart may create the namespace concurrently. Treat
+    # that as success only if the namespace now exists; any other failure is
+    # fatal.
+    kubectl get namespace "${namespace}" >/dev/null 2>&1 ||
+      die "could not create namespace ${namespace} for the dry-run gate"
+    return 0
+  fi
   printf 'Created namespace %s for the dry-run gate\n' "${namespace}"
 }
 
