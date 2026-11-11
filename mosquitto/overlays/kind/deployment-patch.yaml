@@ -1,0 +1,30 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mosquitto
+spec:
+  template:
+    metadata:
+      labels:
+        # Distinguishes broker pods from e2e probe pods (which inherit
+        # app.kubernetes.io/name: mosquitto from the base labels
+        # transformer). The Service selector requires this label, so probe
+        # pods can never become Service endpoints.
+        app.kubernetes.io/component: broker
+    spec:
+      securityContext:
+        # Defensive: guarantees the local-path PVC is writable by UID 1883.
+        fsGroup: 1883
+      volumes:
+      # E2E only: the projected volume (configMap + mosquitto-passwd secret)
+      # becomes a plain ConfigMap volume with the anonymous-listener config.
+      # Keep the volume and mount names identical to base so the
+      # volumeMounts stay valid.
+      - name: mosquitto-config
+        projected: null
+        configMap:
+          name: mosquitto-config
+      - name: mosquitto-data
+        persistentVolumeClaim:
+          claimName: mosquitto-data

@@ -1,0 +1,53 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: mosquitto
+
+# kind e2e overlay for the mosquitto application.
+#
+# The base manifests target a real cluster: a LoadBalancer Service with a
+# reserved address and credentials sealed for the production sealed-secrets
+# key pair. Neither works in a fresh kind cluster (no LoadBalancer
+# implementation; the sealed-secrets controller generates its own key pair),
+# so this overlay:
+#
+#   - switches the Service to ClusterIP (service-patch.yaml),
+#   - deletes the SealedSecret and swaps the Deployment's projected volume
+#     for an anonymous-listener ConfigMap, generated below with the
+#     deterministic unhashed name mosquitto-config,
+#   - carries its own NetworkPolicy (networkpolicy.yaml) with in-cluster
+#     egress allowed, because the kind CNI enforces NetworkPolicy and the
+#     probe Job must reach DNS and the broker,
+#   - tags the broker pods with app.kubernetes.io/component: broker and adds
+#     that label to the Service selector, so probe pods are never used as
+#     Service endpoints,
+#   - runs a PostSync probe Job proving an MQTT publish/subscribe round-trip
+#     (job.yaml).
+#
+# Anonymous access is e2e-only. See README.md in this directory.
+resources:
+- ../../base
+# E2E-only NetworkPolicy: the base kustomization does not deploy the base
+# manifests/networkpolicy.yaml (production ships without it), but the kind
+# e2e CNI enforces NetworkPolicy, so this overlay carries its own variant
+# with in-cluster egress allowed for the probe Job.
+- networkpolicy.yaml
+- job.yaml
+
+configMapGenerator:
+- name: mosquitto-config
+  # Replace the base generator's hash-suffixed ConfigMap wholesale: the e2e
+  # harness asserts on the unhashed name mosquitto-config, the Deployment
+  # volume must reference exactly this name, and the anonymous-listener
+  # config supersedes the production one.
+  behavior: replace
+  options:
+    disableNameSuffixHash: true
+  files:
+  - mosquitto.conf=mosquitto-e2e.conf
+
+patches:
+- path: deployment-patch.yaml
+- path: service-patch.yaml
+- path: sealedsecret-delete.yaml

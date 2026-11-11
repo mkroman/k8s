@@ -1,0 +1,35 @@
+---
+# E2E-only variant of the base limited-ingress policy (the base
+# kustomization does not wire in its manifests/networkpolicy.yaml, so
+# production deploys no policy; this overlay adds one because the kind e2e
+# CNI enforces NetworkPolicy).
+#
+# Ingress mirrors the base intent: MQTT from in-cluster addresses only
+# (pod CIDR and service CIDR are both inside 10.0.0.0/8 in kind).
+#
+# Egress is opened for in-cluster addresses because the base labels
+# transformer stamps every resource — probe Job pods included — with
+# app.kubernetes.io/name: mosquitto, so they are selected by this policy
+# and a default-deny egress would block the probe's DNS lookups and broker
+# connection.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: limited-ingress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: mosquitto
+  policyTypes:
+  - Egress
+  - Ingress
+  egress:
+  - to:
+    - ipBlock:
+        cidr: 10.0.0.0/8
+  ingress:
+  - from:
+    - ipBlock:
+        cidr: 10.0.0.0/8
+    ports:
+    - port: 1883

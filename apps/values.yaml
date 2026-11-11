@@ -147,6 +147,19 @@ projects:
       - namespace: mosquitto
     sourceRepos:
       - https://github.com/mkroman/k8s
+    namespaceResourceWhitelist:
+      - group: ""
+        kind: ConfigMap
+      - group: ""
+        kind: PersistentVolumeClaim
+      - group: ""
+        kind: Service
+      - group: apps
+        kind: Deployment
+      - group: batch
+        kind: Job
+      - group: networking.k8s.io
+        kind: NetworkPolicy
 
   - name: mumble
     description: "Mumble (Murmur) VoIP server"
@@ -390,6 +403,31 @@ projects:
       - group: ""
         kind: LimitRange
 
+  - name: zigbee2mqtt
+    description: "Zigbee2MQTT — Zigbee to MQTT bridge with a USB coordinator"
+    destinations:
+      - namespace: zigbee2mqtt
+    sourceRepos:
+      - https://github.com/mkroman/k8s
+    namespaceResourceWhitelist:
+      - group: ""
+        kind: ConfigMap
+      - group: ""
+        kind: PersistentVolumeClaim
+      - group: ""
+        kind: Service
+      - group: apps
+        kind: StatefulSet
+      - group: networking.k8s.io
+        kind: NetworkPolicy
+      # The e2e PostSync probe runs as a Job in this namespace (kind-only
+      # values enable it; production leaves e2e.enabled false).
+      - group: batch
+        kind: Job
+      # Optional: commit the MQTT password as a SealedSecret under the chart.
+      - group: bitnami.com
+        kind: SealedSecret
+
 # List of namespaces to create.
 namespaces:
   - name: agentgateway-system
@@ -433,6 +471,18 @@ namespaces:
   - name: zeta-dev
   - name: zeta-magistr
   - name: zeta-prod
+  - name: zigbee2mqtt
+    labels:
+      # The USB coordinator is passed with hostPath, which baseline and
+      # restricted Pod Security Standards forbid. The workload itself is
+      # unprivileged; mark the namespace privileged so the hostPath exception
+      # is explicit instead of relying on the unlabeled namespace default.
+      pod-security.kubernetes.io/enforce: privileged
+      pod-security.kubernetes.io/enforce-version: latest
+      pod-security.kubernetes.io/audit: privileged
+      pod-security.kubernetes.io/audit-version: latest
+      pod-security.kubernetes.io/warn: privileged
+      pod-security.kubernetes.io/warn-version: latest
 
 newApplications:
   - name: agentgateway
@@ -751,3 +801,15 @@ newApplications:
       helm:
         valueFiles:
           - values-magistr.yaml
+
+  # Depends on mosquitto for MQTT and node-feature-discovery for the coordinator
+  # label. The Pod stays Pending until both are available.
+  - name: zigbee2mqtt
+    annotations:
+      argocd.argoproj.io/sync-wave: "2"
+    project: zigbee2mqtt
+    destination:
+      namespace: zigbee2mqtt
+    source:
+      repoURL: https://github.com/mkroman/k8s
+      path: zigbee2mqtt

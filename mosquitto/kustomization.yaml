@@ -1,16 +1,9 @@
+---
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
+
+# The manifests live in base/ so that overlays/kind (the e2e variant) can
+# reference them as a sibling directory. Deploying this root renders base
+# unchanged; environment-specific variants live in overlays/.
 resources:
-- ./manifests/sealedsecret.mosquitto-passwd.yaml
-- ./manifests/persistentvolumeclaim.yaml
-- ./manifests/deployment.yaml
-- ./manifests/service.yaml
-configMapGenerator:
-- files:
-  - ./mosquitto.conf
-  name: mosquitto-config
-labels:
-- includeSelectors: true
-  pairs:
-    app.kubernetes.io/name: mosquitto
-    app.kubernetes.io/part-of: mosquitto
+- ./base

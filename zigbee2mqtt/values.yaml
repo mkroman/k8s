@@ -1,0 +1,252 @@
+# Default values for the zigbee2mqtt chart.
+#
+# The upstream project publishes a Helm chart, but its generated ConfigMap
+# cannot preserve inline `devices` and `groups` blocks, and its map-typed
+# `statefulset.command` default prevents a wrapper from seeding them. It also
+# defaults to a privileged root container. This chart therefore follows the
+# official container deployment directly: one writable /app/data directory,
+# the official image entrypoint, and the documented configuration.yaml format.
+#
+# Official documentation:
+#   Kubernetes installation: https://www.zigbee2mqtt.io/guide/installation/08_kubernetes.html
+#   Docker: https://www.zigbee2mqtt.io/guide/installation/02_docker.html
+#   Securing the installation: https://www.zigbee2mqtt.io/guide/installation/14_securing.html
+#   MQTT: https://www.zigbee2mqtt.io/guide/configuration/mqtt.html
+#   Devices and groups: https://www.zigbee2mqtt.io/guide/configuration/devices-groups.html
+
+nameOverride: ""
+fullnameOverride: ""
+
+image:
+  # -- Official image documented by the project.
+  repository: ghcr.io/koenkk/zigbee2mqtt
+  # -- Image tag. Defaults to the chart appVersion when empty.
+  tag: ""
+  pullPolicy: IfNotPresent
+
+# -- List of image pull secrets for private registries.
+imagePullSecrets: []
+
+replicaCount: 1
+
+# -- Timezone for the container (TZ). Zigbee2MQTT itself uses the host clock
+#    for log timestamps; this controls the container's local time.
+timezone: Etc/UTC
+
+service:
+  # -- Keep the frontend cluster-internal. The frontend grants full control of
+  #    the Zigbee network; terminate authentication and TLS in front of it.
+  type: ClusterIP
+  # -- Frontend port. Keep this in sync with `config.frontend.port`.
+  port: 8124
+
+# -- Scalar Zigbee2MQTT settings, rendered into configuration.yaml with
+#    `toYaml`. This is the part that is convenient to override with values or
+#    `--set`; it is still seeded only on first start.
+#
+#    Large inventories live in the chart's YAML files instead, because Helm
+#    coalescing deletes explicit `null` values from values maps:
+#      files/devices.yaml  -> /app/data/devices.yaml
+#      files/groups.yaml   -> /app/data/groups.yaml
+#    `devices` and `groups` are injected by the ConfigMap template; setting
+#    them under `config` here has no effect.
+config:
+  # -- Zigbee2MQTT configuration schema version.
+  version: 5
+  homeassistant:
+    enabled: true
+  frontend:
+    enabled: true
+    port: 8124
+    host: 0.0.0.0
+  mqtt:
+    base_topic: zigbee2mqtt
+    # -- MQTT broker URL. Defaults to the mosquitto LoadBalancer address.
+    server: mqtt://10.0.3.3
+    user: mk
+    # The password itself is not stored in Git. secret.yaml must contain:
+    #   password: <mqtt password>
+    password: "!secret.yaml password"
+  serial:
+    # -- Keep this in sync with `coordinator.devicePath`.
+    port: /dev/ttyUSB0
+  advanced:
+    pan_id: 6755
+    log_level: info
+    # Zigbee2MQTT defaults to console + rotated file logs on the PVC. Set
+    # log_output: [console] if you only want stdout for the cluster collector.
+  device_options: {}
+  availability:
+    enabled: false
+
+# -- Secret mounted at /app/data/secret.yaml. It must contain the key named
+#    `secret.key` whose value is the YAML body referenced by config:
+#      password: <mqtt password>
+#    Optionally it can hold `network_key`, referenced as
+#    "!secret.yaml network_key" from config.advanced.
+#    Create it as a SealedSecret; see the README.
+secret:
+  name: zigbee2mqtt-secrets
+  key: secret.yaml
+
+coordinator:
+  # -- Host device passed into the container. Prefer the stable
+  #    /dev/serial/by-id/... path once it is known on the selected node.
+  #    When empty, the device hostPath, the /run/udev hostPath, and the USB
+  #    nodeSelector are not rendered; config.serial.port must then start with
+  #    tcp:// (emulator or remote adapter mode).
+  devicePath: /dev/ttyUSB0
+  # -- hostPath type. Use CharDevice for a device node, or leave empty to
+  #    accept any existing path (for example a symlink).
+  hostPathType: CharDevice
+  # -- GID with write access to the device on the node. Debian and Ubuntu use
+  #    20 (dialout); verify with: stat -c %g /dev/ttyUSB0
+  #    Only used when coordinator.devicePath is set.
+  groupId: 20
+  emulator:
+    # -- Run a Z-Stack (ZNP) coordinator emulator as a pod sidecar, so
+    #    Zigbee2MQTT starts without real hardware. The emulator speaks enough
+    #    of the TI Z-Stack protocol for zigbee-herdsman (adapter zstack) to
+    #    bring the stack up; there is NO radio and no devices can join.
+    #    Requires coordinator.devicePath to be empty and
+    #    config.serial.port: tcp://127.0.0.1:<port>. Intended for the kind
+    #    e2e environment (values-kind.yaml); never enable it in production.
+    enabled: false
+    image:
+      # -- Emulator from https://github.com/romanlum/zstack-adapter-emulator.
+      repository: ghcr.io/romanlum/zstack-adapter-emulator
+      # -- The upstream publishes branch and sha-<commit> tags (no releases);
+      #    pin the sha tag of the reviewed commit.
+      tag: sha-f852d56
+      pullPolicy: IfNotPresent
+    # -- TCP port the emulator listens on, also the port in
+    #    config.serial.port. The container binds all interfaces by default;
+    #    the pod-local loopback path keeps it private.
+    port: 6638
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        cpu: 200m
+        memory: 128Mi
+    # -- The upstream image runs the unprivileged `node` user (UID 1000) and
+    #    only reads its own files at runtime, so a read-only root filesystem
+    #    works (verified against sha-f852d56).
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+          - ALL
+      readOnlyRootFilesystem: true
+      runAsNonRoot: true
+      runAsUser: 1000
+      runAsGroup: 1000
+
+persistence:
+  # -- Persist /app/data (database.db, coordinator_backup.json, state.json and
+  #    the generated configuration). Disabling loses the Zigbee network state
+  #    on every restart.
+  enabled: true
+  # -- Use an existing PVC instead of creating one. The claim must already
+  #    exist in the release namespace.
+  existingClaim: ""
+  storageClass: ssd-gp1x1
+  accessModes:
+    - ReadWriteOnce
+  size: 1Gi
+  # -- Extra annotations for the created PVC.
+  annotations: {}
+
+# -- Node selector for the USB coordinator. The node-feature-discovery chart
+#    sets this label for the Silicon Labs CC2652RB adapter.
+nodeSelector:
+  feature.node.kubernetes.io/zigbee-coordinator: "true"
+
+tolerations: []
+affinity: {}
+
+podAnnotations: {}
+podLabels: {}
+
+# -- Pod-level security context. fsGroup makes the data volume writable by the
+#    unprivileged Zigbee2MQTT user; `coordinator.groupId` is added to
+#    supplementalGroups by the StatefulSet template.
+podSecurityContext:
+  runAsUser: 1000
+  runAsGroup: 1000
+  runAsNonRoot: true
+  fsGroup: 1000
+  fsGroupChangePolicy: OnRootMismatch
+  seccompProfile:
+    type: RuntimeDefault
+
+# -- Container security context. The official image supports running as an
+#    unprivileged user with the dialout group; see the Docker documentation.
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+
+resources:
+  requests:
+    cpu: 200m
+    memory: 600Mi
+  limits:
+    cpu: "1"
+    memory: 1Gi
+
+# -- Grace period for Zigbee2MQTT to close the serial port and MQTT connection.
+terminationGracePeriodSeconds: 30
+
+probes:
+  startup:
+    failureThreshold: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+  readiness:
+    failureThreshold: 3
+    periodSeconds: 10
+    timeoutSeconds: 5
+  liveness:
+    failureThreshold: 5
+    periodSeconds: 30
+    timeoutSeconds: 10
+
+networkPolicy:
+  # -- Restrict network access to the frontend port and the MQTT broker.
+  enabled: true
+  # -- Namespace running the MQTT broker. Also allowed as an egress peer so
+  #    the policy keeps working when the Service is DNATed to a pod IP.
+  mqttNamespace: mosquitto
+  # -- Additional egress peer for the broker's LoadBalancer IP.
+  mqttCidr: 10.0.3.3/32
+  mqttPort: 1883
+  # -- Allow HTTPS egress for OTA firmware index and image downloads. Set to
+  #    false when OTA checks are disabled or egress is restricted elsewhere.
+  allowHttpsEgress: true
+
+# -- E2E-only PostSync probe. Enabled by values-kind.yaml in the kind e2e
+#    environment; never enabled in production. The probe subscribes to the
+#    bridge state topic on the MQTT broker and fails unless Zigbee2MQTT has
+#    published its retained online message, proving the emulator-backed
+#    Zigbee stack reached MQTT.
+e2e:
+  enabled: false
+  # -- Image providing mosquitto_sub for the probe. The eclipse-mosquitto
+  #    image ships the MQTT clients; keep the tag pinned.
+  probeImage: eclipse-mosquitto:2.0.22
+  # -- Broker the probe subscribes on. Required when e2e.enabled is true;
+  #    set it to the e2e mosquitto Service in values-kind.yaml.
+  mqtt:
+    host: ""
+    port: 1883
+  # -- Topic Zigbee2MQTT publishes its retained online state to.
+  topic: zigbee2mqtt/bridge/state
+  # -- Seconds the probe waits for the message before failing.
+  timeoutSeconds: 120

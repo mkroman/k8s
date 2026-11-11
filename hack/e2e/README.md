@@ -97,6 +97,7 @@ and `E2E_TIMEOUT_SECONDS` are defaults only: an app's explicit `retry_limit` or
 | `gateway-api` | Kustomize | none |
 | `grafana` | Helm | `prometheus-operator`; checks the renderer scrape path |
 | `monitoring` | Kustomize | `prometheus-operator`; asserts the control-plane scrape targets are up |
+| `mosquitto` | Kustomize | none; PostSync probe does an MQTT publish/subscribe round-trip |
 | `node-feature-discovery` | Helm | `prometheus-operator`; asserts the bundled NodeFeatureRule and PodMonitor |
 | `prometheus-operator` | Kustomize | `cert-manager`; asserts its ServiceMonitor is deployed |
 | `sealed-secrets` | Kustomize | `prometheus-operator`; asserts its PodMonitor is deployed |
@@ -104,6 +105,7 @@ and `E2E_TIMEOUT_SECONDS` are defaults only: an app's explicit `retry_limit` or
 | `traefik` | Helm | `prometheus-operator` |
 | `vector-agent` | Helm | `prometheus-operator` |
 | `vector-aggregator` | Helm | `prometheus-operator` |
+| `zigbee2mqtt` | Helm | `mosquitto`; runs a Z-Stack emulator sidecar instead of real hardware; PostSync probe waits for the `zigbee2mqtt/bridge/state` topic |
 
 `longhorn` is not e2e-enabled because kind cannot run it; its chart and
 ServiceMonitor are covered by the Helm validation workflow instead.
@@ -121,6 +123,26 @@ NetworkPolicy, and runs a control request against Grafana's health endpoint.
 The Jobs are enabled from `values-kind.yaml`; Argo CD maps the Helm hook
 annotations to its own PostSync hooks, so a failed probe fails the Application
 sync. No runner-specific check code is needed.
+
+Kustomize apps use the same pattern with Argo CD's own hook annotations:
+`mosquitto/overlays/kind` renders a PostSync Job (annotated
+`argocd.argoproj.io/hook: PostSync`) that publishes to an `e2e/probe` topic and
+subscribes it back, proving the broker accepts connections. The overlay also
+switches the Service to ClusterIP (kind has no LoadBalancer implementation),
+replaces the SealedSecret — a fresh sealed-secrets controller generates its own
+key pair and cannot decrypt secrets sealed for another cluster — with an
+anonymous-listener config, and adds `fsGroup` so the local-path PVC is writable
+by the non-root mosquitto user.
+
+The `zigbee2mqtt` probe proves the whole bridge without Zigbee hardware: the
+chart runs a Z-Stack coordinator emulator
+([romanlum/zstack-adapter-emulator](https://github.com/romanlum/zstack-adapter-emulator))
+as a sidecar, points `serial.port` at it over pod-local TCP through the
+documented `adapter: zstack` path, and the PostSync Job subscribes to
+`zigbee2mqtt/bridge/state` on the mosquitto broker. Zigbee2MQTT publishes that
+topic only after MQTT and the Zigbee stack are up, so a healthy probe means the
+deployment, PVC seeding, MQTT connectivity, and emulator startup all worked.
+Values live in `zigbee2mqtt/values-kind.yaml`; production values are unchanged.
 
 The `spegel` probe verifies behaviour end to end: pod A pulls a busybox image
 that is cached nowhere in the fresh kind cluster (upstream pull, advertised by

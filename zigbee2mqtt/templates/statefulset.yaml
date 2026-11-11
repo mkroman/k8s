@@ -1,0 +1,191 @@
+{{- /* The dialout group is only needed for the real serial device. */}}
+{{- $podSecurityContext := deepCopy .Values.podSecurityContext }}
+{{- if .Values.coordinator.devicePath }}
+{{- $_ := set $podSecurityContext "supplementalGroups" (list .Values.coordinator.groupId) }}
+{{- end }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "zigbee2mqtt.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "zigbee2mqtt.labels" . | nindent 4 }}
+spec:
+  serviceName: {{ include "zigbee2mqtt.fullname" . }}-headless
+  replicas: {{ .Values.replicaCount }}
+  revisionHistoryLimit: 3
+  updateStrategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      {{- include "zigbee2mqtt.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "zigbee2mqtt.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml $podSecurityContext | nindent 8 }}
+      {{- /* The USB nodeSelector exists only to pin onto the coordinator node. */}}
+      {{- if and .Values.coordinator.devicePath .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml .Values.nodeSelector | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      initContainers:
+        # Seed each file only when the data volume does not already contain it.
+        # After first start the PVC is the source of truth, so frontend
+        # changes and Zigbee2MQTT's own rewrites are not clobbered.
+        - name: seed-config
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          command:
+            - /bin/sh
+            - -c
+          args:
+            - |
+              set -eu
+              for file in configuration.yaml devices.yaml groups.yaml; do
+                if [ -f "/app/data/$file" ]; then
+                  echo "$file already exists; leaving it untouched"
+                else
+                  cp "/config/$file" "/app/data/$file"
+                  echo "seeded $file"
+                fi
+              done
+          volumeMounts:
+            - name: config
+              mountPath: /config
+              readOnly: true
+            - name: data
+              mountPath: /app/data
+      containers:
+        - name: zigbee2mqtt
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          env:
+            - name: TZ
+              value: {{ .Values.timezone | quote }}
+            # The chart seeds a complete configuration, so the interactive
+            # onboarding server is never needed and should not open a port.
+            - name: Z2M_ONBOARD_NO_SERVER
+              value: "1"
+          ports:
+            - name: web
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          startupProbe:
+            httpGet:
+              path: /
+              port: web
+            failureThreshold: {{ .Values.probes.startup.failureThreshold }}
+            periodSeconds: {{ .Values.probes.startup.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.startup.timeoutSeconds }}
+          readinessProbe:
+            httpGet:
+              path: /
+              port: web
+            failureThreshold: {{ .Values.probes.readiness.failureThreshold }}
+            periodSeconds: {{ .Values.probes.readiness.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.readiness.timeoutSeconds }}
+          livenessProbe:
+            httpGet:
+              path: /
+              port: web
+            failureThreshold: {{ .Values.probes.liveness.failureThreshold }}
+            periodSeconds: {{ .Values.probes.liveness.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.liveness.timeoutSeconds }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /app/data
+            {{- if .Values.secret.name }}
+            - name: secret
+              mountPath: /app/data/secret.yaml
+              subPath: {{ .Values.secret.key }}
+              readOnly: true
+            {{- end }}
+            {{- if .Values.coordinator.devicePath }}
+            - name: zigbee-coordinator
+              mountPath: {{ .Values.coordinator.devicePath }}
+            # Official Docker guidance for adapter detection; read-only.
+            - name: udev
+              mountPath: /run/udev
+              readOnly: true
+            {{- end }}
+            - name: tmp
+              mountPath: /tmp
+        {{- /* Sidecar coordinator emulator for e2e: z2m reaches it on
+           pod-local 127.0.0.1, so no Service or volume is needed. */}}
+        {{- if .Values.coordinator.emulator.enabled }}
+        - name: coordinator-emulator
+          image: "{{ .Values.coordinator.emulator.image.repository }}:{{ .Values.coordinator.emulator.image.tag }}"
+          imagePullPolicy: {{ .Values.coordinator.emulator.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.coordinator.emulator.securityContext | nindent 12 }}
+          args:
+            - --port
+            - {{ .Values.coordinator.emulator.port | quote }}
+          ports:
+            - name: coordinator
+              containerPort: {{ .Values.coordinator.emulator.port }}
+              protocol: TCP
+          resources:
+            {{- toYaml .Values.coordinator.emulator.resources | nindent 12 }}
+        {{- end }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "zigbee2mqtt.fullname" . }}
+        {{- if .Values.secret.name }}
+        - name: secret
+          secret:
+            secretName: {{ .Values.secret.name }}
+        {{- end }}
+        {{- if .Values.coordinator.devicePath }}
+        - name: zigbee-coordinator
+          hostPath:
+            path: {{ .Values.coordinator.devicePath }}
+            {{- with .Values.coordinator.hostPathType }}
+            type: {{ . }}
+            {{- end }}
+        - name: udev
+          hostPath:
+            path: /run/udev
+            type: Directory
+        {{- end }}
+        - name: tmp
+          emptyDir: {}
+        - name: data
+          {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "zigbee2mqtt.pvcName" . }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}

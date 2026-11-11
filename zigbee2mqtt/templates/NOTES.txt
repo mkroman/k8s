@@ -1,0 +1,21 @@
+Zigbee2MQTT has been deployed.
+
+The pod is scheduled only on a node labelled:
+  feature.node.kubernetes.io/zigbee-coordinator=true
+
+Before the first start, create the Secret referenced by `secret.name`
+(default: zigbee2mqtt-secrets) with a key named `secret.key`
+(default: secret.yaml) containing:
+
+  password: <mqtt password>
+
+It is mounted at /app/data/secret.yaml and referenced from configuration.yaml
+as "!secret.yaml password". See the chart README for a kubeseal example.
+
+The data volume holds database.db and coordinator_backup.json. To keep the
+existing Zigbee network, restore that directory (or provide the network key in
+secret.yaml); otherwise Zigbee2MQTT generates a new network key and all devices
+must be paired again.
+
+Frontend (cluster-internal):
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "zigbee2mqtt.fullname" . }} {{ .Values.service.port }}:{{ .Values.service.port }}
