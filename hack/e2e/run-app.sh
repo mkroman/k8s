@@ -1056,7 +1056,9 @@ filter_established_kinds() {
   done <"${established}"
 
   yq '.apiVersion + "/" + .kind' "${rendered}" 2>/dev/null |
-    grep -v '^null/null$' | sort -u >"${TEMP_DIR}/rendered-kinds.txt"
+    # yq separates multi-document output with "---" lines; they are document
+    # separators, and "null/null" is the empty document some outputs carry.
+    grep -vE '^(---|null/null)$' | sort -u >"${TEMP_DIR}/rendered-kinds.txt"
   comm -23 "${TEMP_DIR}/rendered-kinds.txt" \
     <(sort -u "${established}") >"${TEMP_DIR}/skipped-kinds.txt" || true
 
@@ -1078,7 +1080,10 @@ ensure_namespaces() {
     fi
     kubectl create namespace "${namespace}" >/dev/null
     printf 'Created namespace %s for the dry-run gate\n' "${namespace}"
-  done < <(yq '.metadata.namespace // ""' "${rendered}" 2>/dev/null | sort -u)
+  done < <(yq '.metadata.namespace // ""' "${rendered}" 2>/dev/null |
+    # yq separates multi-document output with "---" lines; they are document
+    # separators, not namespace names.
+    grep -vE '^(-{3,})$' | sort -u)
 }
 
 # Wait for the Application's initial reconciliation: manifests generated and
