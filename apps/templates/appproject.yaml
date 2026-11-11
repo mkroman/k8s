@@ -6,6 +6,11 @@ kind: AppProject
 metadata:
   name: {{ $name | quote }}
   namespace: {{ $.Values.argocdNamespace }}
+  # AppProjects must exist before the Applications that reference them:
+  # within a sync wave Argo CD applies resources by kind, and custom resources
+  # sort alphabetically (Application before AppProject).
+  annotations:
+    argocd.argoproj.io/sync-wave: "-10"
   {{- if .finalizers }}
   finalizers:
     {{- toYaml .finalizers | nindent 4 }}

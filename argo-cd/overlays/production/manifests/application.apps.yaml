@@ -3,8 +3,12 @@ kind: Application
 metadata:
   name: apps
   namespace: argocd
-  finalizers:
-  - resources-finalizer.argocd.argoproj.io
+  # No resources-finalizer on purpose: deleting this Application must not
+  # cascade into every child Application (and their data). With
+  # preserveResourcesOnDeletion the controller will not re-add the finalizer;
+  # existing installations need a one-time
+  #   kubectl patch application apps -n argocd --type merge \
+  #     -p '{"metadata":{"finalizers":null}}'
 spec:
   project: production
 
@@ -20,4 +24,18 @@ spec:
     namespace: argocd
 
   syncPolicy:
-    automated: {}
+    automated:
+      # Pruning stays manual; the app catalogue is the source of truth for
+      # creation and updates, not for deletion.
+      prune: false
+      selfHeal: true
+    retry:
+      limit: 10
+      refresh: true
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 5m
+    syncOptions:
+      - ApplyOutOfSyncOnly=true
+    preserveResourcesOnDeletion: true

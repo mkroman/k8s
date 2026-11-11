@@ -1,14 +1,19 @@
-{{- range $key, $value := .Values.applications }}
+{{- range .Values.applications }}
 {{- $name := .name }}
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: {{ .name }}
+  name: {{ .name | quote }}
   namespace: {{ $.Values.argocdNamespace }}
+  annotations:
+    # These parents manage applications from external repositories. Their
+    # health must not gate the root catalogue; the child apps are alerted on
+    # directly instead.
+    argocd.argoproj.io/ignore-healthcheck: "true"
 spec:
   destination:
-    namespace: {{ $.Values.spec.destination.namespace }}
+    namespace: {{ $.Values.spec.destination.namespace | default $.Values.argocdNamespace }}
     server: {{ $.Values.spec.destination.server }}
   project: default
   source:
@@ -21,6 +26,13 @@ spec:
     automated:
       prune: true
       selfHeal: true
+    retry:
+      limit: 10
+      refresh: true
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 5m
     syncOptions:
     - ApplyOutOfSyncOnly=true
 {{- end }}

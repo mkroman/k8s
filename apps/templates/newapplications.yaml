@@ -6,7 +6,24 @@ kind: Application
 metadata:
   name: {{ required "A valid application .name is required" .name | quote }}
   namespace: {{ $.Values.argocdNamespace }}
+  {{- /* Child Application health is scoped on purpose: platform-gate apps
+         (`ignoreHealthcheck: false`) propagate health so the root sync wave
+         waits for them, while every other app is ignored by its parent so a
+         single degraded workload neither stalls the catalogue nor turns the
+         root Application Degraded. Workload health is monitored through
+         Prometheus alerts instead. */}}
+  {{- $ignoreHealthcheck := true }}
+  {{- if hasKey . "ignoreHealthcheck" }}
+    {{- $ignoreHealthcheck = .ignoreHealthcheck }}
+  {{- end }}
+  {{- $annotations := dict }}
+  {{- if $ignoreHealthcheck }}
+    {{- $_ := set $annotations "argocd.argoproj.io/ignore-healthcheck" "true" }}
+  {{- end }}
   {{- with .annotations }}
+    {{- $annotations = mergeOverwrite $annotations . }}
+  {{- end }}
+  {{- with $annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
   {{- end }}
@@ -72,19 +89,51 @@ spec:
   {{- fail (printf "Either 'source' or 'sources' must be provided for application %s" $appName) }}
   {{- end }}
 
-  {{- if .syncPolicy }}
-  syncPolicy:
-    {{- toYaml .syncPolicy | nindent 4 }}
-  {{- else if ne .useDefaultSyncPolicy false }}
+  {{- /* Every application gets a default sync policy; an app's own
+         `syncPolicy` fields override the defaults instead of replacing them,
+         so no application silently loses the retry block:
+           - `automated` is taken verbatim from the app when present
+             (`automated: {}` therefore still means "auto-sync, no prune,
+             no self-heal").
+           - `retry` is deep-merged (`retry: {limit: 0}` disables retries).
+           - `syncOptions` are concatenated after the defaults.
+           - any other `syncPolicy` field (e.g. `managedNamespaceMetadata`)
+             is merged as-is.
+         `useDefaultSyncPolicy: false` renders `syncPolicy` verbatim without
+         any defaults. */}}
+  {{- $automated := dict "prune" true "selfHeal" true }}
+  {{- $retry := dict "limit" 10 "refresh" true "backoff" (dict "duration" "5s" "factor" 2 "maxDuration" "5m") }}
+  {{- $syncOptions := list "ApplyOutOfSyncOnly=true" "SkipDryRunOnMissingResource=true" }}
+  {{- $syncPolicyExtra := dict }}
+  {{- if hasKey . "syncPolicy" }}
+    {{- with .syncPolicy }}
+      {{- if hasKey . "automated" }}
+        {{- $automated = .automated }}
+      {{- end }}
+      {{- if hasKey . "retry" }}
+        {{- $retry = mergeOverwrite $retry .retry }}
+      {{- end }}
+      {{- if hasKey . "syncOptions" }}
+        {{- $syncOptions = concat $syncOptions .syncOptions | uniq }}
+      {{- end }}
+      {{- $syncPolicyExtra = omit . "automated" "retry" "syncOptions" }}
+    {{- end }}
+  {{- end }}
+  {{- if ne .useDefaultSyncPolicy false }}
   syncPolicy:
     automated:
-      prune: true
-      selfHeal: true
+      {{- toYaml $automated | nindent 6 }}
     retry:
-      limit: 5
-      backoff:
-        duration: 5s
-        factor: 2
-        maxDuration: 3m
+      {{- toYaml $retry | nindent 6 }}
+    syncOptions:
+      {{- range $syncOptions }}
+      - {{ . | quote }}
+      {{- end }}
+    {{- with $syncPolicyExtra }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  {{- else if hasKey . "syncPolicy" }}
+  syncPolicy:
+    {{- toYaml .syncPolicy | nindent 4 }}
   {{- end }}
 {{- end }}

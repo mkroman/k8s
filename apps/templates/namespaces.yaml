@@ -3,8 +3,14 @@ apiVersion: v1
 kind: Namespace
 metadata:
   name: rwx
+  annotations:
+    argocd.argoproj.io/sync-wave: "-20"
+    argocd.argoproj.io/sync-options: Prune=confirm
 ---
 apiVersion: v1
 kind: Namespace
 metadata:
   name: magistr-prod
+  annotations:
+    argocd.argoproj.io/sync-wave: "-20"
+    argocd.argoproj.io/sync-options: Prune=confirm

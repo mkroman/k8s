@@ -15,6 +15,27 @@ Helm chart that renders `AppProject` and `Application` resources. This is the
 [app of apps][cluster-bootstrapping] pattern — all local workload Argo CD
 Applications are defined here.
 
+Ordering and health are deliberately two-layered:
+
+- A small **platform gate** (`cert-manager`, `prometheus-operator`,
+  `gateway-api`, `sealed-secrets`, `cloudnative-pg`, `traefik`) runs in sync
+  wave `-1` and propagates health. Argo CD waits for these to be Synced and
+  Healthy before applying any workload.
+- Every other Application runs in wave `0` with
+  `argocd.argoproj.io/ignore-healthcheck`, so one degraded workload neither
+  stalls the catalogue nor turns the root `apps` Application Degraded. They
+  rely on the default retry policy (`limit: 10`, refresh on new revisions) and
+  `SkipDryRunOnMissingResource` instead of a cross-Application wave chain.
+- `Namespace` (`-20`) and `AppProject` (`-10`) resources are ordered inside the
+  root sync. Namespaces carry `Prune=confirm`.
+- Workload health is alerted on directly in
+  [`monitoring/prometheus/base/manifests/prometheusrule.argocd.yaml`](monitoring/prometheus/base/manifests/prometheusrule.argocd.yaml).
+
+The root `apps` Application has no cascade finalizer and sets
+`preserveResourcesOnDeletion`, so deleting it orphans the child Applications
+instead of deleting their resources. Deleting an individual child Application
+still cascades unless it opts out with `useDefaultFinalizers: false`.
+
 ### [`apps-of-apps/`](apps-of-apps/)
 
 Helm chart for Applications sourced from external Git repositories.
