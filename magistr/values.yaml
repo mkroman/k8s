@@ -114,7 +114,7 @@ terminationGracePeriodSeconds: 30
 # controls the replica count. Disabled by default because the traffic profile is unknown.
 # Revisit `podDisruptionBudget.minAvailable` if the HPA can scale below it.
 autoscaling:
-  enabled: true
+  enabled: false
   minReplicas: 2
   maxReplicas: 10
   targetCPUUtilizationPercentage: 80
