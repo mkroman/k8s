@@ -1169,7 +1169,7 @@ preflight_server_dry_run() {
       die "server-side dry-run failed for ${app}; fix the manifests before syncing"
     fi
     printf '%s: server-side dry-run passed (%s resources)\n' \
-      "${app}" "$(grep -c ' (dry run)$' "${TEMP_DIR}/dry-run-${app}.log")"
+      "${app}" "$(grep -c '(server dry run)' "${TEMP_DIR}/dry-run-${app}.log")"
   done
 }
 
