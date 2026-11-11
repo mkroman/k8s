@@ -74,6 +74,17 @@ apps:
         - apiserver
         - kube-scheduler
         - kube-controller-manager
+  node-feature-discovery:
+    requires:
+      - prometheus-operator
+    resources:
+      - apiVersion: nfd.k8s-sigs.io/v1alpha1
+        kind: NodeFeatureRule
+        name: silicon-labs-cc2652rb-usb
+      - apiVersion: monitoring.coreos.com/v1
+        kind: PodMonitor
+        namespace: node-feature-discovery
+        name: node-feature-discovery
   cluster-exporters:
     requires:
       - prometheus-operator

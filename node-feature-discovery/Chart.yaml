@@ -1,0 +1,16 @@
+apiVersion: v2
+name: node-feature-discovery
+description: Node Feature Discovery (NFD) — hardware and OS feature labeling for Kubernetes nodes
+type: application
+
+# Wrapper chart that pins the official upstream chart from the NFD project.
+# Upgrade the dependency below with `helm dependency update` when bumping NFD.
+version: 0.1.0
+appVersion: "v0.20.1"
+
+dependencies:
+  - name: node-feature-discovery
+    version: 0.20.1
+    # The project recommends the OCI repository; the legacy HTTP repository is
+    # deprecated and will stop receiving updates.
+    repository: oci://registry.k8s.io/nfd/charts

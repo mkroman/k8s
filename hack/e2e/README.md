@@ -97,6 +97,7 @@ and `E2E_TIMEOUT_SECONDS` are defaults only: an app's explicit `retry_limit` or
 | `gateway-api` | Kustomize | none |
 | `grafana` | Helm | `prometheus-operator`; checks the renderer scrape path |
 | `monitoring` | Kustomize | `prometheus-operator`; asserts the control-plane scrape targets are up |
+| `node-feature-discovery` | Helm | `prometheus-operator`; asserts the bundled NodeFeatureRule and PodMonitor |
 | `prometheus-operator` | Kustomize | `cert-manager`; asserts its ServiceMonitor is deployed |
 | `sealed-secrets` | Kustomize | `prometheus-operator`; asserts its PodMonitor is deployed |
 | `spegel` | Helm, OCI dependencies | none; ServiceMonitor disabled in kind; PostSync probe runs a two-node P2P pull test |
