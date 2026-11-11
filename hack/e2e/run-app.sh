@@ -186,7 +186,10 @@ reset_e2e_applications() {
   # The cluster is e2e-only, so every Application other than the root belongs
   # to this or an earlier selection. Delete unknown/stale Applications first
   # and then the current chain in reverse dependency order (selected app
-  # before its prerequisites).
+  # before its prerequisites). A stale app can still be mid-retry from a
+  # failed sync: Argo CD will not finalize the deletion while an operation is
+  # running, so clear the operation and disable auto-sync first, exactly as
+  # for the root Application above.
   applications_json="$(kubectl -n argocd get applications -o json)" ||
     die "could not list Applications in the argocd namespace"
 
@@ -196,6 +199,13 @@ reset_e2e_applications() {
     delete_order+=("${app}")
   done < <(jq -r '.items[].metadata.name | select(. != "e2e")' \
     <<<"${applications_json}" | sort)
+
+  for app in "${delete_order[@]}"; do
+    kubectl -n argocd patch application "${app}" --type=merge \
+      -p '{"operation":null,"spec":{"syncPolicy":{"automated":null}}}' \
+      >/dev/null ||
+      die "could not disable auto-sync on stale Application ${app}"
+  done
 
   for ((index = ${#ORDER[@]} - 1; index >= 0; index--)); do
     delete_order+=("${ORDER[index]}")
