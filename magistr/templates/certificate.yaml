@@ -1,10 +1,11 @@
 {{- if and .Values.ingress.enabled .Values.ingress.tls.enabled .Values.ingress.tls.createCertificate }}
 {{- $hosts := .Values.ingress.tls.hosts | default .Values.ingress.hosts }}
+{{- $certificateName := .Values.ingress.tls.certificateName | default (include "magistr.fullname" .) }}
 {{- $secretName := .Values.ingress.tls.secretName | default (printf "%s-tls" (include "magistr.fullname" .)) }}
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: {{ include "magistr.fullname" . }}
+  name: {{ $certificateName }}
   labels:
     {{- include "magistr.labels" . | nindent 4 }}
   {{- with .Values.ingress.annotations }}

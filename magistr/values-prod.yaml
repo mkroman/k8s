@@ -9,9 +9,9 @@ image:
   tag: "0.2.4"
 
 config:
-  # Matches the previous production overlay. Lower to `info` if the SQL and
-  # request traces are too noisy for the cluster's log pipeline.
-  logLevel: "magistr=trace,tower_http=trace,sqlx=trace"
+  # Keep production at `info`; raise to per-target `trace` filters temporarily
+  # when debugging request or SQL behaviour.
+  logLevel: "info"
 
 database:
   # Contains DATABASE_URL for the CloudNativePG `postgres` cluster in the rwx
@@ -59,6 +59,8 @@ ingress:
     enabled: true
     secretName: magistr.dk-tls
     createCertificate: true
+    # Keep the Certificate name from the retired Kustomize overlay.
+    certificateName: magistr.dk
     issuerRef:
       kind: ClusterIssuer
       name: letsencrypt-production

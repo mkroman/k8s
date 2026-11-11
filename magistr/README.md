@@ -129,7 +129,7 @@ Secret are recreated by the chart.
 | `extraEnv`, `extraEnvFrom`, `extraVolumes`, `extraVolumeMounts` | empty | Escape hatches for additional configuration. |
 
 `values-prod.yaml` mirrors the previous production overlay: four replicas,
-the same CPU/memory envelope, trace logging, the `postgres` Secret, Traefik
+the same CPU/memory envelope, `info` logging, the `postgres` Secret, Traefik
 IngressRoutes for `magistr.dk` and `www.magistr.dk`, and a cert-manager
 Certificate stored in `magistr.dk-tls`.
 

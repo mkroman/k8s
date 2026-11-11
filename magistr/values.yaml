@@ -200,6 +200,8 @@ ingress:
     secretName: ""
     # Create a cert-manager Certificate for `hosts` (or `tls.hosts`, when set).
     createCertificate: false
+    # Name of the generated Certificate resource. Defaults to `<fullname>`.
+    certificateName: ""
     # Issuer used by the generated Certificate.
     issuerRef:
       kind: ClusterIssuer
