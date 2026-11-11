@@ -453,6 +453,7 @@ namespaces:
   - name: grafana
   - name: longhorn-system
   - name: monitoring
+  - name: magistr-prod
   - name: mosquitto
   - name: mqtt2prometheus
   - name: nats
