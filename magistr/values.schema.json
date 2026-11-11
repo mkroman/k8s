@@ -382,6 +382,9 @@
             "secretName": {
               "type": "string"
             },
+            "certificateName": {
+              "type": "string"
+            },
             "hosts": {
               "type": "array",
               "items": {
