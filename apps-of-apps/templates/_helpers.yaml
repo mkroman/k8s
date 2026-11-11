@@ -1,7 +1,0 @@
-{{- define "apps-of-apps.argocdNamespace" -}}
-{{- if .Values.argocdNamespace -}}
-{{- .Values.argocdNamespace -}}
-{{- else -}}
-argocd
-{{- end -}}
-{{- end }}

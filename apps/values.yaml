@@ -13,10 +13,6 @@ spec:
     repoURL: https://github.com/mkroman/k8s
     targetRevision: HEAD
 
-applications:
-  - name: k8s-meta-apps
-  - name: k8s-rwx-apps
-
 # -- List of Argo CD projects.
 projects:
   - name: agentgateway
@@ -495,7 +491,7 @@ namespaces:
       pod-security.kubernetes.io/warn: privileged
       pod-security.kubernetes.io/warn-version: latest
 
-newApplications:
+applications:
   - name: agentgateway
     project: agentgateway
     destination:
