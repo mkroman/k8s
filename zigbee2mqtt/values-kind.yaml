@@ -1,0 +1,54 @@
+# E2E-only overrides for the kind-based test cluster (hack/e2e/run-app.sh).
+#
+# The runner appends this file to the Application's helm valueFiles because it
+# sits next to Chart.yaml. Every override below exists only to make
+# Zigbee2MQTT deployable and healthy on kind, which has:
+#   - no USB coordinator device and no feature.node.kubernetes.io/
+#     zigbee-coordinator=true node label,
+#   - a default StorageClass (`standard`), not the production ssd-gp1x1,
+#   - no Sealed Secrets key, and the mosquitto e2e app running an anonymous
+#     MQTT listener at mosquitto.mosquitto.svc.cluster.local:1883.
+#
+# Instead of the real device, the pod runs a Z-Stack (ZNP) coordinator
+# emulator sidecar (ghcr.io/romanlum/zstack-adapter-emulator) that gives
+# zigbee-herdsman just enough of the TI protocol to start the Zigbee stack
+# without a radio. No real devices can join; this proves deployment and
+# bridge health only.
+coordinator:
+  # Empty disables the device hostPath, the /run/udev hostPath, and the
+  # USB nodeSelector; the chart then requires a tcp:// serial port below.
+  devicePath: ""
+  emulator:
+    enabled: true
+    image:
+      # The upstream publishes only branch and sha-<commit> tags; pin the
+      # sha tag of the reviewed commit instead of `latest`.
+      tag: sha-f852d56
+
+persistence:
+  # Use the cluster default StorageClass (kind provides `standard`).
+  storageClass: ""
+
+# The e2e mosquitto listener is anonymous: no secret file is mounted and
+# MQTT credentials are empty. configuration.yaml is rendered without a
+# `!secret.yaml` reference so the file is never needed.
+secret:
+  name: ""
+
+config:
+  mqtt:
+    server: mqtt://mosquitto.mosquitto.svc.cluster.local:1883
+    user: ""
+    password: ""
+  serial:
+    port: tcp://127.0.0.1:6638
+    adapter: zstack
+
+# PostSync probe: subscribe to the bridge state topic on the e2e broker and
+# fail the Argo CD sync unless Zigbee2MQTT published its retained online
+# message (see templates/e2e/probe.yaml).
+e2e:
+  enabled: true
+  mqtt:
+    host: mosquitto.mosquitto.svc.cluster.local
+    port: 1883

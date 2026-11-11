@@ -74,6 +74,16 @@ apps:
         - apiserver
         - kube-scheduler
         - kube-controller-manager
+  mosquitto:
+    resources:
+      - apiVersion: apps/v1
+        kind: Deployment
+        namespace: mosquitto
+        name: mosquitto
+      - apiVersion: v1
+        kind: ConfigMap
+        namespace: mosquitto
+        name: mosquitto-config
   node-feature-discovery:
     requires:
       - prometheus-operator
@@ -164,3 +174,19 @@ apps:
         kind: PodMonitor
         namespace: vector
         name: vector-aggregator
+  zigbee2mqtt:
+    # The e2e deployment runs without real Zigbee hardware: the chart mounts a
+    # Z-Stack coordinator emulator sidecar and connects over pod-local TCP, so
+    # it only needs a reachable MQTT broker.
+    requires:
+      - mosquitto
+    timeout_seconds: 900
+    resources:
+      - apiVersion: apps/v1
+        kind: StatefulSet
+        namespace: zigbee2mqtt
+        name: zigbee2mqtt
+      - apiVersion: v1
+        kind: ConfigMap
+        namespace: zigbee2mqtt
+        name: zigbee2mqtt

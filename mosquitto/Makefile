@@ -1,5 +1,5 @@
 SHELL := /bin/bash
-MANIFESTS_DIR := ./manifests
+MANIFESTS_DIR := ./base/manifests
 OP2SECRET ?= op2secret
 KUBESEAL ?= kubeseal
 SECRETS := mosquitto/mosquitto-passwd

@@ -15,7 +15,12 @@ readonly REPO_ROOT
 readonly YAMLLINT_CONFIG="${REPO_ROOT}/hack/ci/yamllint.yaml"
 
 collect_yaml_files() {
-  git -C "${REPO_ROOT}" ls-files '*.yaml' '*.yml' |
+  # `--others --exclude-standard` covers brand-new files that are not staged
+  # yet, so agent and local edits are linted immediately. `--cached` keeps
+  # tracked files; the existence filter below skips paths that are staged but
+  # deleted in the working tree.
+  git -C "${REPO_ROOT}" ls-files --cached --others --exclude-standard \
+    -- '*.yaml' '*.yml' |
     grep -vE '(^|/)(templates|charts)/' |
     grep -vE '^\.github/workflows/'
 }
@@ -24,7 +29,11 @@ main() {
   cd "${REPO_ROOT}"
 
   local -a files=()
-  mapfile -t files < <(collect_yaml_files)
+  local file
+  while IFS= read -r file; do
+    [[ -f "${file}" ]] || continue
+    files+=("${file}")
+  done < <(collect_yaml_files)
 
   if ((${#files[@]} == 0)); then
     printf 'No YAML files to lint.\n'

@@ -1,0 +1,93 @@
+# Device overrides, seeded to /app/data/devices.yaml on first start only.
+# Keep the IEEE address keys quoted so YAML parses them as strings.
+'0x00158d000233f8c3':
+  friendly_name: living_room_climate_sensor
+'0x000b57fffeeb6c8f':
+  friendly_name: '0x000b57fffeeb6c8f'
+'0x00158d000244e2f9':
+  friendly_name: lab/motion_sensor
+'0x000b57fffee98c78':
+  friendly_name: '0x000b57fffee98c78'
+'0x00158d00025f0397':
+  friendly_name: bathroom_climate_sensor
+'0x00158d000324258c':
+  friendly_name: shed/door_magnet_sensor
+'0x00158d000237153f':
+  friendly_name: bedroom_climate_sensor
+'0x00158d0002f8cb25':
+  friendly_name: desk_motion_sensor
+'0x000d6ffffe79b517':
+  friendly_name: '0x000d6ffffe79b517'
+'0x000d6ffffe0120ef':
+  friendly_name: '0x000d6ffffe0120ef'
+'0x00158d0003667c8e':
+  friendly_name: shed/motion_sensor
+'0x00158d0002c126c9':
+  friendly_name: kitchen_climate_sensor
+'0x000b57fffee77787':
+  friendly_name: remote_control_03
+'0x90fd9ffffe90874c':
+  friendly_name: remote_control_02
+'0x000b57fffeda7129':
+  friendly_name: remote_control_04
+'0x00158d0007e208a4':
+  friendly_name: lab_climate_sensor
+'0x00158d0007e20849':
+  friendly_name: entrance_climate_sensor
+'0x00158d0007e201d2':
+  friendly_name: unused_climate_sensor
+'0x0c4314fffe6453c4':
+  friendly_name: living_room_door_radiator_thermostat
+  homeassistant:
+    name: null
+'0x50325ffffe7a1b1b':
+  friendly_name: living_room_terrace_radiator_thermostat
+'0xb4e3f9fffec740c0':
+  friendly_name: bedroom_radiator_thermostat
+'0x000b57fffed2e66e':
+  friendly_name: '0x000b57fffed2e66e'
+'0x0c4314fffe6f7afa':
+  friendly_name: entrance_radiator_thermostat
+'0x000b57fffee1b0cf':
+  friendly_name: remote_control_01
+  description: Hello world
+'0xa4c13808629f8dca':
+  friendly_name: shed_climate_sensor
+'0xa4c138deee058c7f':
+  friendly_name: utility_closet_climate_sensor
+'0xa4c138e1b2322ff6':
+  friendly_name: lab_cct_strip_01
+'0xa4c138afeff741bc':
+  friendly_name: filament_storage_climate_sensor
+'0xe8e07efffebc94b2':
+  friendly_name: lab_radiator_thermostat
+'0xa4c13842f524743b':
+  friendly_name: bedroom_co2_sensor
+'0xa4c1380476cad7b5':
+  friendly_name: living_room_co2_sensor
+'0x90ab96fffe692698':
+  friendly_name: living_room_desk_light_remote
+'0x90ab96fffeec8fee':
+  friendly_name: lab/light_remote
+'0x000b57fffe2d4674':
+  friendly_name: '0x000b57fffe2d4674'
+'0x287681fffe9c82a2':
+  friendly_name: lab/led_panel
+'0x90fd9ffffe0de006':
+  friendly_name: shed/light
+'0xa4c138bb9c724a1e':
+  friendly_name: lab_desk_presence_sensor
+'0xa4c138b3269809a4':
+  friendly_name: '0xa4c138b3269809a4'
+'0xa4c1383e0f5e33f2':
+  friendly_name: living_room_desk_presence_sensor
+'0xa4c13885ce754411':
+  friendly_name: kitchen/freezer_climate_sensor
+  homeassistant:
+    name: Kitchen Freezer
+'0xa4c138429af0a2b5':
+  friendly_name: kitchen/fridge_climate_sensor
+'0xa4c13816283b8bd4':
+  friendly_name: '0xa4c13816283b8bd4'
+'0x90fd9ffffe8c3ec7':
+  friendly_name: kitchen/island_led_panel

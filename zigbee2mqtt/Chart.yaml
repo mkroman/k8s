@@ -1,0 +1,39 @@
+apiVersion: v2
+name: zigbee2mqtt
+description: >-
+  Zigbee2MQTT (Zigbee to MQTT bridge) on Kubernetes, following the official
+  container and configuration documentation. Requires a USB Zigbee coordinator
+  passed through from the node selected by the zigbee-coordinator NFD label.
+type: application
+version: 0.1.0
+# renovate: datasource=github-releases depName=Koenkk/zigbee2mqtt
+appVersion: "2.14.3"
+kubeVersion: ">=1.26.0-0"
+
+home: https://www.zigbee2mqtt.io/
+icon: https://www.zigbee2mqtt.io/logo.png
+sources:
+  - https://github.com/Koenkk/zigbee2mqtt
+  - https://www.zigbee2mqtt.io/guide/installation/08_kubernetes.html
+  - https://www.zigbee2mqtt.io/guide/installation/02_docker.html
+keywords:
+  - zigbee
+  - mqtt
+  - home-assistant
+  - zigbee2mqtt
+maintainers:
+  - name: mkroman
+annotations:
+  artifacthub.io/license: GPL-3.0-only
+  artifacthub.io/images: |
+    - name: zigbee2mqtt
+      image: ghcr.io/koenkk/zigbee2mqtt:2.14.3
+  artifacthub.io/links: |
+    - name: Kubernetes installation guide
+      url: https://www.zigbee2mqtt.io/guide/installation/08_kubernetes.html
+    - name: Docker installation
+      url: https://www.zigbee2mqtt.io/guide/installation/02_docker.html
+    - name: Securing the installation
+      url: https://www.zigbee2mqtt.io/guide/installation/14_securing.html
+    - name: MQTT configuration
+      url: https://www.zigbee2mqtt.io/guide/configuration/mqtt.html

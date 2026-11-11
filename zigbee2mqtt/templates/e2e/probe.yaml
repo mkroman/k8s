@@ -1,0 +1,99 @@
+{{- if .Values.e2e.enabled }}
+{{- $probeImage := required "e2e.probeImage is required when e2e.enabled is true" .Values.e2e.probeImage }}
+{{- $mqttHost := required "e2e.mqtt.host is required when e2e.enabled is true" .Values.e2e.mqtt.host }}
+{{- $mqttPort := int (required "e2e.mqtt.port is required when e2e.enabled is true" .Values.e2e.mqtt.port) }}
+{{- $topic := required "e2e.topic is required when e2e.enabled is true" .Values.e2e.topic }}
+{{- $timeout := int (required "e2e.timeoutSeconds is required when e2e.enabled is true" .Values.e2e.timeoutSeconds) }}
+{{- /* No RBAC: the probe only talks MQTT, never the Kubernetes API. */}}
+{{- /* PostSync hook: the sync fails when the bridge state stays offline. */}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: e2e-zigbee2mqtt-bridge-state
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "10"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  # The subscribe loop must fit below this deadline.
+  activeDeadlineSeconds: {{ add $timeout 30 }}
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: zigbee2mqtt
+        app.kubernetes.io/component: e2e-probe
+    spec:
+      automountServiceAccountToken: false
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: probe
+          image: {{ $probeImage | quote }}
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          env:
+            - name: MQTT_HOST
+              value: {{ $mqttHost | quote }}
+            - name: MQTT_PORT
+              value: {{ $mqttPort | quote }}
+            - name: TOPIC
+              value: {{ $topic | quote }}
+            - name: TIMEOUT_SECONDS
+              value: {{ $timeout | quote }}
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              set -euo pipefail
+              # Zigbee2MQTT retains its state on <base_topic>/bridge/state:
+              # "online" once the Zigbee stack is up (via the emulator in
+              # e2e), "offline" when it stops. Since 2.x the payload is JSON
+              # ({"state":"online"}); older releases publish the bare string.
+              # Subscribing with -C 1 -W returns the retained message
+              # immediately, or nothing on timeout. An absent message and an
+              # offline payload are hard failures; a broker connection error
+              # is retried until the deadline because the PostSync hook runs
+              # while dependent pods may still be settling.
+              received=""
+              deadline=$(( $(date +%s) + TIMEOUT_SECONDS ))
+              while [ "$(date +%s)" -lt "$deadline" ]; do
+                remaining=$(( deadline - $(date +%s) ))
+                if received="$(mosquitto_sub -h "${MQTT_HOST}" -p "${MQTT_PORT}" \
+                    -t "${TOPIC}" -C 1 -W "${remaining}" -v 2>/dev/null)" &&
+                    [ -n "${received}" ]; then
+                  break
+                fi
+                echo "no message on ${TOPIC} yet; retrying"
+                sleep 2
+              done
+              if [ -z "${received}" ]; then
+                echo "FAIL: no message received on ${TOPIC} within ${TIMEOUT_SECONDS}s" >&2
+                exit 1
+              fi
+              payload="${received#* }"
+              if [ "${payload}" != "online" ] && \
+                  ! printf '%s' "${payload}" | grep -q '"state"[[:space:]]*:[[:space:]]*"online"'; then
+                echo "FAIL: expected an online payload on ${TOPIC}, got: ${received}" >&2
+                exit 1
+              fi
+              echo "PASS: bridge state is online: ${received}"
+{{- end }}

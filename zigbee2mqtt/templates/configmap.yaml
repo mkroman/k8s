@@ -1,0 +1,37 @@
+{{- $config := omit .Values.config "devices" "groups" }}
+{{- $frontendPort := int (required "config.frontend.port is required" $config.frontend.port) }}
+{{- if ne $frontendPort (int .Values.service.port) }}
+{{- fail (printf "service.port (%d) must match config.frontend.port (%d)" (int .Values.service.port) $frontendPort) }}
+{{- end }}
+{{- $serialPort := required "config.serial.port is required" $config.serial.port }}
+{{- if .Values.coordinator.emulator.enabled }}
+{{- if .Values.coordinator.devicePath }}
+{{- fail "coordinator.emulator.enabled requires coordinator.devicePath to be empty (the emulator replaces the device)" }}
+{{- end }}
+{{- $loopback := printf "tcp://127.0.0.1:%d" (int .Values.coordinator.emulator.port) }}
+{{- if ne (toString $serialPort) $loopback }}
+{{- fail (printf "coordinator.emulator is enabled, so config.serial.port (%s) must point at the pod-local sidecar: %s" $serialPort $loopback) }}
+{{- end }}
+{{- end }}
+{{- if .Values.coordinator.devicePath }}
+{{- if ne (toString $serialPort) (toString .Values.coordinator.devicePath) }}
+{{- fail (printf "coordinator.devicePath (%s) must match config.serial.port (%s)" .Values.coordinator.devicePath $serialPort) }}
+{{- end }}
+{{- else if not (hasPrefix "tcp://" (toString $serialPort)) }}
+{{- fail (printf "coordinator.devicePath is empty, so config.serial.port (%s) must start with tcp:// (emulator or remote adapter mode)" $serialPort) }}
+{{- end }}
+{{- $configuration := merge (dict "devices" "devices.yaml" "groups" "groups.yaml") $config }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "zigbee2mqtt.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "zigbee2mqtt.labels" . | nindent 4 }}
+data:
+  configuration.yaml: |
+    {{- toYaml $configuration | nindent 4 }}
+  devices.yaml: |
+    {{- required "files/devices.yaml is required" (.Files.Get "files/devices.yaml") | trim | nindent 4 }}
+  groups.yaml: |
+    {{- required "files/groups.yaml is required" (.Files.Get "files/groups.yaml") | trim | nindent 4 }}

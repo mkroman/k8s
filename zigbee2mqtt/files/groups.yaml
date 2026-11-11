@@ -1,0 +1,18 @@
+# Group definitions, seeded to /app/data/groups.yaml on first start only.
+# Group keys must be quoted integers.
+'1':
+  friendly_name: kitchen_lights
+'2':
+  friendly_name: lab_lights
+'3':
+  friendly_name: entrance_lights
+'18547':
+  friendly_name: bedroom_lights
+  retain: false
+  transition: 2
+  optimistic: true
+'61688':
+  friendly_name: living_room_lights
+  retain: false
+  transition: 2
+  optimistic: true

@@ -1,0 +1,50 @@
+{{- if .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "zigbee2mqtt.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "zigbee2mqtt.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "zigbee2mqtt.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # The Service is ClusterIP. Allow cluster clients to reach the frontend;
+    # expose it through an authenticated ingress/gateway when needed.
+    - ports:
+        - protocol: TCP
+          port: {{ .Values.service.port }}
+  egress:
+    # DNS resolution. Left destination-open so it also covers NodeLocal DNS
+    # and clusters whose resolver runs outside kube-system.
+    - ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # MQTT broker, by namespace (pod IP after Service DNAT) and by the
+    # broker's LoadBalancer address.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.networkPolicy.mqttNamespace }}
+        - ipBlock:
+            cidr: {{ .Values.networkPolicy.mqttCidr }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.networkPolicy.mqttPort }}
+    {{- if .Values.networkPolicy.allowHttpsEgress }}
+    # OTA firmware index and image downloads.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - protocol: TCP
+          port: 443
+    {{- end }}
+{{- end }}

@@ -51,6 +51,7 @@ Helm chart for Applications sourced from external Git repositories.
 | vector-agent                | [`vector`](vector/)                             | [![App Status](https://argo-cd.infra.rwx.im/api/badge?name=vector-agent)](https://argo-cd.infra.rwx.im/applications/vector-agent) |
 | vector-aggregator           | [`vector`](vector/)                             | [![App Status](https://argo-cd.infra.rwx.im/api/badge?name=vector-aggregator)](https://argo-cd.infra.rwx.im/applications/vector-aggregator) |
 | zeta                        | [`zeta`](zeta/)                                 | [![App Status](https://argo-cd.infra.rwx.im/api/badge?name=zeta)](https://argo-cd.infra.rwx.im/applications/zeta) |
+| zigbee2mqtt                 | [`zigbee2mqtt`](zigbee2mqtt/)                   | [![App Status](https://argo-cd.infra.rwx.im/api/badge?name=zigbee2mqtt)](https://argo-cd.infra.rwx.im/applications/zigbee2mqtt) |
 
 ### External apps
 

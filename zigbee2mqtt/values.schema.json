@@ -1,0 +1,342 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "zigbee2mqtt chart values",
+  "type": "object",
+  "required": [
+    "image",
+    "service",
+    "config",
+    "coordinator",
+    "persistence"
+  ],
+  "properties": {
+    "global": {
+      "type": "object"
+    },
+    "nameOverride": {
+      "type": "string"
+    },
+    "fullnameOverride": {
+      "type": "string"
+    },
+    "image": {
+      "type": "object",
+      "required": [
+        "repository"
+      ],
+      "properties": {
+        "repository": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tag": {
+          "type": "string"
+        },
+        "pullPolicy": {
+          "type": "string",
+          "enum": [
+            "Always",
+            "IfNotPresent",
+            "Never"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "imagePullSecrets": {
+      "type": "array"
+    },
+    "replicaCount": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "timezone": {
+      "type": "string"
+    },
+    "service": {
+      "type": "object",
+      "required": [
+        "type",
+        "port"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "ClusterIP",
+            "NodePort",
+            "LoadBalancer"
+          ]
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        }
+      },
+      "additionalProperties": false
+    },
+    "config": {
+      "type": "object",
+      "required": [
+        "version",
+        "mqtt",
+        "serial",
+        "frontend"
+      ],
+      "properties": {
+        "version": {
+          "type": "integer"
+        },
+        "homeassistant": {
+          "type": "object"
+        },
+        "frontend": {
+          "type": "object",
+          "required": [
+            "enabled",
+            "port"
+          ],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "port": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 65535
+            },
+            "host": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": true
+        },
+        "mqtt": {
+          "type": "object",
+          "required": [
+            "server"
+          ],
+          "properties": {
+            "server": {
+              "type": "string",
+              "minLength": 1
+            },
+            "base_topic": {
+              "type": "string"
+            },
+            "user": {
+              "type": "string"
+            },
+            "password": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": true
+        },
+        "serial": {
+          "type": "object",
+          "required": [
+            "port"
+          ],
+          "properties": {
+            "port": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "additionalProperties": true
+        },
+        "advanced": {
+          "type": "object"
+        },
+        "device_options": {
+          "type": "object"
+        },
+        "availability": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": true
+    },
+    "secret": {
+      "type": "object",
+      "description": "Empty name disables the secret mount entirely (e2e anonymous MQTT).",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "key": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "coordinator": {
+      "type": "object",
+      "required": [
+        "devicePath",
+        "groupId"
+      ],
+      "properties": {
+        "devicePath": {
+          "type": "string",
+          "description": "Empty disables the device hostPath, /run/udev, and the nodeSelector; config.serial.port must then start with tcp://."
+        },
+        "hostPathType": {
+          "type": "string"
+        },
+        "groupId": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "emulator": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "image": {
+              "type": "object",
+              "required": [
+                "repository"
+              ],
+              "properties": {
+                "repository": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "tag": {
+                  "type": "string"
+                },
+                "pullPolicy": {
+                  "type": "string",
+                  "enum": [
+                    "Always",
+                    "IfNotPresent",
+                    "Never"
+                  ]
+                }
+              },
+              "additionalProperties": false
+            },
+            "port": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 65535
+            },
+            "resources": {
+              "type": "object"
+            },
+            "securityContext": {
+              "type": "object"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "persistence": {
+      "type": "object",
+      "required": [
+        "enabled"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "existingClaim": {
+          "type": "string"
+        },
+        "storageClass": {
+          "type": "string"
+        },
+        "accessModes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "size": {
+          "type": "string",
+          "minLength": 1
+        },
+        "annotations": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    },
+    "nodeSelector": {
+      "type": "object"
+    },
+    "tolerations": {
+      "type": "array"
+    },
+    "affinity": {
+      "type": "object"
+    },
+    "podAnnotations": {
+      "type": "object"
+    },
+    "podLabels": {
+      "type": "object"
+    },
+    "podSecurityContext": {
+      "type": "object"
+    },
+    "securityContext": {
+      "type": "object"
+    },
+    "resources": {
+      "type": "object"
+    },
+    "terminationGracePeriodSeconds": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "probes": {
+      "type": "object"
+    },
+    "networkPolicy": {
+      "type": "object"
+    },
+    "e2e": {
+      "type": "object",
+      "description": "E2E-only PostSync probe; enabled by values-kind.yaml.",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "probeImage": {
+          "type": "string"
+        },
+        "mqtt": {
+          "type": "object",
+          "properties": {
+            "host": {
+              "type": "string"
+            },
+            "port": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 65535
+            }
+          },
+          "additionalProperties": false
+        },
+        "topic": {
+          "type": "string"
+        },
+        "timeoutSeconds": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false
+}

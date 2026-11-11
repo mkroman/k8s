@@ -157,10 +157,20 @@ diagnose() {
     jq -r '.items[] | select((.status.failed // 0) > 0) |
       "\(.metadata.namespace)/\(.metadata.name)"')
   printf '::endgroup::\n'
-  printf '::group::Argo CD controller logs\n'
-  kubectl -n argocd logs statefulset/argocd-application-controller \
-    --tail=200 || true
-  kubectl -n argocd logs deployment/argocd-repo-server --tail=100 || true
+  printf '::group::Argo CD controller and repo server errors\n'
+  # The repo server emits JSON per rendered manifest and drowns real errors at
+  # sync time, so logs go to files and only error-shaped lines are printed.
+  # The runner times out on such failures anyway; the filtered lines are what
+  # names the failing resource.
+  local target log_file
+  for target in statefulset/argocd-application-controller \
+    deployment/argocd-repo-server; do
+    log_file="${TEMP_DIR}/argocd-${target//\//-}.log"
+    kubectl -n argocd logs "${target}" --tail=500 >"${log_file}" 2>&1 || true
+    printf -- '--- %s ---\n' "${target}"
+    grep -iE '"level":"(error|warn)"|error|invalid|failed|forbidden|unable|timed? ?out' \
+      "${log_file}" | tail -30 || true
+  done
   printf '::endgroup::\n'
 }
 
@@ -186,7 +196,10 @@ reset_e2e_applications() {
   # The cluster is e2e-only, so every Application other than the root belongs
   # to this or an earlier selection. Delete unknown/stale Applications first
   # and then the current chain in reverse dependency order (selected app
-  # before its prerequisites).
+  # before its prerequisites). A stale app can still be mid-retry from a
+  # failed sync: Argo CD will not finalize the deletion while an operation is
+  # running, so clear the operation and disable auto-sync first, exactly as
+  # for the root Application above.
   applications_json="$(kubectl -n argocd get applications -o json)" ||
     die "could not list Applications in the argocd namespace"
 
@@ -196,6 +209,13 @@ reset_e2e_applications() {
     delete_order+=("${app}")
   done < <(jq -r '.items[].metadata.name | select(. != "e2e")' \
     <<<"${applications_json}" | sort)
+
+  for app in "${delete_order[@]}"; do
+    kubectl -n argocd patch application "${app}" --type=merge \
+      -p '{"operation":null,"spec":{"syncPolicy":{"automated":null}}}' \
+      >/dev/null ||
+      die "could not disable auto-sync on stale Application ${app}"
+  done
 
   for ((index = ${#ORDER[@]} - 1; index >= 0; index--)); do
     delete_order+=("${ORDER[index]}")
@@ -315,6 +335,7 @@ app_pull_image() {
 build_apps() {
   local revision="$1"
   local repo_url="$2"
+  local paused="${3:-0}"
   local app entry path overlay wave retry_limit
   local -a entries=()
 
@@ -374,6 +395,18 @@ build_apps() {
       end
     ' <<<"${entry}")"
 
+    if [[ "${paused}" == "1" ]]; then
+      # Phase 1 creates the Applications without syncing: the child's own
+      # automated policy is stripped here and re-applied by the runner once
+      # the server-side dry-run gate has validated the rendered manifests
+      # (see preflight_server_dry_run). The automated block is captured below
+      # so the re-enable step restores exactly what the application declares.
+      # Every e2e application uses the default automated policy; an
+      # application that opted out (useDefaultSyncPolicy: false) would fall
+      # back to the default here, which is fine for the current app set.
+      entry="$(jq 'del(.syncPolicy.automated)' <<<"${entry}")"
+    fi
+
     wave=$(( -10 * ${DEPTH[${app}]} ))
     entry="$(jq --arg wave "${wave}" '
       .annotations = ((.annotations // {}) +
@@ -382,6 +415,14 @@ build_apps() {
 
     entries+=("${entry}")
   done
+
+  # The automated policies stripped above, per application, for the re-enable
+  # step after the dry-run gate.
+  printf '%s\n' "${entries[@]}" |
+    jq -s 'map({key: .name,
+                value: (.syncPolicy.automated //
+                  {prune: true, selfHeal: true})}) |
+           from_entries' >"${TEMP_DIR}/child-automated.json"
 
   printf '%s\n' "${entries[@]}" | jq -s -c '.'
 }
@@ -633,6 +674,7 @@ render_root_app() {
 refresh_application() {
   local app="$1"
   local timeout_seconds="$2"
+  local force="${3:-0}"
   local start elapsed previous previous_rv current current_rv
   local application_json refresh_annotation
 
@@ -653,7 +695,14 @@ refresh_application() {
   )"
   # The first reconciliation has not happened yet, so it will use the current
   # API versions anyway. Refreshing now can race with AppProject creation.
-  [[ -n "${previous}" ]] || return 0
+  # The pre-sync gate passes force=1 because it already waited for the project:
+  # child Applications are created in negative sync-waves before the
+  # AppProjects from wave 0, so their first reconcile can fail with
+  # InvalidSpecError and only a forced refresh after the project exists heals
+  # it.
+  if [[ -z "${previous}" && "${force}" != "1" ]]; then
+    return 0
+  fi
 
   # Hard refresh through the CLI. This sets the same refresh=hard annotation
   # the controller consumes and additionally drops the repo server's cached
@@ -754,30 +803,27 @@ wait_for_application() {
   local app="$1"
   local revision="$2"
   local timeout_seconds="$3"
-  local start elapsed remaining application_json health operation_phase
+  local start elapsed application_json health operation_phase failed_syncs
 
   start="$(date +%s)"
 
   # The e2e cluster runs Argo CD headless (argocd-server is scaled to zero),
-  # so the CLI watches the Application resources directly in core mode. -N pins
-  # the lookup to the argocd namespace instead of the kubeconfig context's
-  # default namespace.
+  # so the Application resource is polled directly with kubectl in the argocd
+  # namespace instead of through the CLI.
   #
-  # Do not pass --health here: argocd app wait treats any Progressing ->
+  # Do not use `argocd app wait --operation` to wait for the sync: an
+  # automated sync that keeps failing (for example a hook manifest the API
+  # server rejects) starts a new operation on every retry, so the CLI wait
+  # sees "still running" forever and burns the whole budget while the actual
+  # error surfaces only in the operation history. Poll the phase instead and
+  # bail out on a Failed phase or on a second failed entry in the history,
+  # whichever shows up first.
+  #
+  # Do not pass --health either: argocd app wait treats any Progressing ->
   # Degraded transition as fatal, and a new Prometheus CR is briefly Degraded
   # because prometheus-operator reports Available=False/NoPodReady until its
-  # first pod is ready. Wait for the sync operation with the CLI, then poll
-  # health until the overall deadline so a transient degraded state does not
-  # fail the run.
-  elapsed=$(( $(date +%s) - start ))
-  remaining=$((timeout_seconds - elapsed))
-  if ((remaining <= 0)) ||
-    ! argocd app wait "${app}" --core -N argocd \
-      --sync --operation --timeout "${remaining}"; then
-    diagnose
-    die "Application ${app} did not finish syncing within ${timeout_seconds}s"
-  fi
-
+  # first pod is ready. Health is polled against the overall deadline so a
+  # transient degraded state does not fail the run.
   while true; do
     elapsed=$(( $(date +%s) - start ))
     if ((elapsed > timeout_seconds)); then
@@ -793,8 +839,10 @@ wait_for_application() {
       operation_phase="$(
         jq -r '.status.operationState.phase // ""' <<<"${application_json}"
       )"
-      printf 'Application %s: health=%s operation=%s\n' \
-        "${app}" "${health}" "${operation_phase:-none}"
+      failed_syncs="$(jq '[.status.history[]? | select(.phase == "Failed")] | length' \
+        <<<"${application_json}")"
+      printf 'Application %s: health=%s operation=%s failedSyncs=%s\n' \
+        "${app}" "${health}" "${operation_phase:-none}" "${failed_syncs}"
 
       case "${operation_phase}" in
         Failed | Error)
@@ -804,6 +852,13 @@ wait_for_application() {
         Running | Terminating)
           # PostSync hooks, including e2e probes, run during the operation.
           # Do not treat resource health alone as success: wait for the hook.
+          # A phase can flip Failed -> Running between polls, so the operation
+          # history is the reliable repeated-failure signal: two failed
+          # attempts mean the same failure will keep recurring.
+          if ((failed_syncs >= 2)); then
+            diagnose
+            die "Application ${app} failed ${failed_syncs} sync attempts: $(jq -r '[.status.history[]? | select(.phase == "Failed")] | last | .message // "no message"' <<<"${application_json}")"
+          fi
           ;;
         *)
           if [[ "${health}" == "Healthy" ]]; then
@@ -936,6 +991,207 @@ check_prometheus_targets() {
   die "Prometheus targets for ${app} did not become healthy: ${summary}"
 }
 
+# The harness deploys the committed revision: the local Git daemon serves a
+# bare clone of HEAD, so uncommitted changes under an application's path are
+# silently missing from the deployment under test.
+require_clean_app_trees() {
+  local app path dirty
+  local -a dirty_paths=()
+
+  for app in "${ORDER[@]}"; do
+    path="$(app_entry "${app}" | jq -r '.source.path // .name')"
+    if ! dirty="$(git -C "${REPO_ROOT}" status --porcelain -- "${path}")"; then
+      die "could not read the git status for ${path}"
+    fi
+    [[ -z "${dirty}" ]] || dirty_paths+=("${path}")
+  done
+
+  if ((${#dirty_paths[@]} > 0)); then
+    printf 'Uncommitted changes under application paths:\n' >&2
+    printf '  %s\n' "${dirty_paths[@]}" >&2
+    die "the harness deploys the committed revision (HEAD); commit or stash the changes above first"
+  fi
+}
+
+# Established API resources in the target cluster, as one "apiVersion/kind"
+# pair per line, crawled from the discovery endpoints. api-resources column
+# parsing is avoided on purpose: the SHORTNAMES column is empty for many
+# resources, which shifts awk fields.
+established_api_resources() {
+  local output="$1"
+  local group_version
+
+  : >"${output}"
+
+  for group_version in $(kubectl get --raw /api | jq -r '.versions[]'); do
+    kubectl get --raw "/api/${group_version}" |
+      jq -r --arg av "${group_version}" \
+        '.resources[]? | select(.kind != "") | "\($av)/\(.kind)"' >>"${output}"
+  done
+  while IFS= read -r group_version; do
+    kubectl get --raw "/apis/${group_version}" |
+      jq -r --arg av "${group_version}" \
+        '.resources[]? | select(.kind != "") | "\($av)/\(.kind)"' >>"${output}"
+  done < <(kubectl get --raw /apis | jq -r '.groups[] | .versions[] | .groupVersion')
+
+  sort -u -o "${output}" "${output}"
+
+  # CustomResourceDefinition objects are excluded from the gate: client-side
+  # `kubectl apply` stores each manifest in the last-applied-configuration
+  # annotation, which exceeds the 256KiB object limit for large CRDs
+  # (prometheus-operator's prometheuses CRD is roughly 400KiB) and fails with a
+  # false "metadata.annotations: Too long" error. kubeconform validates CRD
+  # schemas during chart validation, and Argo CD applies CRDs with server-side
+  # apply where the chart requires it.
+  grep -v '^apiextensions.k8s.io/v1/CustomResourceDefinition$' \
+    "${output}" >"${output}.tmp"
+  mv "${output}.tmp" "${output}"
+}
+
+# Copy only the rendered documents whose apiVersion/kind is established in the
+# cluster, and report the kinds that were skipped. Operator CRDs from
+# prerequisite applications have not synced yet at preflight time, so resources
+# backed by them (ServiceMonitor, PodMonitor, ...) cannot be validated against
+# a fresh cluster; their CRDs are applied in earlier sync waves and Argo CD
+# applies those resources after the CRDs are established.
+filter_established_kinds() {
+  local rendered="$1"
+  local established="$2"
+  local output="$3"
+  local pair api_version kind
+  local expression=""
+
+  while IFS= read -r pair; do
+    [[ -n "${pair}" ]] || continue
+    # Split on the LAST slash: apiVersion can itself contain one
+    # (cluster-scoped groups like "apps/v1", "monitoring.coreos.com/v1").
+    api_version="${pair%/*}"
+    kind="${pair##*/}"
+    [[ -n "${expression}" ]] && expression+=' or '
+    # Parenthesize each clause: yq's and/or are left-associative with equal
+    # precedence, so an unparenthesized "a and b or c and d" would parse as
+    # "((a and b) or c) and d" and match nothing.
+    expression+="(.apiVersion == \"${api_version}\" and .kind == \"${kind}\")"
+  done <"${established}"
+
+  yq '.apiVersion + "/" + .kind' "${rendered}" 2>/dev/null |
+    # yq separates multi-document output with "---" lines; they are document
+    # separators, and "null/null" is the empty document some outputs carry.
+    grep -vE '^(---|null/null)$' | sort -u >"${TEMP_DIR}/rendered-kinds.txt"
+  comm -23 "${TEMP_DIR}/rendered-kinds.txt" \
+    <(sort -u "${established}") >"${TEMP_DIR}/skipped-kinds.txt" || true
+
+  yq eval-all "select(${expression})" "${rendered}" >"${output}"
+}
+
+# Admission (and strict server-side field validation) runs in the manifest's
+# namespace, so it must exist before the gate. The applications chart creates
+# these namespaces during the sync; creating them here only covers the window
+# before that sync.
+ensure_namespaces() {
+  local rendered="$1"
+  local namespace
+
+  while IFS= read -r namespace; do
+    [[ -n "${namespace}" ]] || continue
+    if kubectl get namespace "${namespace}" >/dev/null 2>&1; then
+      continue
+    fi
+    kubectl create namespace "${namespace}" >/dev/null
+    printf 'Created namespace %s for the dry-run gate\n' "${namespace}"
+  done < <(yq '.metadata.namespace // ""' "${rendered}" 2>/dev/null |
+    # yq separates multi-document output with "---" lines; they are document
+    # separators, not namespace names.
+    grep -vE '^(-{3,})$' | sort -u)
+}
+
+# Wait for the Application's initial reconciliation: manifests generated and
+# the resource tree populated. This is the pre-sync gate for the paused
+# Applications (phase 1), which never sync on their own.
+wait_until_reconciled() {
+  local app="$1"
+  local timeout_seconds="$2"
+  local start elapsed state
+
+  start="$(date +%s)"
+
+  while true; do
+    elapsed=$(( $(date +%s) - start ))
+    if ((elapsed > timeout_seconds)); then
+      diagnose
+      die "Application ${app} was not rendered within ${timeout_seconds}s"
+    fi
+
+    state="$(kubectl -n argocd get application "${app}" -o json 2>/dev/null |
+      jq -r '[.status.reconciledAt // "",
+        ((.status.resources // []) | length)] | @tsv' || true)"
+    IFS=$'\t' read -r _ resource_count <<<"${state}"
+    if [[ -n "${state}" ]] && ((resource_count > 0)); then
+      return 0
+    fi
+
+    sleep 2
+  done
+}
+
+# Re-enable the automated sync policy that preflight_server_dry_run's paused
+# render stripped, restoring exactly the block the application declares.
+unpause_application() {
+  local app="$1"
+  local automated
+
+  automated="$(jq -r --arg app "${app}" '.[$app]' \
+    "${TEMP_DIR}/child-automated.json")"
+  kubectl -n argocd patch application "${app}" --type=merge \
+    -p "{\"spec\":{\"syncPolicy\":{\"automated\":${automated}}}}" >/dev/null ||
+    die "could not re-enable auto-sync for Application ${app}"
+}
+
+# Validate Argo CD's rendered manifests against the live API server before
+# anything syncs. Admission and strict server-side field validation catch
+# errors no static check can see (a Job with a hand-written spec.selector, a
+# mistyped field) in seconds, instead of after a failed sync cycle. The
+# manifests come from the repo server, so this validates exactly what Argo CD
+# would apply — including chart dependencies resolved by Argo CD.
+preflight_server_dry_run() {
+  local app rendered filtered skipped_kinds
+
+  established_api_resources "${TEMP_DIR}/api-resources.tsv"
+
+  for app in "${ORDER[@]}"; do
+    rendered="${TEMP_DIR}/dry-run-${app}.yaml"
+    filtered="${TEMP_DIR}/dry-run-${app}.filtered.yaml"
+
+    if ! argocd app manifests "${app}" --core -N argocd \
+      >"${rendered}" 2>"${TEMP_DIR}/manifests-${app}.err"; then
+      die "could not fetch rendered manifests for ${app}: $(cat "${TEMP_DIR}/manifests-${app}.err")"
+    fi
+
+    ensure_namespaces "${rendered}"
+    filter_established_kinds "${rendered}" \
+      "${TEMP_DIR}/api-resources.tsv" "${filtered}"
+
+    skipped_kinds="$(tr '\n' ' ' <"${TEMP_DIR}/skipped-kinds.txt")"
+    if [[ -n "${skipped_kinds}" ]]; then
+      printf '%s: kinds not covered by the dry-run gate: %s\n' \
+        "${app}" "${skipped_kinds}"
+    fi
+
+    if [[ ! -s "${filtered}" ]] || ! grep -q . "${filtered}"; then
+      printf '%s: nothing to dry-run (all rendered kinds are CRD-backed)\n' "${app}"
+      continue
+    fi
+
+    if ! kubectl apply --dry-run=server --validate=strict \
+      -f "${filtered}" >"${TEMP_DIR}/dry-run-${app}.log" 2>&1; then
+      cat "${TEMP_DIR}/dry-run-${app}.log" >&2
+      die "server-side dry-run failed for ${app}; fix the manifests before syncing"
+    fi
+    printf '%s: server-side dry-run passed (%s resources)\n' \
+      "${app}" "$(grep -c '(server dry run)' "${TEMP_DIR}/dry-run-${app}.log")"
+  done
+}
+
 wait_for_root_sync() {
   local revision="$1"
   local timeout_seconds="$2"
@@ -979,6 +1235,7 @@ main() {
 
   yq -o=json '.' "${VALUES_FILE}" >"${TEMP_DIR}/apps-values.json"
   resolve_app "${app}" 0
+  require_clean_app_trees
 
   revision="$(git -C "${REPO_ROOT}" rev-parse HEAD)"
 
@@ -1034,7 +1291,7 @@ main() {
   [[ "${repo_url}" != "git://:"* ]] || die "could not determine the kind gateway IP"
   printf 'Argo CD will read the checkout from %s\n' "${repo_url}"
 
-  apps_json="$(build_apps "${revision}" "${repo_url}")"
+  apps_json="$(build_apps "${revision}" "${repo_url}" 1)"
   projects_json="$(build_projects "${repo_url}")"
   render_root_app "${revision}" "${repo_url}" "${apps_json}" "${projects_json}"
 
@@ -1044,8 +1301,32 @@ main() {
   printf 'Apps: %s\n' "${ORDER[*]}"
   printf '::endgroup::\n'
 
-  printf '::group::Wait for Applications\n'
+  printf '::group::Server-side dry-run preflight\n'
+  # Applications are created paused (no automated sync), so nothing reaches
+  # the cluster before the rendered manifests have been validated by the API
+  # server. Prerequisite applications are part of the same chain and render in
+  # this phase too. wait_for_project is needed here as well: the CLI rejects
+  # argocd app manifests for an application whose project does not exist yet,
+  # because the root app syncs Applications in earlier sync-waves than their
+  # AppProjects.
   for app in "${ORDER[@]}"; do
+    wait_for_project "${app}" "$(app_entry "${app}" | jq -r '.project // "default"')"
+    # Child Applications are created before the AppProjects (negative
+    # sync-waves), so their first reconcile can fail with InvalidSpecError.
+    # Force a refresh now that the project exists, then wait for the resource
+    # tree to populate before asking the repo server for manifests.
+    refresh_application "${app}" "${E2E_REFRESH_TIMEOUT_SECONDS}" 1
+    wait_until_reconciled "${app}" "${E2E_REFRESH_TIMEOUT_SECONDS}"
+  done
+  preflight_server_dry_run
+  printf '::endgroup::\n'
+
+  printf '::group::Sync and wait for Applications\n'
+  # Unpause in dependency order (selected app last): an application must not
+  # sync before its prerequisites are healthy, and the requires graph is the
+  # dependency order.
+  for app in "${ORDER[@]}"; do
+    unpause_application "${app}"
     timeout_seconds="$(yq -r ".apps[\"${app}\"].timeout_seconds // 0" "${CONFIG_FILE}")"
     if [[ "${timeout_seconds}" == "0" || "${timeout_seconds}" == "null" ]]; then
       timeout_seconds="${E2E_TIMEOUT_SECONDS}"

@@ -1,0 +1,299 @@
+# Zigbee2MQTT
+
+Deploys [Zigbee2MQTT](https://www.zigbee2mqtt.io/) 2.14.3 on Kubernetes using
+the official `ghcr.io/koenkk/zigbee2mqtt` image. It bridges a USB Zigbee
+coordinator to MQTT and Home Assistant.
+
+## Deployment model
+
+The upstream project publishes a Helm chart
+([`Koenkk/zigbee2mqtt-chart`](https://github.com/Koenkk/zigbee2mqtt-chart)),
+but this chart deliberately follows the official container deployment instead:
+
+- The upstream chart generates its own `configuration.yaml` and cannot preserve
+  inline `devices` and `groups` blocks. Its `statefulset.command` default is an
+  empty map, which also prevents a wrapper chart from adding a seeding command
+  because Helm cannot coalesce a list over a map.
+- The upstream chart defaults to `privileged: true` with a root container. The
+  [official security guide](https://www.zigbee2mqtt.io/guide/installation/14_securing.html)
+  recommends a dedicated unprivileged user.
+
+This chart keeps deployment and scalar settings in structured `config` values
+and the large device/group inventories in `files/devices.yaml` and
+`files/groups.yaml`. On first start an init container copies
+`configuration.yaml`, `devices.yaml`, and `groups.yaml` into the data volume,
+then leaves the volume alone. Separating the inventories avoids Helm coalescing
+deleting explicit `null` values (for example a device-level
+`homeassistant.name: null`) and keeps the files diff-friendly.
+
+### Configuration options considered
+
+| Option | Trade-off |
+| --- | --- |
+| One raw `config:` string | Exact and simple, but indent-sensitive, impossible to override per key, and no schema. |
+| One structured map + `toYaml` | Ergonomic and `--set` friendly, but Helm deletes explicit `null` values during coalescing, which changes device behaviour. |
+| Opaque existing ConfigMap/Secret (Sironite chart) | Good when config lives in an external secret manager, but the chart no longer owns defaults or validation. |
+| Structured scalars + separate device/group files (this chart) | Keeps values ergonomic and validated, preserves `null`/comments in inventories, and matches the official split-file format. |
+
+The chart renders `config` with `toYaml`, but reads `files/devices.yaml` and
+`files/groups.yaml` verbatim with `.Files.Get`. Those files are valid
+Zigbee2MQTT YAML and are not reshaped by Helm.
+
+### Components
+
+| Resource | Purpose |
+| --- | --- |
+| StatefulSet | One Zigbee2MQTT process; the single replica avoids concurrent serial-device and PVC access |
+| PVC (`<release>-data`) | `/app/data`: configuration, devices, groups, `database.db`, `coordinator_backup.json`, state, logs |
+| Service | ClusterIP frontend on port 8124 |
+| Headless Service | Governing Service for the StatefulSet |
+| ConfigMap | First-start `configuration.yaml`, `devices.yaml`, and `groups.yaml` |
+| NetworkPolicy | Frontend ingress; DNS, MQTT, and OTA HTTPS egress |
+
+## Prerequisites
+
+- The USB coordinator is present on the node and usable by the container:
+  - `feature.node.kubernetes.io/zigbee-coordinator=true` must label that node.
+    The `node-feature-discovery` chart creates this label for the Silicon Labs
+    CC2652RB adapter with serial `00_12_4B_00_21_A8_EC_9C`.
+  - The device is exposed at `coordinator.devicePath` (default
+    `/dev/ttyUSB0`). Keep `config.serial.port` in sync with it. Prefer the
+    stable `/dev/serial/by-id/...` path from the node once known; see the
+    [adapter documentation](https://www.zigbee2mqtt.io/guide/configuration/adapter-settings.html).
+  - The container user (UID 1000) needs access to the device's group. Debian
+    and Ubuntu use GID 20 (`dialout`). Verify with
+    `stat -c %g /dev/ttyUSB0` and set `coordinator.groupId`.
+- An MQTT broker reachable at `mqtt://10.0.3.3` (default). The NetworkPolicy
+  allows the `mosquitto` namespace and `10.0.3.3/32`; adjust
+  `networkPolicy.mqttNamespace`, `mqttCidr`, and `mqttPort` if needed.
+- The Sealed Secrets controller (`kube-system`) for the MQTT password.
+
+## Secret
+
+`configuration.yaml` references the MQTT password as
+`'!secret.yaml password'`. The chart mounts the Secret key at
+`/app/data/secret.yaml`:
+
+```yaml
+password: <mqtt password>
+```
+
+Create and seal it:
+
+```bash
+cat > /tmp/z2m-secret.yaml <<'EOF'
+password: <mqtt password>
+EOF
+
+kubectl create secret generic zigbee2mqtt-secrets \
+  --namespace zigbee2mqtt \
+  --from-file=secret.yaml=/tmp/z2m-secret.yaml \
+  --dry-run=client -o yaml |
+  kubeseal \
+    --controller-namespace kube-system \
+    --controller-name sealed-secrets-controller \
+    --format yaml > zigbee2mqtt/templates/sealedsecret.yaml
+```
+
+Commit the resulting `SealedSecret` (any `templates/*.yaml` file is rendered by
+Helm). The chart mounts it read-only; changing the password requires a Pod
+restart because the file is mounted with `subPath`.
+
+If the existing Zigbee network key is not in the restored data directory,
+add it to the secret and reference it from `config.advanced.network_key`:
+
+```yaml
+# secret.yaml
+network_key: [0x01, 0x03, 0x05, ...]
+```
+
+```yaml
+# config.advanced
+network_key: '!secret.yaml network_key'
+```
+
+Changing or omitting the network key requires re-pairing every device.
+
+## Configuration
+
+`config` contains the scalar Zigbee2MQTT settings and is rendered with
+`toYaml`. Device and group inventories are the chart files
+`files/devices.yaml` and `files/groups.yaml`; the template reads them verbatim.
+All three files are written to `/app/data` only when the corresponding file
+does not already exist. This is intentional: after first start the PVC is the
+source of truth, so changes made in the frontend, device pairing, and
+Zigbee2MQTT's own migrations are not overwritten by a Git sync.
+
+- To change a scalar setting, edit `config` in `values.yaml` (or use
+  `--set config.mqtt.server=...`), then remove the corresponding key from the
+  generated `configuration.yaml` on the PVC and restart. Do not delete the whole
+  file unless you have the network key/data backup; Zigbee2MQTT may have
+  written the generated network key into it.
+- To change devices or groups, edit `files/devices.yaml` or
+  `files/groups.yaml`, then replace the matching file on the PVC and restart.
+  Using the frontend is safer for groups while the app is running. These files
+  are intentionally not values, so `--set` cannot change them; that is what
+  keeps `null`, quoting, and comments intact.
+- `service.port` must equal `config.frontend.port`, and
+  `coordinator.devicePath` must equal `config.serial.port`. When
+  `coordinator.devicePath` is empty (emulator/remote mode), `config.serial.port`
+  must instead start with `tcp://`; the chart fails to render if these rules
+  diverge. `values.schema.json` also rejects wrong types such as a string
+  frontend port.
+
+The frontend binds `0.0.0.0` because the Service is the access path; the
+Service is `ClusterIP`, and access should be through an authenticated,
+TLS-terminating ingress/gateway. See the
+[frontend documentation](https://www.zigbee2mqtt.io/guide/configuration/frontend.html)
+for `auth_token`, `base_url`, and TLS options.
+
+## Persistence and migration
+
+The PVC keeps `database.db` and, for Texas Instruments coordinators,
+`coordinator_backup.json`. Copy the **entire** data directory when migrating;
+the project FAQ and troubleshooting guide explicitly call this out. To keep
+the existing network, restore the data before the first start, or provide the
+network key as above. Without either, Zigbee2MQTT generates a new network and
+all devices must be paired again.
+
+The PVC carries `argocd.argoproj.io/sync-options: Prune=false,Delete=false` and
+`helm.sh/resource-policy: keep` so pruning or deleting the Application does not
+delete the Zigbee database.
+
+Set `persistence.existingClaim` to use a pre-created claim instead. Setting
+`persistence.enabled=false` uses `emptyDir` and loses the network state on
+every restart; it is for testing only.
+
+## Security notes
+
+- Runs as UID/GID 1000, non-root, with `fsGroup` 1000 and supplementary GID 20
+  for the serial device.
+- `readOnlyRootFilesystem`, all capabilities dropped, no privilege escalation,
+  `RuntimeDefault` seccomp, and no Kubernetes API token.
+- `hostPath` is used only for the serial device and `/run/udev` (read-only),
+  following the official Docker guidance. This is the reason the namespace is
+  labeled `pod-security.kubernetes.io/enforce=privileged`; the container itself
+  is still unprivileged with all capabilities dropped.
+- The frontend is not exposed and has no `auth_token` in the default config.
+  Anyone who can reach it has full control of the Zigbee network.
+
+## Backup and restore
+
+Use Longhorn snapshots/backups of the PVC, or copy the data directory while
+Zigbee2MQTT is stopped. The project's backup guidance is: copy the whole data
+folder, including `coordinator_backup.json` for TI coordinators. Zigbee2MQTT
+also exposes an MQTT backup request
+(`zigbee2mqtt/bridge/request/backup`) that returns a base64 zip of the data
+folder; see the
+[MQTT topics documentation](https://www.zigbee2mqtt.io/guide/usage/mqtt_topics_and_messages.html).
+
+To restore: scale the StatefulSet to zero, restore the files into the PVC
+(including `configuration.yaml`, `devices.yaml`, and `groups.yaml`), scale back
+to one. The init container will not overwrite existing files. If the files come
+from a root-run deployment, make them writable by UID/GID 1000 first
+(`chown -R 1000:1000`); otherwise Zigbee2MQTT cannot update its own
+configuration and database.
+
+## Upgrade and rollback
+
+1. Back up the PVC.
+2. Bump `appVersion` and the image tag together (the image tag defaults to
+   `appVersion`).
+3. Render and validate (see below), then let Argo CD sync.
+4. Watch the logs for configuration migrations and adapter startup.
+
+Zigbee2MQTT migrates `configuration.yaml` on startup. Roll back the image only
+after restoring a matching data directory backup; newer schema versions may not
+be readable by older releases.
+
+## Observability
+
+Logs go to the container output (console) and, by Zigbee2MQTT's default, to
+rotated log directories on the PVC; collected stdout is available to the
+cluster's Vector agent. Set `config.advanced.log_output: [console]` if you do
+not want file logs on the data volume. There is no native Prometheus endpoint;
+the project publishes health on the MQTT topic `zigbee2mqtt/bridge/health`. The
+existing `mqtt2prometheus` Application can export selected MQTT values if
+needed.
+
+## Validation
+
+```bash
+helm lint zigbee2mqtt
+helm template zigbee2mqtt zigbee2mqtt --namespace zigbee2mqtt \
+  > /tmp/zigbee2mqtt.yaml
+kubeconform -strict -summary /tmp/zigbee2mqtt.yaml
+yamllint --no-warnings --config-file hack/ci/yamllint.yaml \
+  zigbee2mqtt/Chart.yaml zigbee2mqtt/values.yaml
+./hack/ci/validate-helm.sh zigbee2mqtt
+```
+
+The rendered chart was also exercised against the real 2.14.3 image as UID
+1000 with a read-only root filesystem, a writable data directory, and the
+secret file mounted. The configuration parsed and Zigbee2MQTT reached adapter
+discovery; it then failed only because the test host has no USB coordinator.
+The chart has **not** been run end-to-end on a cluster with the coordinator, so
+the device node, UID/GID mapping, and node label must be verified on the target
+node.
+
+## e2e / kind
+
+The kind-based e2e cluster (`hack/e2e/run-app.sh`) has no USB coordinator and
+no `feature.node.kubernetes.io/zigbee-coordinator=true` node, so the chart can
+run there only with a coordinator emulator. `values-kind.yaml` (next to
+`Chart.yaml`; the runner appends it to the Application's valueFiles) wires this
+up. It is e2e-only and must never be enabled in production.
+
+- The emulator ([romanlum/zstack-adapter-emulator](https://github.com/romanlum/zstack-adapter-emulator))
+  runs as a pod sidecar (`coordinator.emulator.enabled: true`) and speaks just
+  enough of the TI Z-Stack (ZNP) protocol over TCP for zigbee-herdsman
+  (`adapter: zstack`) to start the Zigbee stack. It provides **no real radio**:
+  no RF, no pairing, no devices — it only proves that Zigbee2MQTT deploys,
+  starts, and reports itself online.
+- `coordinator.devicePath: ""` disables the device hostPath, the `/run/udev`
+  hostPath, and the USB `nodeSelector` (there is no USB node in kind). With the
+  emulator, the serial port is the pod-local loopback sidecar address
+  `config.serial.port: tcp://127.0.0.1:6638`, so no Service is needed.
+- The remaining overrides adapt to the kind cluster: default StorageClass
+  (`persistence.storageClass: ""`), anonymous MQTT against the e2e mosquitto
+  app (`config.mqtt.server: mqtt://mosquitto.mosquitto.svc.cluster.local:1883`,
+  empty user/password, `secret.name: ""` so no Secret is mounted).
+- The PostSync probe (`templates/e2e/probe.yaml`, gated by `e2e.enabled`) is a
+  Helm `post-install,post-upgrade` hook Job that subscribes to
+  `zigbee2mqtt/bridge/state` on the e2e broker with `mosquitto_sub` and fails
+  the sync unless it receives the retained online state within
+  `e2e.timeoutSeconds` (bare `online` or, since Zigbee2MQTT 2.x, JSON
+  `{"state":"online"}`). It needs no RBAC because it never touches the
+  Kubernetes API.
+
+## Known gaps
+
+- Single replica only. Zigbee2MQTT is not horizontally scalable: two processes
+  cannot share the coordinator or the data volume.
+- The HTTP probes use `/` on the frontend. If you enable `frontend.auth_token`,
+  they will receive 401 and restart the Pod; use TCP probes or add an
+  unauthenticated health path in a future chart revision.
+- No native Prometheus endpoint; use `mqtt2prometheus` or the MQTT health topic.
+- The chart does not create an Ingress. The Service is `ClusterIP` by default.
+- `supplementalGroups: [20]` and `/dev/ttyUSB0` are defaults for this cluster;
+  verify the device group and prefer the stable `/dev/serial/by-id/...` path.
+
+## Sources
+
+- [Zigbee2MQTT documentation](https://www.zigbee2mqtt.io/)
+- [Kubernetes installation](https://www.zigbee2mqtt.io/guide/installation/08_kubernetes.html)
+- [Docker installation](https://www.zigbee2mqtt.io/guide/installation/02_docker.html)
+- [Securing the installation](https://www.zigbee2mqtt.io/guide/installation/14_securing.html)
+- [MQTT configuration](https://www.zigbee2mqtt.io/guide/configuration/mqtt.html)
+- [Devices and groups](https://www.zigbee2mqtt.io/guide/configuration/devices-groups.html)
+- [Adapter settings](https://www.zigbee2mqtt.io/guide/configuration/adapter-settings.html)
+- [Troubleshooting / adapter access](https://www.zigbee2mqtt.io/guide/installation/20_zigbee2mqtt-fails-to-start_crashes-runtime.html)
+- [Official Helm chart](https://github.com/Koenkk/zigbee2mqtt-chart)
+- [Sironite Helm chart](https://github.com/Sironite/helm-zigbee2mqtt) (opaque
+  ConfigMap/Secret + init-copy pattern)
+- [dawg-io Kustomize manifests](https://github.com/dawg-io/zigbee2mqtt-kustomize)
+  (separate `devices.yaml`/`groups.yaml`, first-run copying)
+- [k8s-at-home chart](https://github.com/k8s-at-home/charts/tree/master/charts/stable/zigbee2mqtt)
+  (structured `config` values copied on first run)
+- [Official image](https://github.com/Koenkk/zigbee2mqtt/pkgs/container/zigbee2mqtt)
+- License: GPL-3.0

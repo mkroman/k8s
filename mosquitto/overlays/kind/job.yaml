@@ -1,0 +1,63 @@
+---
+# PostSync probe: proves an end-to-end MQTT round-trip against the broker
+# deployed from this overlay. Publishes a message to e2e/probe (retained, so
+# publish-before-subscribe is race-free), then subscribes and requires the
+# exact message back with -C 1 -W 30; an empty or wrong payload, including
+# the -W 30 timeout, fails the Job. No Kubernetes API access, no RBAC.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: mosquitto-e2e-probe
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 120
+  # No explicit spec.selector: the API server rejects a hand-written Job
+  # selector ("selector not auto-generated") and the Job controller generates
+  # one from batch.kubernetes.io/controller-uid/job-name. The broker pod can
+  # never carry this Job's generated labels, so there is no adoption risk.
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: e2e-probe
+    spec:
+      automountServiceAccountToken: false
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1883
+        runAsGroup: 1883
+        fsGroup: 1883
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: probe
+        image: eclipse-mosquitto:2.0.22
+        command:
+        - /bin/sh
+        - -ec
+        args:
+        - |
+          mosquitto_pub -h mosquitto -p 1883 -t e2e/probe -m e2e-roundtrip-ok -r
+          msg="$(mosquitto_sub -h mosquitto -p 1883 -t e2e/probe -C 1 -W 30)"
+          [ "$msg" = e2e-roundtrip-ok ] || {
+            echo "probe failed: expected 'e2e-roundtrip-ok', got '${msg}'" >&2
+            exit 1
+          }
+          mosquitto_pub -h mosquitto -p 1883 -t e2e/probe -n -r
+          echo "mqtt round-trip ok"
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+        resources:
+          requests:
+            cpu: 50m
+            memory: 16Mi
+          limits:
+            cpu: 250m
+            memory: 32Mi
