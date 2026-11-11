@@ -14,12 +14,10 @@ metadata:
 spec:
   backoffLimit: 0
   activeDeadlineSeconds: 120
-  selector:
-    matchLabels:
-      # Explicit selector: the base labels transformer may add its pairs to
-      # Job selectors, and without a distinguishing key the Job controller
-      # could treat the broker pod (same injected labels) as its own.
-      app.kubernetes.io/component: e2e-probe
+  # No explicit spec.selector: the API server rejects a hand-written Job
+  # selector ("selector not auto-generated") and the Job controller generates
+  # one from batch.kubernetes.io/controller-uid/job-name. The broker pod can
+  # never carry this Job's generated labels, so there is no adoption risk.
   template:
     metadata:
       labels:
