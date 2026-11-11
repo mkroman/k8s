@@ -674,6 +674,7 @@ render_root_app() {
 refresh_application() {
   local app="$1"
   local timeout_seconds="$2"
+  local force="${3:-0}"
   local start elapsed previous previous_rv current current_rv
   local application_json refresh_annotation
 
@@ -694,7 +695,14 @@ refresh_application() {
   )"
   # The first reconciliation has not happened yet, so it will use the current
   # API versions anyway. Refreshing now can race with AppProject creation.
-  [[ -n "${previous}" ]] || return 0
+  # The pre-sync gate passes force=1 because it already waited for the project:
+  # child Applications are created in negative sync-waves before the
+  # AppProjects from wave 0, so their first reconcile can fail with
+  # InvalidSpecError and only a forced refresh after the project exists heals
+  # it.
+  if [[ -z "${previous}" && "${force}" != "1" ]]; then
+    return 0
+  fi
 
   # Hard refresh through the CLI. This sets the same refresh=hard annotation
   # the controller consumes and additionally drops the repo server's cached
@@ -1027,6 +1035,17 @@ established_api_resources() {
   done < <(kubectl get --raw /apis | jq -r '.groups[] | .versions[] | .groupVersion')
 
   sort -u -o "${output}" "${output}"
+
+  # CustomResourceDefinition objects are excluded from the gate: client-side
+  # `kubectl apply` stores each manifest in the last-applied-configuration
+  # annotation, which exceeds the 256KiB object limit for large CRDs
+  # (prometheus-operator's prometheuses CRD is roughly 400KiB) and fails with a
+  # false "metadata.annotations: Too long" error. kubeconform validates CRD
+  # schemas during chart validation, and Argo CD applies CRDs with server-side
+  # apply where the chart requires it.
+  grep -v '^apiextensions.k8s.io/v1/CustomResourceDefinition$' \
+    "${output}" >"${output}.tmp"
+  mv "${output}.tmp" "${output}"
 }
 
 # Copy only the rendered documents whose apiVersion/kind is established in the
@@ -1154,7 +1173,7 @@ preflight_server_dry_run() {
 
     skipped_kinds="$(tr '\n' ' ' <"${TEMP_DIR}/skipped-kinds.txt")"
     if [[ -n "${skipped_kinds}" ]]; then
-      printf '%s: skipping CRD-backed kinds not yet established: %s\n' \
+      printf '%s: kinds not covered by the dry-run gate: %s\n' \
         "${app}" "${skipped_kinds}"
     fi
 
@@ -1292,6 +1311,11 @@ main() {
   # AppProjects.
   for app in "${ORDER[@]}"; do
     wait_for_project "${app}" "$(app_entry "${app}" | jq -r '.project // "default"')"
+    # Child Applications are created before the AppProjects (negative
+    # sync-waves), so their first reconcile can fail with InvalidSpecError.
+    # Force a refresh now that the project exists, then wait for the resource
+    # tree to populate before asking the repo server for manifests.
+    refresh_application "${app}" "${E2E_REFRESH_TIMEOUT_SECONDS}" 1
     wait_until_reconciled "${app}" "${E2E_REFRESH_TIMEOUT_SECONDS}"
   done
   preflight_server_dry_run
