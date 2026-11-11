@@ -125,7 +125,7 @@ autoscaling:
 tests:
   image:
     repository: mirror.gcr.io/library/busybox
-    tag: "1.37.0"
+    tag: "1.38.0"
     pullPolicy: IfNotPresent
 
 # The application has no dedicated health endpoint or metrics endpoint.
