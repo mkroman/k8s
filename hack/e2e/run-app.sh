@@ -196,10 +196,10 @@ reset_e2e_applications() {
   # The cluster is e2e-only, so every Application other than the root belongs
   # to this or an earlier selection. Delete unknown/stale Applications first
   # and then the current chain in reverse dependency order (selected app
-  # before its prerequisites). A stale app can still be mid-retry from a
-  # failed sync: Argo CD will not finalize the deletion while an operation is
-  # running, so clear the operation and disable auto-sync first, exactly as
-  # for the root Application above.
+  # before its prerequisites). Any Application from the previous run can
+  # still be mid-retry from a failed sync: Argo CD will not finalize the
+  # deletion while an operation is running, so clear the operation and
+  # disable auto-sync first, exactly as for the root Application above.
   applications_json="$(kubectl -n argocd get applications -o json)" ||
     die "could not list Applications in the argocd namespace"
 
@@ -210,15 +210,20 @@ reset_e2e_applications() {
   done < <(jq -r '.items[].metadata.name | select(. != "e2e")' \
     <<<"${applications_json}" | sort)
 
+  for ((index = ${#ORDER[@]} - 1; index >= 0; index--)); do
+    delete_order+=("${ORDER[index]}")
+  done
+
+  # Patch every Application that is about to be deleted, including the
+  # current chain: on a repeated run of the same app its previous Application
+  # is not "stale", but it can be stuck in the same retry loop. The current
+  # selection may not exist in the reused cluster, so skip missing ones.
   for app in "${delete_order[@]}"; do
+    kubectl -n argocd get application "${app}" >/dev/null 2>&1 || continue
     kubectl -n argocd patch application "${app}" --type=merge \
       -p '{"operation":null,"spec":{"syncPolicy":{"automated":null}}}' \
       >/dev/null ||
-      die "could not disable auto-sync on stale Application ${app}"
-  done
-
-  for ((index = ${#ORDER[@]} - 1; index >= 0; index--)); do
-    delete_order+=("${ORDER[index]}")
+      die "could not disable auto-sync on Application ${app}"
   done
 
   for app in "${delete_order[@]}"; do
@@ -336,8 +341,9 @@ build_apps() {
   local revision="$1"
   local repo_url="$2"
   local paused="${3:-0}"
-  local app entry path overlay wave retry_limit
+  local app entry path overlay wave retry_limit automated
   local -a entries=()
+  local -a automated_entries=()
 
   for app in "${ORDER[@]}"; do
     entry="$(app_entry "${app}")"
@@ -399,11 +405,14 @@ build_apps() {
       # Phase 1 creates the Applications without syncing: the child's own
       # automated policy is stripped here and re-applied by the runner once
       # the server-side dry-run gate has validated the rendered manifests
-      # (see preflight_server_dry_run). The automated block is captured below
-      # so the re-enable step restores exactly what the application declares.
-      # Every e2e application uses the default automated policy; an
-      # application that opted out (useDefaultSyncPolicy: false) would fall
-      # back to the default here, which is fine for the current app set.
+      # (see preflight_server_dry_run). Capture the exact block *before*
+      # removing it so the re-enable step restores what the application
+      # declares, including a non-default or empty automated policy.
+      automated="$(jq -c '.syncPolicy.automated // empty' <<<"${entry}")"
+      [[ -n "${automated}" ]] ||
+        die "e2e app ${app} has no automated sync policy; the runner cannot pause and re-enable it"
+      automated_entries+=("$(jq -cn --arg name "${app}" --argjson automated "${automated}" \
+        '{key: $name, value: $automated}')")
       entry="$(jq 'del(.syncPolicy.automated)' <<<"${entry}")"
     fi
 
@@ -416,13 +425,12 @@ build_apps() {
     entries+=("${entry}")
   done
 
-  # The automated policies stripped above, per application, for the re-enable
-  # step after the dry-run gate.
-  printf '%s\n' "${entries[@]}" |
-    jq -s 'map({key: .name,
-                value: (.syncPolicy.automated //
-                  {prune: true, selfHeal: true})}) |
-           from_entries' >"${TEMP_DIR}/child-automated.json"
+  if [[ "${paused}" == "1" ]]; then
+    # The automated policies captured above, per application, for the
+    # re-enable step after the dry-run gate.
+    printf '%s\n' "${automated_entries[@]}" |
+      jq -s 'from_entries' >"${TEMP_DIR}/child-automated.json"
+  fi
 
   printf '%s\n' "${entries[@]}" | jq -s -c '.'
 }
@@ -803,7 +811,8 @@ wait_for_application() {
   local app="$1"
   local revision="$2"
   local timeout_seconds="$3"
-  local start elapsed application_json health operation_phase failed_syncs
+  local start elapsed application_json health sync_status operation_phase
+  local retry_limit retry_count failed_syncs
 
   start="$(date +%s)"
 
@@ -815,9 +824,10 @@ wait_for_application() {
   # automated sync that keeps failing (for example a hook manifest the API
   # server rejects) starts a new operation on every retry, so the CLI wait
   # sees "still running" forever and burns the whole budget while the actual
-  # error surfaces only in the operation history. Poll the phase instead and
-  # bail out on a Failed phase or on a second failed entry in the history,
-  # whichever shows up first.
+  # error surfaces only in the operation history. Poll the phase and retry
+  # count instead: a failed attempt is only fatal once the Application has
+  # exhausted spec.syncPolicy.retry.limit. Cold-image probes declare
+  # retry_limit: 0, so their first failure is immediate.
   #
   # Do not pass --health either: argocd app wait treats any Progressing ->
   # Degraded transition as fatal, and a new Prometheus CR is briefly Degraded
@@ -836,32 +846,38 @@ wait_for_application() {
     )"
     if [[ -n "${application_json}" ]]; then
       health="$(jq -r '.status.health.status // "Unknown"' <<<"${application_json}")"
+      sync_status="$(jq -r '.status.sync.status // "Unknown"' <<<"${application_json}")"
       operation_phase="$(
         jq -r '.status.operationState.phase // ""' <<<"${application_json}"
       )"
+      retry_limit="$(jq -r '.spec.syncPolicy.retry.limit // 0' <<<"${application_json}")"
+      retry_count="$(jq -r '.status.operationState.retryCount // 0' <<<"${application_json}")"
       failed_syncs="$(jq '[.status.history[]? | select(.phase == "Failed")] | length' \
         <<<"${application_json}")"
-      printf 'Application %s: health=%s operation=%s failedSyncs=%s\n' \
-        "${app}" "${health}" "${operation_phase:-none}" "${failed_syncs}"
+      printf 'Application %s: health=%s sync=%s operation=%s retries=%s/%s failedSyncs=%s\n' \
+        "${app}" "${health}" "${sync_status}" "${operation_phase:-none}" \
+        "${retry_count}" "${retry_limit}" "${failed_syncs}"
 
       case "${operation_phase}" in
         Failed | Error)
-          diagnose
-          die "Application ${app} sync operation ${operation_phase}: $(jq -r '.status.operationState.message // "no message"' <<<"${application_json}")"
+          # A failed attempt is not final while the retry budget has room
+          # (a negative limit means unlimited retries). status.history is
+          # capped, so use the operation state's retry count rather than
+          # counting history entries.
+          if ((retry_limit < 0 || retry_count < retry_limit)); then
+            printf 'Application %s: sync attempt failed (retry %s/%s); waiting for the retry\n' \
+              "${app}" "${retry_count}" "${retry_limit}"
+          else
+            diagnose
+            die "Application ${app} sync operation ${operation_phase}: $(jq -r '.status.operationState.message // "no message"' <<<"${application_json}")"
+          fi
           ;;
         Running | Terminating)
           # PostSync hooks, including e2e probes, run during the operation.
           # Do not treat resource health alone as success: wait for the hook.
-          # A phase can flip Failed -> Running between polls, so the operation
-          # history is the reliable repeated-failure signal: two failed
-          # attempts mean the same failure will keep recurring.
-          if ((failed_syncs >= 2)); then
-            diagnose
-            die "Application ${app} failed ${failed_syncs} sync attempts: $(jq -r '[.status.history[]? | select(.phase == "Failed")] | last | .message // "no message"' <<<"${application_json}")"
-          fi
           ;;
         *)
-          if [[ "${health}" == "Healthy" ]]; then
+          if [[ "${health}" == "Healthy" && "${sync_status}" == "Synced" ]]; then
             require_app_revision "${app}" "${revision}"
             return 0
           fi
@@ -1088,17 +1104,23 @@ filter_established_kinds() {
 # namespace, so it must exist before the gate. The applications chart creates
 # these namespaces during the sync; creating them here only covers the window
 # before that sync.
+ensure_namespace() {
+  local namespace="$1"
+
+  [[ -n "${namespace}" ]] || return 0
+  if kubectl get namespace "${namespace}" >/dev/null 2>&1; then
+    return 0
+  fi
+  kubectl create namespace "${namespace}" >/dev/null
+  printf 'Created namespace %s for the dry-run gate\n' "${namespace}"
+}
+
 ensure_namespaces() {
   local rendered="$1"
   local namespace
 
   while IFS= read -r namespace; do
-    [[ -n "${namespace}" ]] || continue
-    if kubectl get namespace "${namespace}" >/dev/null 2>&1; then
-      continue
-    fi
-    kubectl create namespace "${namespace}" >/dev/null
-    printf 'Created namespace %s for the dry-run gate\n' "${namespace}"
+    ensure_namespace "${namespace}"
   done < <(yq '.metadata.namespace // ""' "${rendered}" 2>/dev/null |
     # yq separates multi-document output with "---" lines; they are document
     # separators, not namespace names.
@@ -1140,8 +1162,10 @@ unpause_application() {
   local app="$1"
   local automated
 
-  automated="$(jq -r --arg app "${app}" '.[$app]' \
+  automated="$(jq -c --arg app "${app}" '.[$app]' \
     "${TEMP_DIR}/child-automated.json")"
+  [[ -n "${automated}" && "${automated}" != "null" ]] ||
+    die "no automated sync policy was captured for Application ${app}"
   kubectl -n argocd patch application "${app}" --type=merge \
     -p "{\"spec\":{\"syncPolicy\":{\"automated\":${automated}}}}" >/dev/null ||
     die "could not re-enable auto-sync for Application ${app}"
@@ -1154,7 +1178,7 @@ unpause_application() {
 # manifests come from the repo server, so this validates exactly what Argo CD
 # would apply — including chart dependencies resolved by Argo CD.
 preflight_server_dry_run() {
-  local app rendered filtered skipped_kinds
+  local app rendered filtered skipped_kinds namespace
 
   established_api_resources "${TEMP_DIR}/api-resources.tsv"
 
@@ -1167,6 +1191,15 @@ preflight_server_dry_run() {
       die "could not fetch rendered manifests for ${app}: $(cat "${TEMP_DIR}/manifests-${app}.err")"
     fi
 
+    # The manifests command does not add the destination namespace to
+    # namespace-scoped resources that omit metadata.namespace, and the
+    # kubectl context is left in the argocd namespace. Pass the application's
+    # destination explicitly so admission runs where the Application will
+    # apply, not in argocd.
+    namespace="$(app_entry "${app}" |
+      jq -r '.destination.namespace // empty')"
+    [[ -n "${namespace}" ]] || namespace="${app}"
+    ensure_namespace "${namespace}"
     ensure_namespaces "${rendered}"
     filter_established_kinds "${rendered}" \
       "${TEMP_DIR}/api-resources.tsv" "${filtered}"
@@ -1182,7 +1215,7 @@ preflight_server_dry_run() {
       continue
     fi
 
-    if ! kubectl apply --dry-run=server --validate=strict \
+    if ! kubectl -n "${namespace}" apply --dry-run=server --validate=strict \
       -f "${filtered}" >"${TEMP_DIR}/dry-run-${app}.log" 2>&1; then
       cat "${TEMP_DIR}/dry-run-${app}.log" >&2
       die "server-side dry-run failed for ${app}; fix the manifests before syncing"

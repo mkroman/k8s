@@ -23,13 +23,17 @@ application manifests instead of carrying a second copy of the app catalogue.
    pulls each app's rendered manifests from the Argo CD repo server
    (`argocd app manifests`), drops CRD-backed kinds whose CRDs are not
    established yet (operator CRDs from prerequisites sync in earlier waves),
-   and applies the rest with `kubectl apply --dry-run=server
-   --validate=strict`. Admission and strict field validation catch errors no
-   static check can see (a Job with a hand-written `spec.selector`, a
-   mistyped field) in seconds instead of after a failed sync cycle.
+   and applies the rest with `kubectl -n <destination> apply --dry-run=server
+   --validate=strict`. The destination namespace is passed explicitly because
+   the repo server does not inject it into namespaceless manifests. Admission
+   and strict field validation catch errors no static check can see (a Job with
+   a hand-written `spec.selector`, a mistyped field) in seconds instead of
+   after a failed sync cycle.
 7. The runner re-enables automated sync in dependency order and waits for
    every prerequisite and the selected app to be `Synced` and `Healthy` at
-   the tested revision.
+   the tested revision. The root `e2e` Application ignores differences in
+   child `.spec/syncPolicy.automated` so its self-heal cannot revert that
+   re-enable step.
 
 Argo CD reads the checkout from a local Git daemon, so the test deploys the
 exact commit under test, including a pull request's merge commit. No
@@ -47,7 +51,9 @@ prerequisite CRDs are copied or applied by hand.
   and e2e policies are `networking.k8s.io/NetworkPolicy`; both need an
   explicit `namespaceResourceWhitelist` (or opt-out `namespaceResourceBlacklist: []`)
   on the application's project in `apps/values.yaml`, otherwise the sync
-  fails with a permission error.
+  fails with a permission error. A whitelist is exclusive: it replaces the
+  default allow-all behavior, so list every kind the production render
+  contains too (for example `bitnami.com/SealedSecret`).
 - **Helm values cannot clear base values.** Helm merges maps recursively, so
   `nodeSelector: {}` in a kind values file does not remove keys set in
   `values.yaml`, and explicit `null` values are deleted during coalescing

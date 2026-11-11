@@ -16,9 +16,9 @@ namespace: mosquitto
 #   - deletes the SealedSecret and swaps the Deployment's projected volume
 #     for an anonymous-listener ConfigMap, generated below with the
 #     deterministic unhashed name mosquitto-config,
-#   - carries its own NetworkPolicy (networkpolicy.yaml) with in-cluster
-#     egress allowed, because the kind CNI enforces NetworkPolicy and the
-#     probe Job must reach DNS and the broker,
+#   - carries its own NetworkPolicy (networkpolicy.yaml) because the kind CNI
+#     enforces NetworkPolicy; it keeps broker egress in-cluster and leaves the
+#     probe Job unselected,
 #   - tags the broker pods with app.kubernetes.io/component: broker and adds
 #     that label to the Service selector, so probe pods are never used as
 #     Service endpoints,
@@ -31,7 +31,7 @@ resources:
 # E2E-only NetworkPolicy: the base kustomization does not deploy the base
 # manifests/networkpolicy.yaml (production ships without it), but the kind
 # e2e CNI enforces NetworkPolicy, so this overlay carries its own variant
-# with in-cluster egress allowed for the probe Job.
+# with in-cluster egress allowed for the broker pods it selects.
 - networkpolicy.yaml
 - job.yaml
 

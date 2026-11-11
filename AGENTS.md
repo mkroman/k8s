@@ -111,7 +111,10 @@ zeros.
 - Check the application's AppProject whitelist before adding probe or policy
   resources. The default namespace blacklist denies ResourceQuota, LimitRange
   and NetworkPolicy; probe Jobs are `batch/Job` and need an explicit entry in
-  `apps/values.yaml` (`projects[].namespaceResourceWhitelist`).
+  `apps/values.yaml` (`projects[].namespaceResourceWhitelist`). A whitelist
+  is exclusive: it replaces the default allow-all behavior, so it must list
+  every kind the application renders, including `bitnami.com/SealedSecret`
+  for an application that ships one.
 - Explicitly delete probe-created pods and poll until they are gone before
   reusing fixed names. Treat only HTTP 404 as gone; 401/403/429/5xx responses
   and timeouts are not evidence that a pod was deleted.

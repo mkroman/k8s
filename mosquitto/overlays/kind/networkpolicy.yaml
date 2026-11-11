@@ -7,11 +7,10 @@
 # Ingress mirrors the base intent: MQTT from in-cluster addresses only
 # (pod CIDR and service CIDR are both inside 10.0.0.0/8 in kind).
 #
-# Egress is opened for in-cluster addresses because the base labels
-# transformer stamps every resource — probe Job pods included — with
-# app.kubernetes.io/name: mosquitto, so they are selected by this policy
-# and a default-deny egress would block the probe's DNS lookups and broker
-# connection.
+# Egress is opened for in-cluster addresses for the broker pods selected by
+# this policy. The probe Job is deliberately not selected: overlay resources
+# do not receive the base labels transformer's app.kubernetes.io/name, so the
+# probe keeps unrestricted egress.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:

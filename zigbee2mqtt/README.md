@@ -99,6 +99,12 @@ Commit the resulting `SealedSecret` (any `templates/*.yaml` file is rendered by
 Helm). The chart mounts it read-only; changing the password requires a Pod
 restart because the file is mounted with `subPath`.
 
+The Application is registered in `apps/values.yaml` and syncs automatically.
+The chart does not create the Secret itself, so until the sealed secret is
+committed (or a Secret with the same name exists out-of-band) the StatefulSet
+Pod stays in `ContainerCreating` and the Application is not Healthy. Commit the
+sealed secret before relying on the application.
+
 If the existing Zigbee network key is not in the restored data directory,
 add it to the secret and reference it from `config.advanced.network_key`:
 

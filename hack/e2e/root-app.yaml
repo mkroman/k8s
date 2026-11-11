@@ -21,6 +21,16 @@ spec:
   destination:
     server: https://kubernetes.default.svc
     namespace: argocd
+  # The runner creates the child Applications without automated sync for the
+  # dry-run phase, then patches the live Applications to re-enable it. The
+  # root app owns those Applications and self-heals drift, so ignore the one
+  # field the runner intentionally diverges on; otherwise the root reverts the
+  # patch and a child can stay paused until the run times out.
+  ignoreDifferences:
+    - group: argoproj.io
+      kind: Application
+      jsonPointers:
+        - /spec/syncPolicy/automated
   syncPolicy:
     automated:
       prune: true
