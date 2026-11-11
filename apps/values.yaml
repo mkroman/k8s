@@ -171,6 +171,11 @@ projects:
         kind: Job
       - group: networking.k8s.io
         kind: NetworkPolicy
+      # The production render includes the MQTT password as a SealedSecret.
+      # A namespaceResourceWhitelist is exclusive, so an unlisted kind is
+      # denied during sync even though the e2e overlay deletes this resource.
+      - group: bitnami.com
+        kind: SealedSecret
 
   - name: mumble
     description: "Mumble (Murmur) VoIP server"
@@ -435,7 +440,8 @@ projects:
       # values enable it; production leaves e2e.enabled false).
       - group: batch
         kind: Job
-      # Optional: commit the MQTT password as a SealedSecret under the chart.
+      # Commit the MQTT password as a SealedSecret under the chart before the
+      # first sync; the StatefulSet mounts it and cannot start without it.
       - group: bitnami.com
         kind: SealedSecret
 
@@ -825,7 +831,9 @@ newApplications:
           - values-magistr.yaml
 
   # Depends on mosquitto for MQTT and node-feature-discovery for the coordinator
-  # label. The Pod stays Pending until both are available.
+  # label. The Pod stays Pending until both are available. The StatefulSet also
+  # mounts the `zigbee2mqtt-secrets` Secret, so commit the SealedSecret
+  # described in zigbee2mqtt/README.md before the first sync.
   - name: zigbee2mqtt
     annotations:
       argocd.argoproj.io/sync-wave: "2"
