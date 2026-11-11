@@ -173,10 +173,14 @@ Use `extraEnv` to add any new variable once the application supports it.
 
 The application has no dedicated health, readiness, or metrics endpoint.
 
-- Startup/liveness probes request `/robots.txt`, which is served from embedded
-  static assets and does not touch the database.
+- Startup/liveness probes request `/ny.php`. The GET handler renders the
+  new-quote form and does not touch PostgreSQL, so it exercises the router and
+  Askama templates without tying pod restarts to database availability.
 - Readiness requests `/`, which queries PostgreSQL; a database outage removes
-  the pod from the Service instead of restarting it.
+  the pod from the Service instead of restarting it. The quotes query is cached
+  for five minutes per replica, so readiness can remain green for up to five
+  minutes after a database outage. Upstream has no uncached health endpoint;
+  using `/` for liveness would turn that cache window into a restart loop.
 - Logs are JSON on stdout/stderr. There is no Prometheus endpoint, so the
   chart does not create a ServiceMonitor.
 - The service is stateless and scales horizontally. The application caches the
@@ -248,6 +252,9 @@ A disposable kind cluster (`v1.37.0`) was also used for a real install with
 - SQLx created `_sqlx_migrations` and `quotes` in PostgreSQL 18.6;
 - `helm test` passed, `POST /ny.php` stored a quote, and the row was confirmed
   in PostgreSQL;
+- with PostgreSQL scaled to zero, `/ny.php` stayed at HTTP 200 and the pod did
+  not restart; readiness remained green because of the documented five-minute
+  cache;
 - `helm uninstall` removed every namespaced resource cleanly.
 
 Production values were not installed against the real cluster (the `postgres`
@@ -268,8 +275,10 @@ few deliberate departures:
 - `extraVolumes`/`extraVolumeMounts` are named as escape hatches rather than
   the generated chart's `volumes`/`volumeMounts`; the chart already mounts no
   application volumes, so the values represent additions, not replacements.
-- The probes use `/robots.txt` for startup/liveness and `/` for readiness
-  because the application publishes no dedicated health endpoint.
+- The probes use `/ny.php` for startup/liveness and `/` for readiness
+  because the application publishes no dedicated health endpoint. `/ny.php`
+  covers the dynamic render path without touching PostgreSQL; `/` is the only
+  endpoint that reflects database health.
 
 ## Known assumptions and gaps
 

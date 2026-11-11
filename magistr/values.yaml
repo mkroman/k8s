@@ -128,11 +128,16 @@ tests:
     tag: "1.37.0"
     pullPolicy: IfNotPresent
 
-# The application has no dedicated health endpoint. `/robots.txt` is served from embedded
-# static assets (liveness/startup) and `/` performs a database query (readiness).
+# The application has no dedicated health endpoint or metrics endpoint.
+# - `/ny.php` (GET) renders the new-quote form without touching PostgreSQL. It exercises
+#   the router and Askama templates, making it a safe startup/liveness probe.
+# - `/` queries PostgreSQL for readiness, but the result is cached for five minutes per
+#   replica (`once(time = 300)`), so a database outage can take up to five minutes to mark
+#   every pod unready. There is no uncached endpoint upstream; do not use `/` for liveness,
+#   or a database blip would restart every replica.
 livenessProbe:
   httpGet:
-    path: /robots.txt
+    path: /ny.php
     port: http
   periodSeconds: 10
   timeoutSeconds: 2
@@ -146,7 +151,7 @@ readinessProbe:
   failureThreshold: 3
 startupProbe:
   httpGet:
-    path: /robots.txt
+    path: /ny.php
     port: http
   periodSeconds: 2
   timeoutSeconds: 2
