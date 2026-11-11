@@ -78,7 +78,7 @@ config:
     # Address the server binds to. Empty uses the application default `[::]:3000`.
     address: ""
     # Enable HTTP response compression.
-    compression: true
+    compression: false
   tracing:
     # The application defaults to OTLP tracing enabled. It is disabled here because no
     # collector is part of this chart; set OTEL_EXPORTER_OTLP_ENDPOINT through `extraEnv`
@@ -114,7 +114,7 @@ terminationGracePeriodSeconds: 30
 # controls the replica count. Disabled by default because the traffic profile is unknown.
 # Revisit `podDisruptionBudget.minAvailable` if the HPA can scale below it.
 autoscaling:
-  enabled: false
+  enabled: true
   minReplicas: 2
   maxReplicas: 10
   targetCPUUtilizationPercentage: 80
