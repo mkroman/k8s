@@ -1,0 +1,40 @@
+magistr has been deployed to the {{ .Release.Namespace }} namespace.
+
+{{- $databaseSecret := include "magistr.databaseSecretName" . }}
+{{- if $databaseSecret }}
+The application reads MAGISTR_DATABASE_URL from Secret {{ $databaseSecret | quote }}
+(key {{ .Values.database.existingSecretKey }}).
+{{- else }}
+WARNING: no database Secret is configured. Set `database.existingSecret` to a Secret that
+contains MAGISTR_DATABASE_URL; magistr cannot serve requests without PostgreSQL.
+{{- end }}
+
+{{- if .Values.postgres.enabled }}
+
+WARNING: the in-cluster PostgreSQL is an e2e fixture. It uses passwordless trust
+authentication and emptyDir storage; all quotes are lost when the pod is replaced.
+Do not enable it in production.
+{{- end }}
+
+{{- if .Values.ingress.enabled }}
+
+Ingress hosts:
+{{- range .Values.ingress.hosts }}
+  - http{{ if $.Values.ingress.tls.enabled }}s{{ end }}://{{ . }}/
+{{- end }}
+{{- if .Values.ingress.tls.createCertificate }}
+The cert-manager Certificate requests a certificate from
+{{ .Values.ingress.tls.issuerRef.kind }}/{{ .Values.ingress.tls.issuerRef.name }}.
+{{- end }}
+{{- else }}
+
+The Service is {{ .Values.service.type }}:
+{{- if eq .Values.service.type "ClusterIP" }}
+  kubectl --namespace {{ .Release.Namespace }} port-forward svc/{{ include "magistr.fullname" . }} 8080:{{ .Values.service.port }}
+  then open http://127.0.0.1:8080/
+{{- else if eq .Values.service.type "NodePort" }}
+  kubectl --namespace {{ .Release.Namespace }} get svc {{ include "magistr.fullname" . }}
+{{- else }}
+  kubectl --namespace {{ .Release.Namespace }} get svc {{ include "magistr.fullname" . }} --watch
+{{- end }}
+{{- end }}

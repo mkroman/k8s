@@ -1,0 +1,251 @@
+# Default values for magistr.
+#
+# magistr is a stateless Rust web application backed by PostgreSQL. The
+# database is external to this chart; only the e2e values files enable the
+# disposable in-cluster PostgreSQL under `postgres`.
+#
+# The application is configured exclusively through `MAGISTR_*` environment
+# variables. See README.md for the supported variables and their defaults.
+
+# Number of magistr replicas. The application is stateless; its only shared
+# state is PostgreSQL.
+replicaCount: 2
+
+image:
+  # Official image built by the upstream project's CI.
+  repository: ghcr.io/rwx-labs/magistr
+  # This sets the pull policy for images.
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: ""
+  # Pin the image by digest; replaces the tag when set.
+  digest: ""
+
+# This is for the secrets for pulling an image from a private repository. More information can be
+# found here: https://kubernetes.io/docs/tasks/configure-pod-container/pull-image-private-registry/
+imagePullSecrets: []
+# This is to override the chart name.
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  # Specifies whether a service account should be created (token mounting is disabled either
+  # way -- the application never talks to the Kubernetes API).
+  create: true
+  # Annotations to add to the service account.
+  annotations: {}
+  # The name of the service account to use. If not set and `create` is true, a name is
+  # generated using the fullname template.
+  name: ""
+
+# This is for setting Kubernetes Annotations to a Pod.
+# For more information checkout: https://kubernetes.io/docs/concepts/overview/working-with-objects/annotations/
+podAnnotations: {}
+# This is for setting Kubernetes Labels to a Pod.
+# For more information checkout: https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/
+podLabels: {}
+
+# Satisfies the "restricted" Pod Security Standard together with the container securityContext.
+# 65532 is the uid/gid of the `nonroot` user in the distroless base image.
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  runAsGroup: 65532
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  # The binary and its embedded static assets are read-only; the app writes no files.
+  readOnlyRootFilesystem: true
+
+service:
+  type: ClusterIP
+  # Port exposed by the Service and referenced by the Traefik IngressRoute.
+  port: 3000
+  # Port the container listens on. Keep in sync with `config.http.address`.
+  containerPort: 3000
+  annotations: {}
+
+# Application configuration, rendered as MAGISTR_* environment variables.
+config:
+  # RUST_LOG filter. The application defaults to `magistr=debug,tower_http=debug`.
+  logLevel: "magistr=info,tower_http=info"
+  http:
+    # Address the server binds to. Empty uses the application default `[::]:3000`.
+    address: ""
+    # Enable HTTP response compression.
+    compression: true
+  tracing:
+    # The application defaults to OTLP tracing enabled. It is disabled here because no
+    # collector is part of this chart; set OTEL_EXPORTER_OTLP_ENDPOINT through `extraEnv`
+    # before enabling it.
+    enabled: false
+
+database:
+  # Name of an existing Secret containing the PostgreSQL connection URL. The application
+  # requires PostgreSQL and runs its SQLx migrations automatically at startup.
+  existingSecret: ""
+  # Key inside `existingSecret` that holds the URL.
+  existingSecretKey: DATABASE_URL
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: "1"
+    memory: 512Mi
+
+# Rolling update behaviour. The application shuts down gracefully on SIGTERM.
+strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: 50%
+    maxUnavailable: 1
+
+revisionHistoryLimit: 3
+terminationGracePeriodSeconds: 30
+
+# Optional HorizontalPodAutoscaler. When enabled, `replicaCount` is ignored and the HPA
+# controls the replica count. Disabled by default because the traffic profile is unknown.
+# Revisit `podDisruptionBudget.minAvailable` if the HPA can scale below it.
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 80
+  # targetMemoryUtilizationPercentage: 80
+
+# Helm test Pod (`helm test`). It requests `/`, so a passing test also proves database
+# connectivity. Argo CD skips manifests with the unsupported `test` Helm hook.
+tests:
+  image:
+    repository: mirror.gcr.io/library/busybox
+    tag: "1.37.0"
+    pullPolicy: IfNotPresent
+
+# The application has no dedicated health endpoint or metrics endpoint.
+# - `/ny.php` (GET) renders the new-quote form without touching PostgreSQL. It exercises
+#   the router and Askama templates, making it a safe startup/liveness probe.
+# - `/` queries PostgreSQL for readiness, but the result is cached for five minutes per
+#   replica (`once(time = 300)`), so a database outage can take up to five minutes to mark
+#   every pod unready. There is no uncached endpoint upstream; do not use `/` for liveness,
+#   or a database blip would restart every replica.
+livenessProbe:
+  httpGet:
+    path: /ny.php
+    port: http
+  periodSeconds: 10
+  timeoutSeconds: 2
+  failureThreshold: 3
+readinessProbe:
+  httpGet:
+    path: /
+    port: http
+  periodSeconds: 10
+  timeoutSeconds: 3
+  failureThreshold: 3
+startupProbe:
+  httpGet:
+    path: /ny.php
+    port: http
+  periodSeconds: 2
+  timeoutSeconds: 2
+  failureThreshold: 30
+
+# Additional environment variables for the container, e.g. OTEL_EXPORTER_OTLP_ENDPOINT.
+extraEnv: []
+# Additional environment variables from ConfigMaps or Secrets.
+extraEnvFrom: []
+# Additional volumes on the output Deployment definition.
+extraVolumes: []
+# Additional volumeMounts on the output Deployment definition.
+extraVolumeMounts: []
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# Ingress-only policy. Egress is deliberately unrestricted because the database is external
+# and this chart does not know its address; add an egress policy separately if required.
+networkPolicy:
+  enabled: false
+  ingress:
+    # Allow clients in the same namespace (for example the e2e probe).
+    allowSameNamespace: true
+    # Namespaces whose pods may reach the Service, matched on the automatic
+    # `kubernetes.io/metadata.name` label.
+    namespaces:
+      - traefik
+
+# Traefik IngressRoute plus, optionally, a cert-manager Certificate. The existing
+# magistr.dk deployment uses the Traefik CRDs, so this chart does too.
+ingress:
+  enabled: false
+  annotations: {}
+  entryPoints:
+    web: web
+    websecure: websecure
+  # Redirect HTTP to HTTPS. Has no effect unless `ingress.tls.enabled` is true.
+  redirectToHttps: true
+  # Hostnames served by the IngressRoutes and, by default, listed in the Certificate.
+  hosts: []
+  tls:
+    enabled: false
+    # Secret Traefik reads the certificate from. Defaults to `<fullname>-tls`.
+    secretName: ""
+    # Create a cert-manager Certificate for `hosts` (or `tls.hosts`, when set).
+    createCertificate: false
+    # Issuer used by the generated Certificate.
+    issuerRef:
+      kind: ClusterIssuer
+      name: letsencrypt-production
+
+# Disposable PostgreSQL for the kind e2e run. Requires `e2e.enabled`; the template fails
+# loudly otherwise. NEVER enable this in production: it uses passwordless trust
+# authentication and emptyDir storage, so all data is lost with the pod.
+postgres:
+  enabled: false
+  image:
+    # Docker Hub is rate limited; use Google's pull-through mirror in CI.
+    repository: mirror.gcr.io/library/postgres
+    tag: "18.6"
+    pullPolicy: IfNotPresent
+  database: magistr
+  username: postgres
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: "1"
+      memory: 256Mi
+  podSecurityContext:
+    fsGroup: 999
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+    runAsNonRoot: true
+    runAsUser: 999
+    runAsGroup: 999
+    capabilities:
+      drop:
+        - ALL
+
+# E2E-only PostSync probe. It requests `/` through the Service and fails the sync unless
+# the application returns HTTP 200, which also proves database connectivity.
+e2e:
+  enabled: false
+  probeImage: ""
+  timeoutSeconds: 120
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+topologySpreadConstraints: []
+priorityClassName: ""

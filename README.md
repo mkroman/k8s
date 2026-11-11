@@ -33,6 +33,7 @@ Helm chart for Applications sourced from external Git repositories.
 | gateway-api                 | [`gateway-api`](gateway-api/)                    | [![App Status](https://argo-cd.infra.rwx.im/api/badge?name=gateway-api)](https://argo-cd.infra.rwx.im/applications/gateway-api) |
 | grafana                     | [`grafana`](grafana/)                           | [![App Status](https://argo-cd.infra.rwx.im/api/badge?name=grafana)](https://argo-cd.infra.rwx.im/applications/grafana) |
 | longhorn                    | [`longhorn`](longhorn/)                         | [![App Status](https://argo-cd.infra.rwx.im/api/badge?name=longhorn)](https://argo-cd.infra.rwx.im/applications/longhorn) |
+| magistr                     | [`magistr`](magistr/)                           | [![App Status](https://argo-cd.infra.rwx.im/api/badge?name=magistr)](https://argo-cd.infra.rwx.im/applications/magistr) |
 | monitoring                  | [`monitoring`](monitoring/)                     | [![App Status](https://argo-cd.infra.rwx.im/api/badge?name=monitoring)](https://argo-cd.infra.rwx.im/applications/monitoring) |
 | mosquitto                   | [`mosquitto`](mosquitto/)                       | [![App Status](https://argo-cd.infra.rwx.im/api/badge?name=mosquitto)](https://argo-cd.infra.rwx.im/applications/mosquitto) |
 | mqtt2prometheus             | [`mqtt2prometheus`](mqtt2prometheus/)            | [![App Status](https://argo-cd.infra.rwx.im/api/badge?name=mqtt2prometheus)](https://argo-cd.infra.rwx.im/applications/mqtt2prometheus) |
@@ -57,7 +58,6 @@ Helm chart for Applications sourced from external Git repositories.
 
 | App                         | Source                                                            | Status |
 |-----------------------------|-------------------------------------------------------------------|--------|
-| magistr-prod                | [rwx-labs/k8s-rwx-apps](https://github.com/rwx-labs/k8s-rwx-apps) | [![App Status](https://argo-cd.infra.rwx.im/api/badge?name=magistr-prod)](https://argo-cd.infra.rwx.im/applications/magistr-prod) |
 | meta                        | [mkroman/k8s-meta-apps](https://github.com/mkroman/k8s-meta-apps) | [![App Status](https://argo-cd.infra.rwx.im/api/badge?name=meta)](https://argo-cd.infra.rwx.im/applications/meta) |
 | meta-oss                    | [mkroman/k8s-meta-apps](https://github.com/mkroman/k8s-meta-apps) | [![App Status](https://argo-cd.infra.rwx.im/api/badge?name=meta-oss)](https://argo-cd.infra.rwx.im/applications/meta-oss) |
 | meta-webhook                | [mkroman/k8s-meta-apps](https://github.com/mkroman/k8s-meta-apps) | [![App Status](https://argo-cd.infra.rwx.im/api/badge?name=meta-webhook)](https://argo-cd.infra.rwx.im/applications/meta-webhook) |

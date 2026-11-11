@@ -1,0 +1,23 @@
+apiVersion: v2
+name: magistr
+description: >-
+  magistr.dk IRC quote site (Rust/Axum, PostgreSQL) packaged for Kubernetes.
+  This is a standalone chart because the upstream project does not publish a
+  Helm chart or Kubernetes manifests.
+type: application
+version: 0.1.0
+appVersion: "0.2.4"
+kubeVersion: ">=1.27.0-0"
+home: https://magistr.dk/
+icon: https://magistr.dk/static/favicon.svg
+sources:
+  - https://github.com/rwx-labs/magistr.dk
+  - https://github.com/rwx-labs/k8s-rwx-apps/tree/main/magistr.dk
+keywords:
+  - magistr
+  - quotes
+  - rust
+  - axum
+  - postgresql
+maintainers:
+  - name: mkroman

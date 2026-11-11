@@ -1,0 +1,52 @@
+{{- if .Values.ingress.enabled }}
+{{- $fullname := include "magistr.fullname" . }}
+{{- $tlsSecret := .Values.ingress.tls.secretName | default (printf "%s-tls" $fullname) }}
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: {{ $fullname }}-http
+  labels:
+    {{- include "magistr.labels" . | nindent 4 }}
+  {{- with .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  entryPoints:
+    - {{ .Values.ingress.entryPoints.web | quote }}
+  routes:
+    - match: {{ include "magistr.hostMatch" . | quote }}
+      kind: Rule
+      {{- if and .Values.ingress.redirectToHttps .Values.ingress.tls.enabled }}
+      middlewares:
+        - name: {{ $fullname }}-redirect-https
+      {{- end }}
+      services:
+        - name: {{ $fullname }}
+          port: http
+{{- if .Values.ingress.tls.enabled }}
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: {{ $fullname }}-https
+  labels:
+    {{- include "magistr.labels" . | nindent 4 }}
+  {{- with .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  entryPoints:
+    - {{ .Values.ingress.entryPoints.websecure | quote }}
+  routes:
+    - match: {{ include "magistr.hostMatch" . | quote }}
+      kind: Rule
+      services:
+        - name: {{ $fullname }}
+          port: http
+  tls:
+    secretName: {{ $tlsSecret | quote }}
+{{- end }}
+{{- end }}

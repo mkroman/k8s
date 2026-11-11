@@ -1,0 +1,49 @@
+# E2E-only overrides for the kind-based test cluster (hack/e2e/run-app.sh).
+#
+# The runner appends this file after values-prod.yaml. Overrides exist only to
+# make the chart deployable and healthy on kind, which has:
+#   - no Traefik or cert-manager CRDs in this app's dependency chain,
+#   - no Sealed Secrets key and no production `postgres` Secret,
+#   - disposable storage and no need for a disruption budget.
+#
+# The chart runs a single-replica PostgreSQL fixture with trust authentication
+# and emptyDir storage. It is gated behind e2e.enabled and must never be used
+# outside a throwaway cluster.
+replicaCount: 1
+
+image:
+  tag: "0.2.4"
+
+config:
+  logLevel: "magistr=info,tower_http=info"
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+podDisruptionBudget:
+  enabled: false
+
+networkPolicy:
+  enabled: false
+
+ingress:
+  enabled: false
+
+# Clear the production Secret reference so the chart-managed e2e Secret is used.
+database:
+  existingSecret: ""
+
+postgres:
+  enabled: true
+
+e2e:
+  enabled: true
+  # Alpine-based curl image pulled through Google's Docker Hub mirror (repo
+  # convention, see grafana/values-kind.yaml).
+  probeImage: "mirror.gcr.io/curlimages/curl:8.14.1@sha256:9a1ed35addb45476afa911696297f8e115993df459278ed036182dd2cd22b67b"
+  timeoutSeconds: 120
