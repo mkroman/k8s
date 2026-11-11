@@ -120,6 +120,16 @@
       "groupSlug": "grafana"
     },
     {
+      "description": "Link grafana-image-renderer updates to their GitHub releases",
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchPackageNames": [
+        "grafana/grafana-image-renderer"
+      ],
+      "changelogUrl": "https://github.com/grafana/grafana-image-renderer/releases/tag/{{newVersion}}"
+    },
+    {
       "description": "The self-hosted Renovate image is controlled by the chart appVersion",
       "matchManagers": [
         "helm-values"
