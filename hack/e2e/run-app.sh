@@ -1185,7 +1185,7 @@ unpause_application() {
 # manifests come from the repo server, so this validates exactly what Argo CD
 # would apply — including chart dependencies resolved by Argo CD.
 preflight_server_dry_run() {
-  local app rendered filtered skipped_kinds namespace
+  local app rendered filtered skipped_kinds namespace explicit defaulted
 
   established_api_resources "${TEMP_DIR}/api-resources.tsv"
 
@@ -1222,10 +1222,35 @@ preflight_server_dry_run() {
       continue
     fi
 
-    if ! kubectl -n "${namespace}" apply --dry-run=server --validate=strict \
-      -f "${filtered}" >"${TEMP_DIR}/dry-run-${app}.log" 2>&1; then
+    # kubectl refuses a single --namespace value when an object carries a
+    # different explicit metadata.namespace. Apply resources that already have
+    # a namespace without the flag, and only use the destination namespace for
+    # the rest. The explicit namespaces were created by ensure_namespaces.
+    explicit="${TEMP_DIR}/dry-run-${app}.explicit.yaml"
+    defaulted="${TEMP_DIR}/dry-run-${app}.defaulted.yaml"
+    yq eval-all 'select(.metadata.namespace != null and .metadata.namespace != "")' \
+      "${filtered}" >"${explicit}"
+    yq eval-all 'select(.metadata.namespace == null or .metadata.namespace == "")' \
+      "${filtered}" >"${defaulted}"
+
+    : >"${TEMP_DIR}/dry-run-${app}.log"
+    if [[ -s "${explicit}" ]] && grep -q . "${explicit}" &&
+      ! kubectl apply --dry-run=server --validate=strict \
+        -f "${explicit}" >>"${TEMP_DIR}/dry-run-${app}.log" 2>&1; then
       cat "${TEMP_DIR}/dry-run-${app}.log" >&2
       die "server-side dry-run failed for ${app}; fix the manifests before syncing"
+    fi
+    if [[ -s "${defaulted}" ]] && grep -q . "${defaulted}" &&
+      ! kubectl -n "${namespace}" apply --dry-run=server --validate=strict \
+        -f "${defaulted}" >>"${TEMP_DIR}/dry-run-${app}.log" 2>&1; then
+      cat "${TEMP_DIR}/dry-run-${app}.log" >&2
+      die "server-side dry-run failed for ${app}; fix the manifests before syncing"
+    fi
+
+    if [[ ! -s "${TEMP_DIR}/dry-run-${app}.log" ]] ||
+      ! grep -q . "${TEMP_DIR}/dry-run-${app}.log"; then
+      printf '%s: nothing to dry-run (all rendered kinds are CRD-backed)\n' "${app}"
+      continue
     fi
     printf '%s: server-side dry-run passed (%s resources)\n' \
       "${app}" "$(grep -c '(server dry run)' "${TEMP_DIR}/dry-run-${app}.log")"
