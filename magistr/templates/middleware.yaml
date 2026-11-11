@@ -1,0 +1,16 @@
+{{- if and .Values.ingress.enabled .Values.ingress.redirectToHttps .Values.ingress.tls.enabled }}
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ include "magistr.fullname" . }}-redirect-https
+  labels:
+    {{- include "magistr.labels" . | nindent 4 }}
+  {{- with .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  redirectScheme:
+    scheme: https
+    permanent: true
+{{- end }}

@@ -1,0 +1,64 @@
+# Production overrides for the magistr.dk deployment.
+#
+# This mirrors the previous rwx-labs/k8s-rwx-apps overlay: four replicas, the
+# same resource envelope, Traefik IngressRoutes with a cert-manager
+# Certificate, and the database URL read from the existing `postgres` Secret.
+replicaCount: 4
+
+image:
+  tag: "0.2.4"
+
+config:
+  # Matches the previous production overlay. Lower to `info` if the SQL and
+  # request traces are too noisy for the cluster's log pipeline.
+  logLevel: "magistr=trace,tower_http=trace,sqlx=trace"
+
+database:
+  # Contains DATABASE_URL for the CloudNativePG `postgres` cluster in the rwx
+  # namespace. The Secret lives in magistr-prod because env secretKeyRefs
+  # cannot cross namespaces.
+  existingSecret: postgres
+  existingSecretKey: DATABASE_URL
+
+resources:
+  requests:
+    cpu: "1"
+    memory: 256Mi
+  limits:
+    cpu: "6"
+    memory: 512Mi
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 2
+
+# Spread the four replicas across nodes where possible. The release name is
+# `magistr`; adjust the instance label if you install under another name.
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          topologyKey: kubernetes.io/hostname
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: magistr
+              app.kubernetes.io/instance: magistr
+
+# Ingress-only policy: allow the Traefik namespace and same-namespace clients.
+# Egress stays unrestricted so the external PostgreSQL connection keeps working.
+networkPolicy:
+  enabled: true
+
+ingress:
+  enabled: true
+  hosts:
+    - magistr.dk
+    - www.magistr.dk
+  tls:
+    enabled: true
+    secretName: magistr.dk-tls
+    createCertificate: true
+    issuerRef:
+      kind: ClusterIssuer
+      name: letsencrypt-production

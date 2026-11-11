@@ -1,0 +1,48 @@
+{{- /*
+The test pod must not carry the application's name/instance labels: the app Service selects
+on those, and a test pod without the http port would become a bad endpoint while it runs.
+*/}}
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ include "magistr.fullname" . }}-test-connection"
+  labels:
+    app.kubernetes.io/name: {{ printf "%s-test" (include "magistr.fullname" .) }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: test
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  restartPolicy: Never
+  automountServiceAccountToken: false
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 65534
+    runAsGroup: 65534
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: wget
+      image: "{{ .Values.tests.image.repository }}:{{ .Values.tests.image.tag }}"
+      imagePullPolicy: {{ .Values.tests.image.pullPolicy }}
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop:
+            - ALL
+      resources:
+        requests:
+          cpu: 10m
+          memory: 8Mi
+        limits:
+          memory: 16Mi
+      command:
+        - wget
+      args:
+        # `/` queries PostgreSQL; wget exits non-zero on a 5xx response.
+        - -q
+        - -O
+        - /dev/null
+        - "http://{{ include "magistr.fullname" . }}:{{ .Values.service.port }}/"

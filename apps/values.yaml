@@ -127,6 +127,17 @@ projects:
         kind: "*"
     namespaceResourceBlacklist: []
 
+  - name: magistr
+    description: "magistr.dk IRC quote site"
+    destinations:
+      - namespace: magistr-prod
+    sourceRepos:
+      - https://github.com/mkroman/k8s
+    # Opt out of the default namespace blacklist (which forbids NetworkPolicy,
+    # ResourceQuota and LimitRange): the production chart enables an
+    # ingress-only NetworkPolicy.
+    namespaceResourceBlacklist: []
+
   - name: monitoring
     description: "Cluster monitoring stack (Prometheus, Thanos, Grafana)"
     destinations:
@@ -592,6 +603,17 @@ newApplications:
     source:
       repoURL: https://github.com/mkroman/k8s
       path: longhorn
+
+  - name: magistr
+    project: magistr
+    destination:
+      namespace: magistr-prod
+    source:
+      repoURL: https://github.com/mkroman/k8s
+      path: magistr
+      helm:
+        valueFiles:
+          - values-prod.yaml
 
   - name: monitoring
     project: monitoring

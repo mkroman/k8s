@@ -58,6 +58,24 @@ apps:
   grafana:
     requires:
       - prometheus-operator
+  # No Traefik or cert-manager prerequisite: values-kind.yaml disables the
+  # IngressRoutes and Certificate and runs a disposable PostgreSQL fixture.
+  # The chart's PostSync probe requests `/`, which also proves database
+  # connectivity.
+  magistr:
+    resources:
+      - apiVersion: apps/v1
+        kind: Deployment
+        namespace: magistr-prod
+        name: magistr
+      - apiVersion: v1
+        kind: Service
+        namespace: magistr-prod
+        name: magistr
+      - apiVersion: apps/v1
+        kind: Deployment
+        namespace: magistr-prod
+        name: magistr-postgres
   monitoring:
     requires:
       - prometheus-operator
