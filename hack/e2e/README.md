@@ -18,12 +18,42 @@ application manifests instead of carrying a second copy of the app catalogue.
 5. The `apps` chart is rendered into a root `Application` with an inline
    `valuesObject` containing only the selected app and its prerequisites.
    Child Applications are ordered with `argocd.argoproj.io/sync-wave`.
-6. The runner waits for every prerequisite and the selected app to be
-   `Synced` and `Healthy` at the tested revision.
+6. **Server-side dry-run preflight.** The child Applications are created
+   paused (no automated sync). Once every Application is rendered, the runner
+   pulls each app's rendered manifests from the Argo CD repo server
+   (`argocd app manifests`), drops CRD-backed kinds whose CRDs are not
+   established yet (operator CRDs from prerequisites sync in earlier waves),
+   and applies the rest with `kubectl apply --dry-run=server
+   --validate=strict`. Admission and strict field validation catch errors no
+   static check can see (a Job with a hand-written `spec.selector`, a
+   mistyped field) in seconds instead of after a failed sync cycle.
+7. The runner re-enables automated sync in dependency order and waits for
+   every prerequisite and the selected app to be `Synced` and `Healthy` at
+   the tested revision.
 
 Argo CD reads the checkout from a local Git daemon, so the test deploys the
 exact commit under test, including a pull request's merge commit. No
 prerequisite CRDs are copied or applied by hand.
+
+## Gotchas
+
+- **The harness deploys the committed revision (HEAD).** The Git daemon
+  serves a bare clone, so uncommitted changes under an application's path
+  are silently missing from the deployment under test. The runner checks for
+  this and refuses to start when the selected applications' paths are dirty;
+  commit or stash first.
+- **AppProject namespace blacklist.** The default `AppProject` denies
+  ResourceQuota, LimitRange and NetworkPolicy. Probe Jobs are `batch/Job`
+  and e2e policies are `networking.k8s.io/NetworkPolicy`; both need an
+  explicit `namespaceResourceWhitelist` (or opt-out `namespaceResourceBlacklist: []`)
+  on the application's project in `apps/values.yaml`, otherwise the sync
+  fails with a permission error.
+- **Helm values cannot clear base values.** Helm merges maps recursively, so
+  `nodeSelector: {}` in a kind values file does not remove keys set in
+  `values.yaml`, and explicit `null` values are deleted during coalescing
+  (which is how `homeassistant.name: null` device overrides get lost).
+  Design charts so an empty value means "feature off" — see
+  `zigbee2mqtt`'s `coordinator.devicePath` and `secret.name`.
 
 ## Local iteration
 

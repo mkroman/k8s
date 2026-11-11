@@ -103,6 +103,15 @@ zeros.
   `cache="hit"`), and distinguish an absent metric from a zero value.
 - Read listener ports from chart values instead of hardcoding them. The Spegel
   probe takes the registry and metrics ports from `.Values.spegel.service`.
+- Never set `spec.selector` on a probe Job. The API server rejects a Job whose
+  selector was not auto-generated ("selector not auto-generated"), which
+  static validation cannot see; the runner's server-side dry-run gate catches
+  it before the sync, and the generated selector (controller-uid/job-name)
+  can never match another workload's pods.
+- Check the application's AppProject whitelist before adding probe or policy
+  resources. The default namespace blacklist denies ResourceQuota, LimitRange
+  and NetworkPolicy; probe Jobs are `batch/Job` and need an explicit entry in
+  `apps/values.yaml` (`projects[].namespaceResourceWhitelist`).
 - Explicitly delete probe-created pods and poll until they are gone before
   reusing fixed names. Treat only HTTP 404 as gone; 401/403/429/5xx responses
   and timeouts are not evidence that a pod was deleted.
