@@ -1,149 +1,132 @@
 # Agent notes
 
-This repository is a GitOps app-of-apps for a Kubernetes cluster. Charts live
-under `<app>/`, the application catalogue is `apps/values.yaml`, and the
-kind-based application tests live in `hack/e2e/`.
+GitOps app-of-apps for a home-lab Kubernetes cluster managed by Argo CD.
+Deeper docs: `hack/ci/README.md` (CI scripts, tool manifest),
+`hack/e2e/README.md` (kind e2e harness), `spegel/README.md` (containerd).
 
-## Fast local checks
+## How it is wired
 
-Run the checks that cover the changed area before committing:
+- `argo-cd/overlays/production` (Kustomize, vendored `install-v*.yaml`)
+  installs Argo CD plus the root `apps` Application.
+- `apps/` is a Helm chart, and `apps/values.yaml` is the catalogue:
+  - `projects`: AppProjects
+  - `namespaces`: every Namespace, with Pod Security labels. Applications do
+    not use `CreateNamespace`, so a new namespace must be added here.
+  - `newApplications`: local apps
+  - `applications`: external repos via `apps-of-apps/<name>.yaml`
+- A chart directory with no `newApplications` entry is not deployed (for
+  example `immich`, `kanidm`, `flaresolverr`).
+- AppProject defaults in `apps/templates/appproject.yaml`: if
+  `clusterResourceWhitelist` is omitted it renders `[]`, so no cluster-scoped
+  kinds are allowed. If neither namespace list is set, ResourceQuota,
+  LimitRange and NetworkPolicy are denied. A `namespaceResourceWhitelist` is
+  exclusive and must list every kind the app renders, including
+  `bitnami.com/SealedSecret` and probe `batch/Job`. To opt out, set
+  `namespaceResourceBlacklist: []`.
+- Large-CRD apps need `ServerSideApply=true` in their `syncPolicy`.
+
+## Checks
+
+Install the pinned CI tools with
+`./hack/ci/install-tools.sh ~/.local/bin [tool ...]`. Helm, kubectl and
+yamllint must be installed separately.
 
 ```bash
-# YAML syntax
-yamllint --no-warnings --config-file hack/ci/yamllint.yaml <files>
-
-# One Helm chart: dependency build, lint, render, kubeconform
-./hack/ci/validate-helm.sh spegel
-
-# Every chart (CI parity)
-./hack/ci/validate-helm.sh
-
-# Shell scripts
-bash -n hack/e2e/run-app.sh
+./hack/ci/lint-yaml.sh                      # plain YAML; skips templates/, charts/, workflows
+./hack/ci/validate-helm.sh spegel           # one chart: dep build, lint, render, kubeconform
+./hack/ci/validate-helm.sh                  # every chart (CI)
+./hack/ci/validate-kustomize.sh             # every kustomization.yaml
+./hack/ci/validate-dashboards.py            # grafana/dashboards/*.json; datasources must use $datasource
+python3 hack/ci/test-vector-config.py       # vector/quickwit; needs helm repos from hack/e2e/apps.yaml, vector, PyYAML
 shellcheck hack/ci/*.sh hack/e2e/*.sh
-
-# Whitespace
 git diff --check
 ```
 
-`validate-helm.sh [CHART ...]` accepts repository-relative chart directories.
-With no arguments it validates every chart, which is what CI runs.
+- `validate-helm.sh` renders each chart only with its default `values.yaml`.
+  Other values files are never validated: `values-prod.yaml`,
+  `values-magistr.yaml`, `values-topic-metrics.yaml` and `values-kind.yaml`.
+  When you change one, check it with
+  `helm template <chart> -f <chart>/<file>`.
+- CI also runs actionlint, zizmor and
+  `renovate-config-validator --strict renovate.json`. Pin workflow actions to
+  commit SHAs.
+- Tools are pinned in `hack/ci/tools.txt`. Keep `repo`, `version` and
+  `sha256` directly after the `[tool]` header, because Renovate's regex
+  depends on that order.
 
-## E2E development loop
+## E2E (kind + Argo CD)
 
-`hack/e2e/run-app.sh APP` creates a three-node kind cluster, installs Argo CD,
-renders the real `apps` chart, and waits for the selected app to be Synced and
-Healthy. Cluster creation and the Argo CD install dominate local iteration.
+`hack/e2e/run-app.sh APP` runs one entry from `hack/e2e/apps.yaml`. It needs
+docker, kind, kubectl, argocd, yq and jq.
 
-First run, leaving the cluster behind:
+- It deploys the committed HEAD from a local git daemon and refuses to run if
+  the app's paths are dirty. Commit before testing.
+- Iterate locally with `KEEP_CLUSTER=1` on the first run, then
+  `REUSE_CLUSTER=1`. The cluster is named `e2e-<app>`; tear it down with
+  `kind delete cluster --name e2e-<app>`.
+- For faster local failures, set `E2E_RETRY_LIMIT=1 E2E_RETRY_MAX_DURATION=30s
+  E2E_TIMEOUT_SECONDS=300 E2E_REFRESH_TIMEOUT_SECONDS=60`. Never lower the CI
+  defaults (20, 5m, 600, 120). An app's `retry_limit` or `timeout_seconds` in
+  `apps.yaml` overrides these.
+- Kind overrides are picked up automatically: `<chart>/values-kind.yaml` for
+  Helm, `<app>/overlays/kind/` for Kustomize. CI only runs apps whose path,
+  Application values or `apps.yaml` entry changed. Preview the selection
+  with `./hack/e2e/list-changed.sh origin/main HEAD`.
+- Kind cannot decrypt production SealedSecrets. Disable them or replace them
+  in the kind values/overlay.
+- Helm cannot clear base values: `{}` merges and `null` is dropped. Design
+  values so that empty means "feature off" (for example
+  `zigbee2mqtt` `coordinator.devicePath`).
+- Before syncing, the runner does a server-side dry-run with strict
+  validation. It catches errors static checks miss, such as a hand-written
+  Job `spec.selector`. Never set `spec.selector` on probe Jobs.
 
-```bash
-KEEP_CLUSTER=1 ./hack/e2e/run-app.sh spegel
-```
+## Probe conventions
 
-Subsequent runs reuse the cluster and installed control plane:
-
-```bash
-REUSE_CLUSTER=1 ./hack/e2e/run-app.sh spegel
-```
-
-- `REUSE_CLUSTER=1` requires an existing kind cluster named `e2e-<app>` (or
-  `CLUSTER_NAME=...`) and skips cluster creation and cleanup deletion. Both
-  `REUSE_CLUSTER` and `KEEP_CLUSTER` accept 1/true/yes or 0/false/no.
-- Reuse mode disables root auto-sync, deletes every child Application (stale
-  apps first, then the current chain in reverse order), and fails if any
-  Application cannot be deleted. Namespaces stay in place.
-- The runner removes `e2e.pullImage` from `values-kind.yaml` on every kind node
-  for apps with `requires_fresh_image`, on fresh and reused clusters alike.
-  Before that it removes resources declared under `stale_probe_resources`
-  (post-delete hook leftovers and force-deleted probe/cleanup pods) and waits
-  for them to disappear, so stale containers cannot pin the image or confuse
-  the probe. It verifies the `kind.yaml` containerd patch for apps with
-  `requires_containerd_config`; recreate the cluster if that check fails.
-- Argo CD uses an app's `retry_limit` when set (Spegel uses 0 because a retry
-  cannot recreate a cold image) and otherwise the runner's `E2E_RETRY_LIMIT`.
-  An app's `timeout_seconds` overrides `E2E_TIMEOUT_SECONDS`.
-- Argo CD and the Applications are reapplied every run; the tested revision is
-  always the current checkout.
-- Tear down with `kind delete cluster --name e2e-spegel`.
-
-Faster failure feedback (local only):
-
-```bash
-REUSE_CLUSTER=1 \
-  E2E_RETRY_LIMIT=1 \
-  E2E_RETRY_MAX_DURATION=30s \
-  E2E_TIMEOUT_SECONDS=300 \
-  E2E_REFRESH_TIMEOUT_SECONDS=60 \
-  ./hack/e2e/run-app.sh spegel
-```
-
-CI keeps the defaults: fresh cluster, `E2E_RETRY_LIMIT=20`,
-`E2E_RETRY_MAX_DURATION=5m`, `E2E_TIMEOUT_SECONDS=600`, and
-`E2E_REFRESH_TIMEOUT_SECONDS=120`. Do not lower these in CI; the faster
-settings are for local iterations only. `E2E_RETRY_MAX_DURATION` must be a Go
-duration such as `30s` or `5m`, and `E2E_RETRY_LIMIT` must not have leading
-zeros.
-
-## E2E probe notes
-
-- Chart probes are Helm PostSync hooks gated by `.Values.e2e.enabled`. CI maps
-  `helm.sh/hook: post-install,post-upgrade` to Argo CD PostSync hooks.
-- Keep supporting probe RBAC as normal resources rather than `hook-succeeded`
-  hooks. Argo CD's hook cleanup for passive resources follows sync semantics,
-  not Helm's per-hook lifecycle, so normal resources are the safe way to
-  guarantee RBAC exists while the Job runs.
-- The Kubernetes API may return indented JSON. Parse fields with
-  whitespace-tolerant patterns such as `"phase"[[:space:]]*:` or use a JSON
-  tool; do not assume compact JSON.
-- Probe scripts run with `/bin/sh` (BusyBox ash) in CI. Use
-  `set -euo pipefail`, and make metric checks fail when the metric is absent
-  instead of treating an empty scrape as success. Match the specific metric
-  labels under test (for Spegel, select the tested `registry` and count only
-  `cache="hit"`), and distinguish an absent metric from a zero value.
-- Read listener ports from chart values instead of hardcoding them. The Spegel
-  probe takes the registry and metrics ports from `.Values.spegel.service`.
-- Never set `spec.selector` on a probe Job. The API server rejects a Job whose
-  selector was not auto-generated ("selector not auto-generated"), which
-  static validation cannot see; the runner's server-side dry-run gate catches
-  it before the sync, and the generated selector (controller-uid/job-name)
-  can never match another workload's pods.
-- Check the application's AppProject whitelist before adding probe or policy
-  resources. The default namespace blacklist denies ResourceQuota, LimitRange
-  and NetworkPolicy; probe Jobs are `batch/Job` and need an explicit entry in
-  `apps/values.yaml` (`projects[].namespaceResourceWhitelist`). A whitelist
-  is exclusive: it replaces the default allow-all behavior, so it must list
-  every kind the application renders, including `bitnami.com/SealedSecret`
-  for an application that ships one.
-- Explicitly delete probe-created pods and poll until they are gone before
-  reusing fixed names. Treat only HTTP 404 as gone; 401/403/429/5xx responses
-  and timeouts are not evidence that a pod was deleted.
-- The Spegel probe assumes the configured image is cold. The e2e runner clears
-  the cold test image from the nodes before the probe, so a reused cluster
-  cannot satisfy the assertion from stale containerd content. Recreate the
-  cluster when validating cold-image or DHT provider behavior, because reuse
-  can also retain unrelated content and provider records.
-
-## Cluster preparation
-
-This repository does not ship Ansible or Kubespray playbooks. Document required
-containerd/Kubernetes settings in the relevant chart README and leave node
-preparation to the cluster operator.
-
-The current cluster runs containerd 2.3, which still parses
-`discard_unpacked_layers`; the field is unsupported with the transfer service,
-not removed. Keep it false or omitted: with `true`, containerd GCs layer blobs
-and Spegel cannot serve them. Kubespray only renders
-`containerd_discard_unpacked_layers` for containerd < 2.1, so master omits it
-(default false); kind's base config sets it true, which is why the e2e kind
-patch sets false. Verify `config_path`/certs.d and the effective value
-(`containerd config dump`), not just a config file.
+- Probes are Helm hooks with `post-install,post-upgrade` (Argo CD maps these
+  to PostSync), delete policy `before-hook-creation,hook-succeeded`, and a
+  bounded `activeDeadlineSeconds`. Gate them on `.Values.e2e.enabled`.
+  `helm.sh/hook: test` never runs under Argo CD. Reference implementations:
+  `grafana/templates/e2e/`, `spegel/templates/e2e/checks.yaml`.
+- Probe RBAC must be normal resources, not hooks. Argo CD's hook cleanup for
+  passive resources does not follow Helm's per-hook lifecycle.
+- Scripts run under BusyBox `/bin/sh`:
+  - Use `set -euo pipefail`.
+  - Parse API JSON in a whitespace-tolerant way (the output may be indented).
+  - Treat only HTTP 404 as "deleted".
+  - A metric check must fail when the metric is absent, not treat it as zero.
+  - Read ports from chart values instead of hardcoding them.
+- A probe must be idempotent, or declare its cold-start preconditions in
+  `apps.yaml` (`requires_fresh_image`, `retry_limit: 0`,
+  `stale_probe_resources`), as Spegel does. Recreate the cluster rather than
+  reusing it when validating cold-image or DHT behaviour.
 
 ## Chart conventions
 
 - Wrapper charts pin their upstream dependency in `Chart.yaml`/`Chart.lock`.
-- Do not set empty `image.tag`/`image.digest` overrides: an explicit empty
-  parent value overrides the upstream default and disables digest pinning.
-- Register new applications in `apps/values.yaml` (project, namespace,
-  Application, and any project resource whitelist).
-- Run `./hack/ci/validate-helm.sh <chart>` after chart changes.
+  `charts/*.tgz` is gitignored.
+- Do not set empty `image.tag`/`image.digest` overrides on upstream charts.
+  An explicit empty value replaces the upstream digest pin.
+- New local charts follow the recent ones (`magistr`, `zigbee2mqtt`, `zeta`):
+  - ship `values.schema.json`
+  - name template files after the resource kind
+    (`poddisruptionbudget.yaml`, not `pdb.yaml`)
+  - mark Renovate tracking of `appVersion` with a
+    `# renovate: datasource=... depName=...` comment in `Chart.yaml`
+- Images pinned in `values-kind.yaml` need a `# renovate:` comment on the
+  line before them.
+- Never commit plaintext Secrets. SealedSecrets come from per-app
+  `make secrets` (`op2secret | kubeseal`), which needs 1Password and cluster
+  access. Ask the user to regenerate them.
+- To register a new app: add a project, namespace and `newApplications`
+  entry in `apps/values.yaml`, and add a row to the `README.md` table.
+
+## Cluster / containerd
+
+- This repo has no Ansible or Kubespray playbooks. Document the node
+  settings an app needs in that chart's README.
+- The production cluster runs containerd 2.3. `discard_unpacked_layers` must
+  stay false or omitted, or Spegel cannot serve layers. Kind's base config
+  sets it to true, so `hack/e2e/kind.yaml` patches it. Verify the effective
+  value with `containerd config dump`, not by reading a config file. Details
+  are in `spegel/README.md`.
