@@ -14,6 +14,17 @@ nodeFeatureRules:
 
 node-feature-discovery:
   worker:
+    config:
+      core:
+        # Only discover USB devices. Disabling the other feature sources keeps
+        # the node label set small and avoids needless discovery work.
+        featureSources:
+          - usb
+        # Do not generate any of the standard NFD labels. Labels produced by
+        # NodeFeatureRule resources, such as zigbee-coordinator, are evaluated
+        # by nfd-master and are unaffected by this setting.
+        labelSources: []
+
     # NFD labels only the nodes its worker DaemonSet runs on. This is a home
     # lab where control-plane nodes also run workloads, so cover them too.
     tolerations:
