@@ -16,7 +16,6 @@ spec:
         applications: []
         argoCDApplication:
           enabled: false
-        newApplications: []
         projects: []
   destination:
     server: https://kubernetes.default.svc
