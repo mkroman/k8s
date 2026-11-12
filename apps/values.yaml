@@ -805,15 +805,15 @@ applications:
   # Sync before Zigbee2MQTT so its Service exists when the StatefulSet starts.
   # The bridge is pinned to the coordinator node and is the only privileged
   # workload in this pair.
-  - name: ser2net
-    annotations:
-      argocd.argoproj.io/sync-wave: "1"
-    project: ser2net
-    destination:
-      namespace: ser2net
-    source:
-      repoURL: https://github.com/mkroman/k8s
-      path: ser2net
+  # - name: ser2net
+  #   annotations:
+  #     argocd.argoproj.io/sync-wave: "1"
+  #   project: ser2net
+  #   destination:
+  #     namespace: ser2net
+  #   source:
+  #     repoURL: https://github.com/mkroman/k8s
+  #     path: ser2net
 
   - name: spegel
     project: spegel
