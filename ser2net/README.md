@@ -40,9 +40,9 @@ manager. The image is about 165 MB uncompressed and about 41 MB compressed for
 ### Publishing and immutability
 
 `.github/workflows/container-images.yaml` runs only when `images/ser2net/`
-changes, when the workflow itself changes, or on manual dispatch. It builds
-`linux/amd64` and `linux/arm64` images on pull requests and publishes them on
-`main` and version tags. It pushes:
+changes or on manual dispatch. It builds `linux/amd64` and `linux/arm64`
+images on pull requests and publishes them on `main` and version tags. It
+pushes:
 
 - `sha-<full commit sha>` — the immutable build tag;
 - `4.6.4-1` on `main` — the human-readable build tag (the digest pin takes

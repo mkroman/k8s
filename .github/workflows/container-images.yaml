@@ -4,13 +4,11 @@ on:
   pull_request:
     paths:
       - images/ser2net/**
-      - .github/workflows/container-images.yaml
   push:
     branches: [main]
     tags: ["v*"]
     paths:
       - images/ser2net/**
-      - .github/workflows/container-images.yaml
   workflow_dispatch:
 
 permissions:
