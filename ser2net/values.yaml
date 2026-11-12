@@ -52,6 +52,12 @@ serial:
   # -- Ignore modem control lines. USB serial adapters generally do not
   #    provide DCD/DSR, so this should stay enabled.
   local: true
+  # -- DTR and RTS line state. The CC2652RB wires RTS to RESET and DTR to the
+  #    bootloader pin; leaving them deasserted prevents ser2net from holding
+  #    the coordinator in reset or bootloader mode. Order is significant:
+  #    ser2net emits dtr before rts. Set to "" to omit either option.
+  dtr: "off"
+  rts: "off"
 
 # -- Node selector for the USB coordinator. The node-feature-discovery chart
 #    sets this label for the Silicon Labs CC2652RB adapter.

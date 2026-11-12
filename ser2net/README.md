@@ -115,6 +115,8 @@ serial:
   settings: "115200n81"
   groupId: 20
   local: true
+  dtr: "off"
+  rts: "off"
 
 service:
   port: 6638
@@ -124,6 +126,11 @@ service:
 parity, data bits, stop bits. `local: true` tells ser2net to ignore modem
 control lines, which USB serial adapters generally do not provide.
 
+`dtr` and `rts` default to `off`. The CC2652RB wires RTS to RESET and DTR to
+the bootloader pin, so ser2net must not hold either line asserted; the order
+`dtr=off,rts=off` is significant. Set either value to `""` to omit the option
+for an adapter that needs different line handling.
+
 The generated ConfigMap is:
 
 ```yaml
@@ -131,7 +138,7 @@ The generated ConfigMap is:
 ---
 connection: &zigbee
   accepter: tcp,0.0.0.0,6638
-  connector: serialdev,/dev/ttyUSB0,115200n81,local
+  connector: serialdev,/dev/ttyUSB0,115200n81,local,dtr=off,rts=off
   options:
     kickolduser: true
     max-connections: 1
@@ -139,6 +146,8 @@ connection: &zigbee
 
 Only one client may use the port at a time. A new connection replaces the old
 one (`kickolduser`), matching Zigbee2MQTT's exclusive use of the coordinator.
+The Deployment carries a `checksum/config` annotation, so changing the
+ConfigMap rolls ser2net; ser2net itself does not reload the file automatically.
 
 ## Security notes
 
@@ -191,7 +200,8 @@ been run against a physical coordinator.
   startup. gensio initializes its optional mDNS backend before per-port
   settings are applied; there is no avahi daemon in the container. The message
   is not an OOM and does not affect raw TCP.
-- Raw TCP loses USB modem-control semantics (DTR/RTS). If the coordinator
-  needs them for a reset or bootloader path, test it or use a device plugin
-  instead.
+- Raw TCP cannot carry per-connection DTR/RTS requests. This chart deasserts
+  both lines for the CC2652RB; an adapter with different reset/bootloader
+  wiring may need different `serial.dtr`/`serial.rts` values or a device
+  plugin.
 - Single replica only. Two processes cannot share the coordinator.

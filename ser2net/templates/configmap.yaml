@@ -2,6 +2,12 @@
 {{- if .Values.serial.local }}
 {{- $connector = printf "%s,local" $connector }}
 {{- end }}
+{{- if .Values.serial.dtr }}
+{{- $connector = printf "%s,dtr=%s" $connector .Values.serial.dtr }}
+{{- end }}
+{{- if .Values.serial.rts }}
+{{- $connector = printf "%s,rts=%s" $connector .Values.serial.rts }}
+{{- end }}
 apiVersion: v1
 kind: ConfigMap
 metadata:

@@ -103,6 +103,22 @@
           "type": "string",
           "minLength": 1
         },
+        "dtr": {
+          "type": "string",
+          "enum": [
+            "",
+            "on",
+            "off"
+          ]
+        },
+        "rts": {
+          "type": "string",
+          "enum": [
+            "",
+            "on",
+            "off"
+          ]
+        },
         "groupId": {
           "type": "integer",
           "minimum": 1
