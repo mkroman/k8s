@@ -23,6 +23,10 @@ The default is the ser2net Service in the `ser2net` namespace. Its
 NetworkPolicy must allow egress to networkPolicy.ser2netNamespace and
 networkPolicy.ser2netPort. For the emulator or a remote adapter, point
 config.serial.port at that endpoint and leave ser2netNamespace empty.
+
+Chart-managed config keys are passed as ZIGBEE2MQTT_CONFIG_* environment
+overrides. Runtime keys such as advanced.network_key remain in the PVC's
+configuration.yaml.
 {{- end }}
 
 Before the first start, create the Secret referenced by `secret.name`

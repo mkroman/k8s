@@ -72,8 +72,8 @@ spec:
       {{- end }}
       initContainers:
         # Seed each file only when the data volume does not already contain it.
-        # After first start the PVC is the source of truth, so frontend
-        # changes and Zigbee2MQTT's own rewrites are not clobbered.
+        # Chart-managed settings are applied later as environment overrides;
+        # runtime-owned keys and frontend edits stay in configuration.yaml.
         - name: seed-config
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
@@ -112,6 +112,11 @@ spec:
             # onboarding server is never needed and should not open a port.
             - name: Z2M_ONBOARD_NO_SERVER
               value: "1"
+            # Zigbee2MQTT applies these on top of configuration.yaml. Keeping
+            # them in the Pod template makes config changes roll the Pod while
+            # preserving runtime-owned keys in the PVC.
+            {{- $envConfig := omit .Values.config "version" "devices" "groups" }}
+            {{- include "zigbee2mqtt.configEnv" (dict "prefix" "ZIGBEE2MQTT_CONFIG" "config" $envConfig) | nindent 12 }}
           ports:
             - name: web
               containerPort: {{ .Values.service.port }}

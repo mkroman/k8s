@@ -46,3 +46,30 @@ app.kubernetes.io/instance: {{ .Release.Name | quote }}
 {{- printf "%s-data" (include "zigbee2mqtt.fullname" .) -}}
 {{- end -}}
 {{- end -}}
+
+{{/*
+Render chart-managed config as ZIGBEE2MQTT_CONFIG_* environment variables.
+Zigbee2MQTT applies these on top of configuration.yaml; secret references
+(`!file key`) are intentionally skipped so the PVC's existing reference keeps
+working. Nested keys are joined with underscores, matching settings.ts.
+Usage: include "zigbee2mqtt.configEnv" (dict "prefix" "ZIGBEE2MQTT_CONFIG" "config" $config)
+*/}}
+{{- define "zigbee2mqtt.configEnv" -}}
+{{- $prefix := .prefix -}}
+{{- range $key, $value := .config -}}
+{{- $name := regexReplaceAll "[^A-Z0-9_]" (printf "%s_%s" $prefix $key | upper) "_" -}}
+{{- if kindIs "map" $value -}}
+{{- include "zigbee2mqtt.configEnv" (dict "prefix" $name "config" $value) -}}
+{{- else if kindIs "slice" $value -}}
+{{- printf "- name: %s\n  value: %s\n" $name ($value | toJson | quote) -}}
+{{- else if kindIs "string" $value -}}
+{{- if not (regexMatch "^![^ ]+ .+$" $value) -}}
+{{- printf "- name: %s\n  value: %s\n" $name ($value | quote) -}}
+{{- end -}}
+{{- else if kindIs "bool" $value -}}
+{{- printf "- name: %s\n  value: %s\n" $name ($value | toString | quote) -}}
+{{- else if not (kindIs "invalid" $value) -}}
+{{- printf "- name: %s\n  value: %s\n" $name ($value | toString | quote) -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
