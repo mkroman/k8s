@@ -135,6 +135,10 @@ committed (or a Secret with the same name exists out-of-band) the StatefulSet
 Pod stays in `ContainerCreating` and the Application is not Healthy. Commit the
 sealed secret before relying on the application.
 
+Setting `secret.name: ""` disables both the secret mount and the committed
+SealedSecret template. `values-kind.yaml` uses this because kind has no Sealed
+Secrets controller or CRD.
+
 If the existing Zigbee network key is not in the restored data directory,
 add it to the secret and reference it from `config.advanced.network_key`:
 

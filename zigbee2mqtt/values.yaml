@@ -84,7 +84,9 @@ config:
 #      password: <mqtt password>
 #    Optionally it can hold `network_key`, referenced as
 #    "!secret.yaml network_key" from config.advanced.
-#    Create it as a SealedSecret; see the README.
+#    Empty name disables both the mount and the committed SealedSecret
+#    template (e2e anonymous MQTT). Create it as a SealedSecret; see the
+#    README.
 secret:
   name: zigbee2mqtt-secrets
   key: secret.yaml

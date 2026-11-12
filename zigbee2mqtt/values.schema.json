@@ -162,7 +162,7 @@
     },
     "secret": {
       "type": "object",
-      "description": "Empty name disables the secret mount entirely (e2e anonymous MQTT).",
+      "description": "Empty name disables the secret mount and the committed SealedSecret template (e2e anonymous MQTT).",
       "properties": {
         "name": {
           "type": "string"
