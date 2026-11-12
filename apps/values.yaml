@@ -487,10 +487,11 @@ namespaces:
   - name: zeta-prod
   - name: zigbee2mqtt
     labels:
-      # The USB coordinator is passed with hostPath, which baseline and
-      # restricted Pod Security Standards forbid. The workload itself is
-      # unprivileged; mark the namespace privileged so the hostPath exception
-      # is explicit instead of relying on the unlabeled namespace default.
+      # The USB coordinator is passed with hostPath and the Zigbee2MQTT
+      # container runs privileged (a hostPath device is not added to the
+      # container device cgroup). Baseline and restricted Pod Security
+      # Standards forbid both, so mark the namespace privileged explicitly
+      # instead of relying on the unlabeled namespace default.
       pod-security.kubernetes.io/enforce: privileged
       pod-security.kubernetes.io/enforce-version: latest
       pod-security.kubernetes.io/audit: privileged

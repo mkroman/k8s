@@ -1,7 +1,22 @@
 Zigbee2MQTT has been deployed.
 
+{{- if .Values.coordinator.devicePath }}
+{{- with .Values.nodeSelector }}
 The pod is scheduled only on a node labelled:
-  feature.node.kubernetes.io/zigbee-coordinator=true
+{{ toYaml . | indent 2 }}
+{{- end }}
+
+The Zigbee2MQTT container runs privileged because a hostPath device is not
+added to the container's device cgroup; without that, opening
+{{ .Values.coordinator.devicePath }} fails with EPERM. The process still runs
+as UID 1000 and needs coordinator.groupId (default: 20) to match the device's
+group. The init container, emulator sidecar and probe remain unprivileged.
+See the chart README before changing coordinator.privileged.
+{{- else }}
+coordinator.devicePath is empty: the device hostPath, /run/udev mount and USB
+nodeSelector are disabled (emulator or remote adapter mode). The Zigbee2MQTT
+container stays unprivileged.
+{{- end }}
 
 Before the first start, create the Secret referenced by `secret.name`
 (default: zigbee2mqtt-secrets) with a key named `secret.key`

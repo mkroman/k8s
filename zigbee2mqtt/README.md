@@ -14,7 +14,9 @@ but this chart deliberately follows the official container deployment instead:
   inline `devices` and `groups` blocks. Its `statefulset.command` default is an
   empty map, which also prevents a wrapper chart from adding a seeding command
   because Helm cannot coalesce a list over a map.
-- The upstream chart defaults to `privileged: true` with a root container. The
+- The upstream chart defaults to `privileged: true` with a root container. This
+  chart runs as UID 1000 and uses privileged mode only for the container that
+  opens the host device; a root container is not required. The
   [official security guide](https://www.zigbee2mqtt.io/guide/installation/14_securing.html)
   recommends a dedicated unprivileged user.
 
@@ -62,11 +64,39 @@ Zigbee2MQTT YAML and are not reshaped by Helm.
     [adapter documentation](https://www.zigbee2mqtt.io/guide/configuration/adapter-settings.html).
   - The container user (UID 1000) needs access to the device's group. Debian
     and Ubuntu use GID 20 (`dialout`). Verify with
-    `stat -c %g /dev/ttyUSB0` and set `coordinator.groupId`.
+    `stat -c %g /dev/ttyUSB0` and set `coordinator.groupId`. Privileged mode
+    (below) does not bypass Unix file permissions for a non-root process.
 - An MQTT broker reachable at `mqtt://10.0.3.3` (default). The NetworkPolicy
   allows the `mosquitto` namespace and `10.0.3.3/32`; adjust
   `networkPolicy.mqttNamespace`, `mqttCidr`, and `mqttPort` if needed.
 - The Sealed Secrets controller (`kube-system`) for the MQTT password.
+
+### Device access and privilege
+
+A `hostPath` volume only bind-mounts the device node into the container. It
+does not add the device's major/minor numbers to the container's device
+cgroup, which containerd/runc enforces when the device is opened. The chart
+therefore sets `privileged: true` on the Zigbee2MQTT container when
+`coordinator.devicePath` is set (`coordinator.privileged`, default `true`).
+Without it, adapter discovery still matches `/dev/ttyUSB0`, but opening it
+fails with `EPERM` (`Operation not permitted`). That errno identifies the
+device cgroup: a Unix mode or group problem would be `EACCES`
+(`Permission denied`). Capabilities, `supplementalGroups`, seccomp and Pod
+Security Admission labels do not change the device cgroup.
+
+Only the Zigbee2MQTT container is privileged. The seeding init container,
+coordinator emulator and e2e probe stay unprivileged with all capabilities
+dropped. The main container keeps the non-root UID/GID, read-only root
+filesystem and `RuntimeDefault` seccomp. `allowPrivilegeEscalation` is `true`
+because Kubernetes rejects it being `false` together with `privileged: true`,
+and the capabilities list is omitted because a capability allowlist does not
+gate device-cgroup access. Privileged mode grants that container access to
+every device number, so it is a real trade-off, but it is scoped to the only
+process that needs the coordinator.
+
+Set `coordinator.privileged: false` only when something else allocates the
+device, such as a device plugin or CDI. The chart does not deploy either; see
+[Known gaps](#known-gaps).
 
 ## Secret
 
@@ -146,6 +176,9 @@ Zigbee2MQTT's own migrations are not overwritten by a Git sync.
   must instead start with `tcp://`; the chart fails to render if these rules
   diverge. `values.schema.json` also rejects wrong types such as a string
   frontend port.
+- `coordinator.privileged` defaults to `true`; the main container needs
+  privileged mode to open a host device. See
+  [Device access and privilege](#device-access-and-privilege).
 
 The frontend binds `0.0.0.0` because the Service is the access path; the
 Service is `ClusterIP`, and access should be through an authenticated,
@@ -172,14 +205,23 @@ every restart; it is for testing only.
 
 ## Security notes
 
-- Runs as UID/GID 1000, non-root, with `fsGroup` 1000 and supplementary GID 20
-  for the serial device.
-- `readOnlyRootFilesystem`, all capabilities dropped, no privilege escalation,
-  `RuntimeDefault` seccomp, and no Kubernetes API token.
+- Runs as UID/GID 1000, non-root, with `fsGroup` 1000 and
+  `supplementalGroups: [20]`. The group is still required: privileged mode
+  lifts the device-cgroup check but does not bypass Unix file permissions for
+  a non-root process.
+- The Zigbee2MQTT container is privileged when a real device is configured
+  (`coordinator.devicePath` set, the default). A `hostPath` device is not
+  added to the container device cgroup, so an unprivileged container cannot
+  open it; Kubernetes has no per-device pod field. Privileged mode is a broad
+  grant for that container (access to all device numbers).
+- `readOnlyRootFilesystem`, `RuntimeDefault` seccomp, no privilege escalation
+  for unprivileged containers, and no Kubernetes API token remain in place.
+  The privileged container has `allowPrivilegeEscalation: true` because the
+  API requires it with `privileged: true`; its capabilities list is omitted.
 - `hostPath` is used only for the serial device and `/run/udev` (read-only),
   following the official Docker guidance. This is the reason the namespace is
-  labeled `pod-security.kubernetes.io/enforce=privileged`; the container itself
-  is still unprivileged with all capabilities dropped.
+  labeled `pod-security.kubernetes.io/enforce=privileged`; the label only
+  admits the Pod and does not grant device access.
 - The frontend is not exposed and has no `auth_token` in the default config.
   Anyone who can reach it has full control of the Zigbee network.
 
@@ -234,13 +276,13 @@ yamllint --no-warnings --config-file hack/ci/yamllint.yaml \
 ./hack/ci/validate-helm.sh zigbee2mqtt
 ```
 
-The rendered chart was also exercised against the real 2.14.3 image as UID
+The rendered chart has been exercised against the real 2.14.3 image as UID
 1000 with a read-only root filesystem, a writable data directory, and the
-secret file mounted. The configuration parsed and Zigbee2MQTT reached adapter
-discovery; it then failed only because the test host has no USB coordinator.
-The chart has **not** been run end-to-end on a cluster with the coordinator, so
-the device node, UID/GID mapping, and node label must be verified on the target
-node.
+secret file mounted. The hostPath path was also tested on kind with a fake
+character device: the unprivileged pod fails to open it with `EPERM`, while
+the privileged pod with supplemental GID 20 opens it. The chart has **not**
+been run against a physical USB coordinator, so the device node, its group
+and the node label must be verified on the target node.
 
 ## e2e / kind
 
@@ -281,8 +323,16 @@ up. It is e2e-only and must never be enabled in production.
   unauthenticated health path in a future chart revision.
 - No native Prometheus endpoint; use `mqtt2prometheus` or the MQTT health topic.
 - The chart does not create an Ingress. The Service is `ClusterIP` by default.
+- The real-device path requires a privileged Zigbee2MQTT container. A generic
+  device plugin/CDI allocator or a narrow privileged serial proxy sidecar
+  (Zigbee2MQTT on `tcp://127.0.0.1`) would reduce that grant; neither is part
+  of this chart. `coordinator.privileged: false` only works when a device
+  plugin/CDI already allocates the device.
 - `supplementalGroups: [20]` and `/dev/ttyUSB0` are defaults for this cluster;
   verify the device group and prefer the stable `/dev/serial/by-id/...` path.
+- The e2e suite runs the emulator over TCP and never exercises the USB
+  hostPath/device-cgroup path, so a physical coordinator needs a manual node
+  test.
 
 ## Sources
 

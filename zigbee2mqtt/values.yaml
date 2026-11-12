@@ -101,8 +101,20 @@ coordinator:
   hostPathType: CharDevice
   # -- GID with write access to the device on the node. Debian and Ubuntu use
   #    20 (dialout); verify with: stat -c %g /dev/ttyUSB0
-  #    Only used when coordinator.devicePath is set.
+  #    Only used when coordinator.devicePath is set. The chart still runs
+  #    Zigbee2MQTT as UID 1000, so the process needs this group even when the
+  #    container is privileged.
   groupId: 20
+  # -- Run the Zigbee2MQTT container privileged when coordinator.devicePath is
+  #    set. A hostPath device is only a bind mount: it does not add the device
+  #    number to the container's device-cgroup allowlist, so opening
+  #    /dev/ttyUSB0 fails with EPERM ("Operation not permitted") in an
+  #    otherwise unprivileged container. Kubernetes has no per-device pod
+  #    field; privileged mode (or a device plugin/CDI allocator) is required.
+  #    Only this container becomes privileged; the init container, emulator
+  #    sidecar and e2e probe stay unprivileged. Set to false only when a device
+  #    plugin or CDI injects the device. Ignored when devicePath is empty.
+  privileged: true
   emulator:
     # -- Run a Z-Stack (ZNP) coordinator emulator as a pod sidecar, so
     #    Zigbee2MQTT starts without real hardware. The emulator speaks enough
@@ -181,8 +193,13 @@ podSecurityContext:
   seccompProfile:
     type: RuntimeDefault
 
-# -- Container security context. The official image supports running as an
-#    unprivileged user with the dialout group; see the Docker documentation.
+# -- Container security context for the init container and the base for the
+#    Zigbee2MQTT container. When a real device is configured and
+#    `coordinator.privileged` is true, the StatefulSet template sets
+#    `privileged: true`, `allowPrivilegeEscalation: true`, and removes the
+#    capabilities list on the Zigbee2MQTT container; Kubernetes rejects
+#    privileged with allowPrivilegeEscalation false. readOnlyRootFilesystem and
+#    the non-root UID/GID are kept in both cases.
 securityContext:
   allowPrivilegeEscalation: false
   capabilities:
