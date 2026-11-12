@@ -24,6 +24,13 @@ Deeper docs: `hack/ci/README.md` (CI scripts, tool manifest),
   `bitnami.com/SealedSecret` and probe `batch/Job`. To opt out, set
   `namespaceResourceBlacklist: []`.
 - Large-CRD apps need `ServerSideApply=true` in their `syncPolicy`.
+- The root `apps` Application uses `ServerSideApply=true` and
+  `ServerSideDiff=true`. Argo CD adds pre/post-delete finalizers to child
+  Applications whose charts render delete hooks (currently NFD, Spegel and
+  Longhorn). SSA keeps those controller-owned finalizers out of the
+  app-of-apps diff. Do not remove these options; if client-side apply is ever
+  restored, declare the matching `pre-delete-finalizer.*` or
+  `post-delete-finalizer.*` entries in `apps/values.yaml` instead.
 
 ## Checks
 
@@ -36,6 +43,7 @@ yamllint must be installed separately.
 ./hack/ci/validate-helm.sh spegel           # one chart: dep build, lint, render, kubeconform
 ./hack/ci/validate-helm.sh                  # every chart (CI)
 ./hack/ci/validate-kustomize.sh             # every kustomization.yaml
+./hack/ci/validate-app-of-apps.sh           # root app keeps SSA + server-side diff
 ./hack/ci/validate-dashboards.py            # grafana/dashboards/*.json; datasources must use $datasource
 python3 hack/ci/test-vector-config.py       # vector/quickwit; needs helm repos from hack/e2e/apps.yaml, vector, PyYAML
 shellcheck hack/ci/*.sh hack/e2e/*.sh

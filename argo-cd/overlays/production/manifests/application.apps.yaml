@@ -21,3 +21,10 @@ spec:
 
   syncPolicy:
     automated: {}
+    # Argo CD adds pre/post-delete finalizers to child Applications whose
+    # charts render delete hooks. SSA treats metadata.finalizers as a set and
+    # server-side diff ignores the application controller's entries, so those
+    # finalizers do not appear as permanent drift in this app-of-apps.
+    syncOptions:
+      - ServerSideApply=true
+      - ServerSideDiff=true
