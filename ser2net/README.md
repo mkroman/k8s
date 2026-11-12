@@ -39,10 +39,10 @@ manager. The image is about 165 MB uncompressed and about 41 MB compressed for
 
 ### Publishing and immutability
 
-`.github/workflows/container-images.yaml` runs only when `images/ser2net/`
-changes or on manual dispatch. It builds `linux/amd64` and `linux/arm64`
-images on pull requests and publishes them on `main` and version tags. It
-pushes:
+`.github/workflows/container-images.yaml` runs when `images/ser2net/` changes,
+on manual dispatch, and on a weekly schedule for security updates. It builds
+`linux/amd64` and `linux/arm64` images on pull requests and publishes them on
+`main` and version tags. It pushes:
 
 - `sha-<full commit sha>` — the immutable build tag;
 - `4.6.4-1` on `main` — the human-readable build tag (the digest pin takes
@@ -50,10 +50,13 @@ pushes:
 - semver tags for `v*` releases.
 
 Builds include SBOM and provenance attestations and are signed with cosign
-keyless. The workflow's follow-up job resolves the digest of the new image and
-opens a PR that sets `image.digest` in `values.yaml`. Once that PR is merged,
-the Deployment uses `repository@sha256:...` and is immutable; `image.tag` is
-kept as the human-readable build tag.
+keyless. The weekly scheduled build passes `APT_UPGRADE=true`, so the image
+picks up current Debian security updates for the base packages and the
+installed ser2net package, even when this repository has not changed. The
+workflow's follow-up job resolves the digest of the new image and opens a PR
+that sets `image.digest` in `values.yaml`. Once that PR is merged, the
+Deployment uses `repository@sha256:...` and is immutable; `image.tag` is kept
+as the human-readable build tag.
 
 Verify a published image:
 
@@ -141,9 +144,10 @@ one (`kickolduser`), matching Zigbee2MQTT's exclusive use of the coordinator.
   node and do not add anything else to the container.
 - The image is Debian slim, so it includes a shell and package manager. The
   container still runs as UID 1000 with a read-only root filesystem; treat the
-  extra userland as attack surface. Base-image bumps come from Renovate;
-  dispatch the image workflow after bumping `SER2NET_VERSION` or when a
-  package rebuild is needed.
+  extra userland as attack surface. Base-image bumps come from Renovate; the
+  weekly scheduled workflow rebuilds with current Debian security updates.
+  Dispatch it manually after bumping `SER2NET_VERSION` if an immediate rebuild
+  is needed.
 - The Service is `ClusterIP`; the protocol is raw, unauthenticated serial data.
   Do not expose it with an Ingress, NodePort or LoadBalancer. If the bridge
   must cross an untrusted network, put an authenticated TLS tunnel in front

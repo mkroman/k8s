@@ -10,6 +10,10 @@ on:
     paths:
       - images/ser2net/**
   workflow_dispatch:
+  schedule:
+    # Weekly security rebuild: applies current Debian security updates to the
+    # installed packages, even when the repository did not change.
+    - cron: "17 4 * * 1"
 
 permissions:
   contents: read
@@ -77,6 +81,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             SER2NET_VERSION=${{ env.SER2NET_VERSION }}
+            APT_UPGRADE=${{ github.event_name == 'schedule' }}
           sbom: true
           provenance: mode=max
           cache-from: type=gha
