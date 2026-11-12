@@ -14,8 +14,15 @@ group. The init container, emulator sidecar and probe remain unprivileged.
 See the chart README before changing coordinator.privileged.
 {{- else }}
 coordinator.devicePath is empty: the device hostPath, /run/udev mount and USB
-nodeSelector are disabled (emulator or remote adapter mode). The Zigbee2MQTT
-container stays unprivileged.
+nodeSelector are disabled, and the Zigbee2MQTT container stays unprivileged.
+It reaches the coordinator at:
+
+  {{ .Values.config.serial.port }}
+
+The default is the ser2net Service in the `ser2net` namespace. Its
+NetworkPolicy must allow egress to networkPolicy.ser2netNamespace and
+networkPolicy.ser2netPort. For the emulator or a remote adapter, point
+config.serial.port at that endpoint and leave ser2netNamespace empty.
 {{- end }}
 
 Before the first start, create the Secret referenced by `secret.name`

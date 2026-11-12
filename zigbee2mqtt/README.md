@@ -2,7 +2,9 @@
 
 Deploys [Zigbee2MQTT](https://www.zigbee2mqtt.io/) 2.14.3 on Kubernetes using
 the official `ghcr.io/koenkk/zigbee2mqtt` image. It bridges a USB Zigbee
-coordinator to MQTT and Home Assistant.
+coordinator to MQTT and Home Assistant. By default the coordinator is reached
+through the [ser2net](../ser2net/) TCP bridge, which keeps this workload
+unprivileged; a direct `hostPath` mode remains available as a fallback.
 
 ## Deployment model
 
@@ -15,8 +17,10 @@ but this chart deliberately follows the official container deployment instead:
   empty map, which also prevents a wrapper chart from adding a seeding command
   because Helm cannot coalesce a list over a map.
 - The upstream chart defaults to `privileged: true` with a root container. This
-  chart runs as UID 1000 and uses privileged mode only for the container that
-  opens the host device; a root container is not required. The
+  chart runs as UID 1000. Its default transport is the ser2net bridge, so the
+  application container does not touch the host device at all. Direct hostPath
+  mode is still supported, but only that mode needs privileged mode; a root
+  container is never required. The
   [official security guide](https://www.zigbee2mqtt.io/guide/installation/14_securing.html)
   recommends a dedicated unprivileged user.
 
@@ -50,53 +54,79 @@ Zigbee2MQTT YAML and are not reshaped by Helm.
 | Service | ClusterIP frontend on port 8124 |
 | Headless Service | Governing Service for the StatefulSet |
 | ConfigMap | First-start `configuration.yaml`, `devices.yaml`, and `groups.yaml` |
-| NetworkPolicy | Frontend ingress; DNS, MQTT, and OTA HTTPS egress |
+| NetworkPolicy | Frontend ingress; DNS, MQTT, optional ser2net TCP, and OTA HTTPS egress |
 
 ## Prerequisites
 
-- The USB coordinator is present on the node and usable by the container:
-  - `feature.node.kubernetes.io/zigbee-coordinator=true` must label that node.
-    The `node-feature-discovery` chart creates this label for the Silicon Labs
-    CC2652RB adapter with serial `00_12_4B_00_21_A8_EC_9C`.
-  - The device is exposed at `coordinator.devicePath` (default
-    `/dev/ttyUSB0`). Keep `config.serial.port` in sync with it. Prefer the
-    stable `/dev/serial/by-id/...` path from the node once known; see the
+- The [ser2net](../ser2net/) Application is healthy on the coordinator node,
+  or the chart is switched to direct-device mode. The default
+  `config.serial.port` is
+  `tcp://ser2net.ser2net.svc.cluster.local:6638`.
+  - ser2net must be scheduled on the node labelled
+    `feature.node.kubernetes.io/zigbee-coordinator=true` and must have access
+    to the serial device. See the [ser2net chart README](../ser2net/README.md).
+  - `networkPolicy.ser2netNamespace` and `networkPolicy.ser2netPort` must
+    match the bridge; they default to `ser2net` and `6638`.
+  - Direct mode is the fallback: set `coordinator.devicePath` to the node
+    device and `config.serial.port` to the same path. That mode needs
+    `coordinator.privileged: true` (default) and a namespace that admits
+    `hostPath` and privileged pods. Prefer the stable
+    `/dev/serial/by-id/...` path; see the
     [adapter documentation](https://www.zigbee2mqtt.io/guide/configuration/adapter-settings.html).
-  - The container user (UID 1000) needs access to the device's group. Debian
-    and Ubuntu use GID 20 (`dialout`). Verify with
-    `stat -c %g /dev/ttyUSB0` and set `coordinator.groupId`. Privileged mode
-    (below) does not bypass Unix file permissions for a non-root process.
 - An MQTT broker reachable at `mqtt://10.0.3.3` (default). The NetworkPolicy
   allows the `mosquitto` namespace and `10.0.3.3/32`; adjust
   `networkPolicy.mqttNamespace`, `mqttCidr`, and `mqttPort` if needed.
 - The Sealed Secrets controller (`kube-system`) for the MQTT password.
 
-### Device access and privilege
+### Coordinator access
+
+The default is a TCP serial bridge:
+
+```yaml
+config:
+  serial:
+    port: tcp://ser2net.ser2net.svc.cluster.local:6638
+coordinator:
+  devicePath: ""   # no hostPath, no /run/udev, no USB nodeSelector
+```
+
+In this mode the Zigbee2MQTT container is unprivileged and can run under the
+`restricted` Pod Security Standard. The [ser2net chart](../ser2net/) owns the
+host device and is the only privileged workload. Its NetworkPolicy accepts
+connections only from `networkPolicy.ser2netNamespace`; this chart's egress
+policy allows that namespace on `networkPolicy.ser2netPort`.
+
+Throughput and semantics are those of a raw TCP serial bridge. DTR/RTS modem
+control lines are not carried over plain TCP; if the coordinator needs them
+for a reset or bootloader path, test it or prefer direct mode.
+
+#### Direct hostPath mode (fallback)
 
 A `hostPath` volume only bind-mounts the device node into the container. It
 does not add the device's major/minor numbers to the container's device
-cgroup, which containerd/runc enforces when the device is opened. The chart
-therefore sets `privileged: true` on the Zigbee2MQTT container when
-`coordinator.devicePath` is set (`coordinator.privileged`, default `true`).
-Without it, adapter discovery still matches `/dev/ttyUSB0`, but opening it
-fails with `EPERM` (`Operation not permitted`). That errno identifies the
-device cgroup: a Unix mode or group problem would be `EACCES`
-(`Permission denied`). Capabilities, `supplementalGroups`, seccomp and Pod
-Security Admission labels do not change the device cgroup.
+cgroup, which containerd/runc enforces when the device is opened. Setting
+`coordinator.devicePath` therefore also sets `privileged: true` on the
+Zigbee2MQTT container (`coordinator.privileged`, default `true`). Without it,
+adapter discovery still matches `/dev/ttyUSB0`, but opening it fails with
+`EPERM` (`Operation not permitted`). That errno identifies the device cgroup:
+a Unix mode or group problem would be `EACCES` (`Permission denied`).
+Capabilities, `supplementalGroups`, seccomp and Pod Security Admission labels
+do not change the device cgroup.
 
-Only the Zigbee2MQTT container is privileged. The seeding init container,
+Only the Zigbee2MQTT container becomes privileged. The seeding init container,
 coordinator emulator and e2e probe stay unprivileged with all capabilities
 dropped. The main container keeps the non-root UID/GID, read-only root
 filesystem and `RuntimeDefault` seccomp. `allowPrivilegeEscalation` is `true`
 because Kubernetes rejects it being `false` together with `privileged: true`,
 and the capabilities list is omitted because a capability allowlist does not
 gate device-cgroup access. Privileged mode grants that container access to
-every device number, so it is a real trade-off, but it is scoped to the only
-process that needs the coordinator.
+every device number, so it is a real trade-off.
 
-Set `coordinator.privileged: false` only when something else allocates the
-device, such as a device plugin or CDI. The chart does not deploy either; see
-[Known gaps](#known-gaps).
+Direct mode requires the namespace to admit `hostPath` and privileged pods;
+the default `zigbee2mqtt` namespace in `apps/values.yaml` is `restricted`
+because the default transport is ser2net. Relabel it only when using direct
+mode. Set `coordinator.privileged: false` only when something else allocates
+the device, such as a device plugin or CDI.
 
 ## Secret
 
@@ -174,15 +204,15 @@ Zigbee2MQTT's own migrations are not overwritten by a Git sync.
   Using the frontend is safer for groups while the app is running. These files
   are intentionally not values, so `--set` cannot change them; that is what
   keeps `null`, quoting, and comments intact.
-- `service.port` must equal `config.frontend.port`, and
-  `coordinator.devicePath` must equal `config.serial.port`. When
-  `coordinator.devicePath` is empty (emulator/remote mode), `config.serial.port`
-  must instead start with `tcp://`; the chart fails to render if these rules
-  diverge. `values.schema.json` also rejects wrong types such as a string
-  frontend port.
-- `coordinator.privileged` defaults to `true`; the main container needs
-  privileged mode to open a host device. See
-  [Device access and privilege](#device-access-and-privilege).
+- `service.port` must equal `config.frontend.port`. When
+  `coordinator.devicePath` is set, it must equal `config.serial.port`; when it
+  is empty (the default ser2net/emulator/remote mode), `config.serial.port`
+  must start with `tcp://`. The chart fails to render if these rules diverge.
+  `values.schema.json` also rejects wrong types such as a string frontend
+  port.
+- `coordinator.privileged` defaults to `true` and is used only in direct
+  hostPath mode. The default ser2net transport keeps the container
+  unprivileged. See [Coordinator access](#coordinator-access).
 
 The frontend binds `0.0.0.0` because the Service is the access path; the
 Service is `ClusterIP`, and access should be through an authenticated,
@@ -209,23 +239,19 @@ every restart; it is for testing only.
 
 ## Security notes
 
-- Runs as UID/GID 1000, non-root, with `fsGroup` 1000 and
-  `supplementalGroups: [20]`. The group is still required: privileged mode
-  lifts the device-cgroup check but does not bypass Unix file permissions for
-  a non-root process.
-- The Zigbee2MQTT container is privileged when a real device is configured
-  (`coordinator.devicePath` set, the default). A `hostPath` device is not
-  added to the container device cgroup, so an unprivileged container cannot
-  open it; Kubernetes has no per-device pod field. Privileged mode is a broad
-  grant for that container (access to all device numbers).
-- `readOnlyRootFilesystem`, `RuntimeDefault` seccomp, no privilege escalation
-  for unprivileged containers, and no Kubernetes API token remain in place.
-  The privileged container has `allowPrivilegeEscalation: true` because the
-  API requires it with `privileged: true`; its capabilities list is omitted.
-- `hostPath` is used only for the serial device and `/run/udev` (read-only),
-  following the official Docker guidance. This is the reason the namespace is
-  labeled `pod-security.kubernetes.io/enforce=privileged`; the label only
-  admits the Pod and does not grant device access.
+- Runs as UID/GID 1000, non-root, with `fsGroup` 1000, `readOnlyRootFilesystem`,
+  `RuntimeDefault` seccomp, all capabilities dropped, no privilege escalation,
+  and no Kubernetes API token.
+- The default ser2net transport keeps the Zigbee2MQTT container unprivileged:
+  no `hostPath`, no `/run/udev`, no `supplementalGroups`, and the namespace
+  can use the `restricted` Pod Security Standard. The bridge is the only
+  privileged workload.
+- Direct hostPath mode is opt-in by setting `coordinator.devicePath`. A
+  `hostPath` device is not added to the container device cgroup, so that mode
+  needs `coordinator.privileged: true`; the group (`supplementalGroups: [20]`)
+  is still required because privileged mode does not bypass Unix file
+  permissions for a non-root process. Privileged mode is a broad grant
+  (access to all device numbers), so prefer ser2net.
 - The frontend is not exposed and has no `auth_token` in the default config.
   Anyone who can reach it has full control of the Zigbee network.
 
@@ -282,11 +308,13 @@ yamllint --no-warnings --config-file hack/ci/yamllint.yaml \
 
 The rendered chart has been exercised against the real 2.14.3 image as UID
 1000 with a read-only root filesystem, a writable data directory, and the
-secret file mounted. The hostPath path was also tested on kind with a fake
-character device: the unprivileged pod fails to open it with `EPERM`, while
-the privileged pod with supplemental GID 20 opens it. The chart has **not**
-been run against a physical USB coordinator, so the device node, its group
-and the node label must be verified on the target node.
+secret file mounted. The default ser2net/TCP path was validated with the
+coordinator emulator; the ser2net chart was separately exercised with a PTY
+pair. Direct hostPath mode was tested on kind with a fake character device:
+the unprivileged pod fails to open it with `EPERM`, while the privileged pod
+with supplemental GID 20 opens it. The chart has **not** been run against a
+physical USB coordinator, so the device node, its group and the node label
+must be verified on the target node.
 
 ## e2e / kind
 
@@ -305,7 +333,8 @@ up. It is e2e-only and must never be enabled in production.
 - `coordinator.devicePath: ""` disables the device hostPath, the `/run/udev`
   hostPath, and the USB `nodeSelector` (there is no USB node in kind). With the
   emulator, the serial port is the pod-local loopback sidecar address
-  `config.serial.port: tcp://127.0.0.1:6638`, so no Service is needed.
+  `config.serial.port: tcp://127.0.0.1:6638`, so no Service is needed;
+  `networkPolicy.ser2netNamespace` is empty for the same reason.
 - The remaining overrides adapt to the kind cluster: default StorageClass
   (`persistence.storageClass: ""`), anonymous MQTT against the e2e mosquitto
   app (`config.mqtt.server: mqtt://mosquitto.mosquitto.svc.cluster.local:1883`,
@@ -327,16 +356,17 @@ up. It is e2e-only and must never be enabled in production.
   unauthenticated health path in a future chart revision.
 - No native Prometheus endpoint; use `mqtt2prometheus` or the MQTT health topic.
 - The chart does not create an Ingress. The Service is `ClusterIP` by default.
-- The real-device path requires a privileged Zigbee2MQTT container. A generic
-  device plugin/CDI allocator or a narrow privileged serial proxy sidecar
-  (Zigbee2MQTT on `tcp://127.0.0.1`) would reduce that grant; neither is part
-  of this chart. `coordinator.privileged: false` only works when a device
-  plugin/CDI already allocates the device.
-- `supplementalGroups: [20]` and `/dev/ttyUSB0` are defaults for this cluster;
-  verify the device group and prefer the stable `/dev/serial/by-id/...` path.
-- The e2e suite runs the emulator over TCP and never exercises the USB
-  hostPath/device-cgroup path, so a physical coordinator needs a manual node
-  test.
+- The default real-device path depends on the ser2net Application. It is a
+  raw, unauthenticated TCP bridge and must stay cluster-internal. If it is
+  down, Zigbee2MQTT retries the connection but cannot reach the coordinator.
+- The ser2net bridge is the only privileged workload. It opens exactly one
+  device, but a privileged container still has access to every device number;
+  keep it pinned to the coordinator node and do not add sidecars.
+- Direct hostPath mode still needs a privileged Zigbee2MQTT container and a
+  namespace that admits hostPath pods; the default namespace is restricted.
+  A device plugin/CDI allocator remains the least-privilege alternative.
+- The e2e suite runs the emulator over TCP and never exercises the physical
+  ser2net/USB path, so a real coordinator needs a manual node test.
 
 ## Sources
 
@@ -356,4 +386,5 @@ up. It is e2e-only and must never be enabled in production.
 - [k8s-at-home chart](https://github.com/k8s-at-home/charts/tree/master/charts/stable/zigbee2mqtt)
   (structured `config` values copied on first run)
 - [Official image](https://github.com/Koenkk/zigbee2mqtt/pkgs/container/zigbee2mqtt)
+- [ser2net serial bridge](https://github.com/cminyard/ser2net)
 - License: GPL-3.0

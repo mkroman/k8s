@@ -1,0 +1,219 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "ser2net chart values",
+  "type": "object",
+  "required": [
+    "image",
+    "ser2net",
+    "service",
+    "serial",
+    "podSecurityContext",
+    "securityContext",
+    "installSecurityContext",
+    "resources",
+    "probes",
+    "networkPolicy"
+  ],
+  "properties": {
+    "global": {
+      "type": "object"
+    },
+    "nameOverride": {
+      "type": "string"
+    },
+    "fullnameOverride": {
+      "type": "string"
+    },
+    "image": {
+      "type": "object",
+      "required": [
+        "repository",
+        "tag"
+      ],
+      "properties": {
+        "repository": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tag": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pullPolicy": {
+          "type": "string",
+          "enum": [
+            "Always",
+            "IfNotPresent",
+            "Never"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "imagePullSecrets": {
+      "type": "array"
+    },
+    "ser2net": {
+      "type": "object",
+      "required": [
+        "version",
+        "root"
+      ],
+      "properties": {
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "root": {
+          "type": "string",
+          "pattern": "^/"
+        }
+      },
+      "additionalProperties": false
+    },
+    "replicaCount": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1
+    },
+    "service": {
+      "type": "object",
+      "required": [
+        "type",
+        "port"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "ClusterIP",
+            "NodePort",
+            "LoadBalancer"
+          ]
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        }
+      },
+      "additionalProperties": false
+    },
+    "serial": {
+      "type": "object",
+      "required": [
+        "devicePath",
+        "settings",
+        "groupId",
+        "local"
+      ],
+      "properties": {
+        "devicePath": {
+          "type": "string",
+          "pattern": "^/"
+        },
+        "settings": {
+          "type": "string",
+          "minLength": 1
+        },
+        "groupId": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "local": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "nodeSelector": {
+      "type": "object"
+    },
+    "tolerations": {
+      "type": "array"
+    },
+    "affinity": {
+      "type": "object"
+    },
+    "podAnnotations": {
+      "type": "object"
+    },
+    "podLabels": {
+      "type": "object"
+    },
+    "podSecurityContext": {
+      "type": "object"
+    },
+    "securityContext": {
+      "type": "object"
+    },
+    "installSecurityContext": {
+      "type": "object"
+    },
+    "resources": {
+      "type": "object"
+    },
+    "probes": {
+      "type": "object",
+      "required": [
+        "readiness",
+        "liveness"
+      ],
+      "properties": {
+        "readiness": {
+          "type": "object",
+          "required": [
+            "periodSeconds"
+          ],
+          "properties": {
+            "periodSeconds": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        "liveness": {
+          "type": "object",
+          "required": [
+            "periodSeconds"
+          ],
+          "properties": {
+            "periodSeconds": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "networkPolicy": {
+      "type": "object",
+      "required": [
+        "enabled",
+        "clientNamespace",
+        "allowPackageDownload"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "clientNamespace": {
+          "type": "string",
+          "minLength": 1
+        },
+        "allowPackageDownload": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "terminationGracePeriodSeconds": {
+      "type": "integer",
+      "minimum": 0
+    }
+  },
+  "additionalProperties": false
+}

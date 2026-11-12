@@ -415,6 +415,22 @@ projects:
       - group: ""
         kind: LimitRange
 
+  - name: ser2net
+    description: "Serial-to-TCP bridge for the Zigbee coordinator"
+    destinations:
+      - namespace: ser2net
+    sourceRepos:
+      - https://github.com/mkroman/k8s
+    namespaceResourceWhitelist:
+      - group: ""
+        kind: ConfigMap
+      - group: ""
+        kind: Service
+      - group: apps
+        kind: Deployment
+      - group: networking.k8s.io
+        kind: NetworkPolicy
+
   - name: zigbee2mqtt
     description: "Zigbee2MQTT — Zigbee to MQTT bridge with a USB coordinator"
     destinations:
@@ -480,6 +496,17 @@ namespaces:
       pod-security.kubernetes.io/audit-version: latest
       pod-security.kubernetes.io/warn: privileged
       pod-security.kubernetes.io/warn-version: latest
+  - name: ser2net
+    labels:
+      # The serial bridge needs a hostPath character device and a privileged
+      # container to reach the container device cgroup. It is pinned to the
+      # coordinator node; the application namespace stays restricted.
+      pod-security.kubernetes.io/enforce: privileged
+      pod-security.kubernetes.io/enforce-version: latest
+      pod-security.kubernetes.io/audit: privileged
+      pod-security.kubernetes.io/audit-version: latest
+      pod-security.kubernetes.io/warn: privileged
+      pod-security.kubernetes.io/warn-version: latest
   - name: traefik
   - name: vector
   - name: zeta-dev
@@ -487,16 +514,14 @@ namespaces:
   - name: zeta-prod
   - name: zigbee2mqtt
     labels:
-      # The USB coordinator is passed with hostPath and the Zigbee2MQTT
-      # container runs privileged (a hostPath device is not added to the
-      # container device cgroup). Baseline and restricted Pod Security
-      # Standards forbid both, so mark the namespace privileged explicitly
-      # instead of relying on the unlabeled namespace default.
-      pod-security.kubernetes.io/enforce: privileged
+      # The default transport is ser2net over TCP, so the application has no
+      # hostPath and runs under the restricted Pod Security Standard. Direct
+      # hostPath mode is opt-in and requires relabelling this namespace.
+      pod-security.kubernetes.io/enforce: restricted
       pod-security.kubernetes.io/enforce-version: latest
-      pod-security.kubernetes.io/audit: privileged
+      pod-security.kubernetes.io/audit: restricted
       pod-security.kubernetes.io/audit-version: latest
-      pod-security.kubernetes.io/warn: privileged
+      pod-security.kubernetes.io/warn: restricted
       pod-security.kubernetes.io/warn-version: latest
 
 applications:
@@ -752,6 +777,19 @@ applications:
       repoURL: https://github.com/mkroman/k8s
       path: sealed-secrets
 
+  # Sync before Zigbee2MQTT so its Service exists when the StatefulSet starts.
+  # The bridge is pinned to the coordinator node and is the only privileged
+  # workload in this pair.
+  - name: ser2net
+    annotations:
+      argocd.argoproj.io/sync-wave: "1"
+    project: ser2net
+    destination:
+      namespace: ser2net
+    source:
+      repoURL: https://github.com/mkroman/k8s
+      path: ser2net
+
   - name: spegel
     project: spegel
     destination:
@@ -829,10 +867,11 @@ applications:
         valueFiles:
           - values-magistr.yaml
 
-  # Depends on mosquitto for MQTT and node-feature-discovery for the coordinator
-  # label. The Pod stays Pending until both are available. The StatefulSet also
-  # mounts the `zigbee2mqtt-secrets` Secret, so commit the SealedSecret
-  # described in zigbee2mqtt/README.md before the first sync.
+  # Depends on mosquitto for MQTT and ser2net for the coordinator. The
+  # StatefulSet also mounts the `zigbee2mqtt-secrets` Secret, so commit the
+  # SealedSecret described in zigbee2mqtt/README.md before the first sync.
+  # The application namespace is restricted; only ser2net uses hostPath and a
+  # privileged container.
   - name: zigbee2mqtt
     annotations:
       argocd.argoproj.io/sync-wave: "2"

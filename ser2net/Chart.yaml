@@ -1,0 +1,27 @@
+apiVersion: v2
+name: ser2net
+description: >-
+  ser2net serial-to-TCP bridge for the Zigbee coordinator. Runs on the node
+  that owns the USB adapter and exposes the serial port to Zigbee2MQTT over
+  TCP, so the application itself does not need hostPath or privileged access.
+type: application
+version: 0.1.0
+# renovate: datasource=github-releases depName=cminyard/ser2net
+appVersion: "4.6.4"
+kubeVersion: ">=1.26.0-0"
+
+home: https://github.com/cminyard/ser2net
+sources:
+  - https://github.com/cminyard/ser2net
+  - https://github.com/cminyard/gensio
+keywords:
+  - ser2net
+  - serial
+  - zigbee
+maintainers:
+  - name: mkroman
+annotations:
+  artifacthub.io/license: GPL-2.0-only
+  artifacthub.io/images: |
+    - name: debian
+      image: docker.io/library/debian:13.7-slim

@@ -1,0 +1,141 @@
+{{- /* The device group is only needed for the real serial device. */}}
+{{- $podSecurityContext := deepCopy .Values.podSecurityContext }}
+{{- $_ := set $podSecurityContext "supplementalGroups" (list .Values.serial.groupId) }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "ser2net.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "ser2net.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      {{- include "ser2net.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "ser2net.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml $podSecurityContext | nindent 8 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      initContainers:
+        # There is no official ser2net container image. Download the pinned
+        # Debian package and extract it with its dependencies into a shared
+        # emptyDir; the main container runs that binary as UID 1000. The
+        # official Debian image and Debian archive are the only inputs.
+        - name: install-ser2net
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.installSecurityContext | nindent 12 }}
+          command:
+            - /bin/sh
+            - -ec
+          args:
+            - |
+              set -eu
+              apt-get update
+              apt-get install -y --download-only --no-install-recommends \
+                ser2net={{ .Values.ser2net.version }}
+              mkdir -p {{ .Values.ser2net.root }}
+              for deb in /var/cache/apt/archives/*.deb; do
+                dpkg-deb -x "$deb" {{ .Values.ser2net.root }}
+              done
+              test -x {{ .Values.ser2net.root }}/usr/sbin/ser2net
+          volumeMounts:
+            - name: ser2net-root
+              mountPath: {{ .Values.ser2net.root }}
+      containers:
+        - name: ser2net
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          command:
+            - /bin/sh
+            - -ec
+          args:
+            - |
+              set -eu
+              # Packages are extracted outside the image's library paths.
+              # Build LD_LIBRARY_PATH from the extracted multiarch directories.
+              LD_LIBRARY_PATH="$(find {{ .Values.ser2net.root }} -maxdepth 3 -type d \
+                \( -path '*/usr/lib/*-linux-gnu*' -o -path '*/lib/*-linux-gnu*' \) \
+                -print | paste -sd: -)"
+              export LD_LIBRARY_PATH
+              exec {{ .Values.ser2net.root }}/usr/sbin/ser2net \
+                -d -c /config/ser2net.yaml
+          ports:
+            - name: serial
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          readinessProbe:
+            tcpSocket:
+              port: serial
+            periodSeconds: {{ .Values.probes.readiness.periodSeconds }}
+          livenessProbe:
+            tcpSocket:
+              port: serial
+            periodSeconds: {{ .Values.probes.liveness.periodSeconds }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: ser2net-root
+              mountPath: {{ .Values.ser2net.root }}
+              readOnly: true
+            # gensio loads its protocol modules from the compiled-in
+            # /usr/libexec/<triplet>/gensio directory. Mount the extracted
+            # tree there so serialdev is available without writing to the
+            # read-only image root filesystem.
+            - name: ser2net-root
+              mountPath: /usr/libexec
+              subPath: usr/libexec
+              readOnly: true
+            - name: config
+              mountPath: /config
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+            # ser2net takes UUCP locks in /run/lock (Debian's /var/lock is a
+            # symlink there); the image root filesystem is read-only.
+            - name: lock
+              mountPath: /run/lock
+      volumes:
+        - name: ser2net-root
+          emptyDir: {}
+        - name: config
+          configMap:
+            name: {{ include "ser2net.fullname" . }}
+        - name: tmp
+          emptyDir: {}
+        - name: lock
+          emptyDir: {}

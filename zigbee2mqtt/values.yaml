@@ -7,6 +7,11 @@
 # official container deployment directly: one writable /app/data directory,
 # the official image entrypoint, and the documented configuration.yaml format.
 #
+# By default the coordinator is reached through the ser2net chart over TCP.
+# That keeps this container unprivileged. Setting coordinator.devicePath to a
+# host device switches to the direct hostPath mode, which requires privileged
+# mode and a namespace that admits hostPath pods; see the README.
+#
 # Official documentation:
 #   Kubernetes installation: https://www.zigbee2mqtt.io/guide/installation/08_kubernetes.html
 #   Docker: https://www.zigbee2mqtt.io/guide/installation/02_docker.html
@@ -68,8 +73,10 @@ config:
     #   password: <mqtt password>
     password: "!secret.yaml password"
   serial:
-    # -- Keep this in sync with `coordinator.devicePath`.
-    port: /dev/ttyUSB0
+    # -- Coordinator transport. The default reaches the ser2net bridge in
+    #    the `ser2net` namespace. If `coordinator.devicePath` is set instead,
+    #    this must exactly match that device path (direct USB mode).
+    port: tcp://ser2net.ser2net.svc.cluster.local:6638
   advanced:
     pan_id: 6755
     log_level: info
@@ -92,12 +99,13 @@ secret:
   key: secret.yaml
 
 coordinator:
-  # -- Host device passed into the container. Prefer the stable
-  #    /dev/serial/by-id/... path once it is known on the selected node.
-  #    When empty, the device hostPath, the /run/udev hostPath, and the USB
-  #    nodeSelector are not rendered; config.serial.port must then start with
-  #    tcp:// (emulator or remote adapter mode).
-  devicePath: /dev/ttyUSB0
+  # -- Direct hostPath mode. Empty (the default) disables the device
+  #    hostPath, the /run/udev hostPath, and the USB nodeSelector, and
+  #    requires config.serial.port to start with tcp://. Set this to a node
+  #    device only when the ser2net bridge is not used; prefer the stable
+  #    /dev/serial/by-id/... path. Direct mode requires privileged mode and a
+  #    namespace that admits hostPath pods.
+  devicePath: ""
   # -- hostPath type. Use CharDevice for a device node, or leave empty to
   #    accept any existing path (for example a symlink).
   hostPathType: CharDevice
@@ -172,8 +180,10 @@ persistence:
   # -- Extra annotations for the created PVC.
   annotations: {}
 
-# -- Node selector for the USB coordinator. The node-feature-discovery chart
-#    sets this label for the Silicon Labs CC2652RB adapter.
+# -- Node selector for direct USB mode. Ignored when `coordinator.devicePath`
+#    is empty; the ser2net chart has its own selector. The
+#    node-feature-discovery chart sets this label for the Silicon Labs
+#    CC2652RB adapter.
 nodeSelector:
   feature.node.kubernetes.io/zigbee-coordinator: "true"
 
@@ -243,6 +253,11 @@ networkPolicy:
   # -- Namespace running the MQTT broker. Also allowed as an egress peer so
   #    the policy keeps working when the Service is DNATed to a pod IP.
   mqttNamespace: mosquitto
+  # -- Namespace running the ser2net serial bridge. Allowed as an egress peer
+  #    when `config.serial.port` is a tcp:// URL. Leave empty for the emulator
+  #    or direct-device mode.
+  ser2netNamespace: ser2net
+  ser2netPort: 6638
   # -- Additional egress peer for the broker's LoadBalancer IP.
   mqttCidr: 10.0.3.3/32
   mqttPort: 1883
