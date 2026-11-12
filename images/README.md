@@ -8,8 +8,9 @@ Images built and published from this repository.
 
 ## Conventions
 
-- Build with a multi-stage Dockerfile and a distroless runtime. Pin both the
-  builder and the runtime base by digest so Renovate can update them.
+- Pin the base image by digest so Renovate can update it. Prefer a minimal
+  base, but a normal slim distribution is acceptable when it removes a fragile
+  hand-maintained runtime copy; record the size and attack-surface trade-off.
 - Publish multi-arch images (`linux/amd64`, `linux/arm64`) with BuildKit cache,
   SBOM, and provenance attestations.
 - Sign published images with cosign keyless from GitHub Actions.
@@ -18,7 +19,7 @@ Images built and published from this repository.
 - Pin deployments by digest. The image workflow resolves the digest of the
   image it just built and opens a PR that updates the consuming chart's
   `image.digest`; the tag stays as a human-readable build tag.
-- Prefer a simple, robust runtime copy over a hand-maintained library closure.
-  `ser2net` copies the full Debian multiarch library directory and all gensio
-  modules so a `dlopen()`ed dependency cannot be missed; optimize only when
-  there is a clear operational need.
+- Prefer a simple, robust runtime dependency set over a hand-maintained
+  library closure. `ser2net` uses Debian slim and lets `apt` own the package
+  and its dependencies: larger than distroless, but it cannot miss a
+  `dlopen()`ed library and is simpler to maintain.

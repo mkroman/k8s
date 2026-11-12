@@ -26,20 +26,16 @@ proxy:
 ## Image
 
 The image is built from [`images/ser2net/Dockerfile`](../images/ser2net/Dockerfile)
-in this repository. It is a multi-stage build:
+in this repository. It is a single-stage build on official
+`debian:13.7-slim` with the pinned package `ser2net=4.6.4-1`.
 
-- builder: official `debian:13.7-slim`, with the pinned package
-  `ser2net=4.6.4-1`;
-- runtime: `gcr.io/distroless/base-nossl-debian13:nonroot`, with the ser2net
-  binary, the full Debian multiarch library directory, and all gensio modules
-  copied in.
-
-The runtime copy is deliberately simple rather than a hand-maintained
-dependency closure, which could miss a `dlopen()`ed library. The image is
-larger than a curated copy, but it is more robust across ser2net/gensio
-updates. The distroless runtime has no shell or package manager.
-`static-debian13` is not usable here because ser2net and gensio are
-dynamically linked.
+This is deliberately a normal Debian image rather than distroless. The
+distroless variants do not contain ser2net or gensio, so they required copying
+the binary, the full multiarch library directory, and the gensio modules from
+a builder. The Debian package manager keeps that dependency set correct and
+the Dockerfile simple, at the cost of a larger image with a shell and package
+manager. The image is about 165 MB uncompressed and about 41 MB compressed for
+`linux/amd64`.
 
 ### Publishing and immutability
 
@@ -142,9 +138,9 @@ one (`kickolduser`), matching Zigbee2MQTT's exclusive use of the coordinator.
   device group through `supplementalGroups`. Privileged mode grants access to
   every device number, so keep this workload on the dedicated coordinator
   node and do not add anything else to the container.
-- The distroless runtime has no shell or package manager. It contains the
-  ser2net binary, the Debian multiarch library directory, and the gensio
-  modules.
+- The image is Debian slim, so it includes a shell and package manager. The
+  container still runs as UID 1000 with a read-only root filesystem; treat the
+  extra userland as attack surface and rebuild the image for package updates.
 - The Service is `ClusterIP`; the protocol is raw, unauthenticated serial data.
   Do not expose it with an Ingress, NodePort or LoadBalancer. If the bridge
   must cross an untrusted network, put an authenticated TLS tunnel in front

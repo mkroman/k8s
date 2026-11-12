@@ -1,6 +1,6 @@
 # Default values for the ser2net chart.
 #
-# The image is built from images/ser2net/Dockerfile on a distroless base and
+# The image is built from images/ser2net/Dockerfile on Debian slim and
 # published by .github/workflows/container-images.yaml. The chart defaults to
 # the `4.6.4-1` build tag; the image workflow's digest PR additionally pins the
 # exact image by digest for immutable deployments.
