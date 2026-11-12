@@ -40,14 +40,16 @@ manager. The image is about 165 MB uncompressed and about 41 MB compressed for
 ### Publishing and immutability
 
 `.github/workflows/container-images.yaml` runs when `images/ser2net/` changes,
-on manual dispatch, and on a weekly schedule for security updates. It builds
-`linux/amd64` and `linux/arm64` images on pull requests and publishes them on
-`main` and version tags. It pushes:
+on manual dispatch, and on a weekly schedule for security updates.
+`.github/workflows/container-images-release.yaml` additionally runs for
+image-specific release tags such as `ser2net-0.2.0`. It builds `linux/amd64`
+and `linux/arm64` images on pull requests and publishes them on `main` and
+release tags. It pushes:
 
 - `sha-<full commit sha>` — the immutable build tag;
 - `4.6.4-1` on `main` — the human-readable build tag (the digest pin takes
   precedence in the chart);
-- semver tags for `v*` releases.
+- the version from a `ser2net-<version>` release tag.
 
 Builds include SBOM and provenance attestations and are signed with cosign
 keyless. The weekly scheduled build passes `APT_UPGRADE=true`, disables the

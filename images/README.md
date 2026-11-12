@@ -2,9 +2,9 @@
 
 Images built and published from this repository.
 
-| Image | Dockerfile | Workflow | Consumer |
-| --- | --- | --- | --- |
-| `ghcr.io/mkroman/ser2net` | [`ser2net/Dockerfile`](ser2net/Dockerfile) | [`.github/workflows/container-images.yaml`](../.github/workflows/container-images.yaml) | [`ser2net`](../ser2net/) chart |
+| Image | Dockerfile | Release tag prefix | Workflow | Consumer |
+| --- | --- | --- | --- | --- |
+| `ghcr.io/mkroman/ser2net` | [`ser2net/Dockerfile`](ser2net/Dockerfile) | `ser2net-` | [`.github/workflows/container-images.yaml`](../.github/workflows/container-images.yaml) | [`ser2net`](../ser2net/) chart |
 
 ## Conventions
 
@@ -18,7 +18,11 @@ Images built and published from this repository.
   update consumers.
 - Sign published images with cosign keyless from GitHub Actions.
 - Always publish an immutable `sha-<full commit sha>` tag. Mutable convenience
-  tags are allowed only for bootstrap/release use.
+  tags are allowed only for bootstrap use.
+- Release tags are image-specific and have no shared `v` prefix, for example
+  `ser2net-0.2.0`. A single repository-wide version tag cannot identify which
+  image and version it refers to. Add a matching prefix, trigger, and matrix
+  entry when adding another image.
 - Pin deployments by digest. The image workflow resolves the digest of the
   image it just built and opens a PR that updates the consuming chart's
   `image.digest`; the tag stays as a human-readable build tag.

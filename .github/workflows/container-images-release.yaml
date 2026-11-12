@@ -1,0 +1,26 @@
+name: Container image releases
+
+on:
+  push:
+    # Image-specific release tags, e.g. ser2net-0.2.0. Do not use a shared v*
+    # tag: each image has its own version line.
+    tags:
+      - "ser2net-*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: container-images-release-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ser2net:
+    name: Release ser2net
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    # actionlint 1.7.12 does not understand GitHub's newer $/ self-repository
+    # syntax yet, so keep the workspace-relative form.
+    uses: ./.github/workflows/container-images.yaml # zizmor: ignore[self-repository]
