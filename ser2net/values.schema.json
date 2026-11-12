@@ -1,0 +1,163 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "ser2net chart values",
+  "type": "object",
+  "required": [
+    "image",
+    "service",
+    "serial",
+    "podSecurityContext",
+    "securityContext",
+    "resources",
+    "networkPolicy"
+  ],
+  "properties": {
+    "global": {
+      "type": "object"
+    },
+    "nameOverride": {
+      "type": "string"
+    },
+    "fullnameOverride": {
+      "type": "string"
+    },
+    "image": {
+      "type": "object",
+      "required": [
+        "repository",
+        "tag"
+      ],
+      "properties": {
+        "repository": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tag": {
+          "type": "string"
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^$|^sha256:[a-f0-9]{64}$",
+          "description": "Pin the image by digest; replaces tag when set."
+        },
+        "pullPolicy": {
+          "type": "string",
+          "enum": [
+            "Always",
+            "IfNotPresent",
+            "Never"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "imagePullSecrets": {
+      "type": "array"
+    },
+    "replicaCount": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1
+    },
+    "service": {
+      "type": "object",
+      "required": [
+        "type",
+        "port"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "ClusterIP",
+            "NodePort",
+            "LoadBalancer"
+          ]
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        }
+      },
+      "additionalProperties": false
+    },
+    "serial": {
+      "type": "object",
+      "required": [
+        "devicePath",
+        "hostPathType",
+        "settings",
+        "groupId",
+        "local"
+      ],
+      "properties": {
+        "devicePath": {
+          "type": "string",
+          "pattern": "^/"
+        },
+        "hostPathType": {
+          "type": "string"
+        },
+        "settings": {
+          "type": "string",
+          "minLength": 1
+        },
+        "groupId": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "local": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "nodeSelector": {
+      "type": "object"
+    },
+    "tolerations": {
+      "type": "array"
+    },
+    "affinity": {
+      "type": "object"
+    },
+    "podAnnotations": {
+      "type": "object"
+    },
+    "podLabels": {
+      "type": "object"
+    },
+    "podSecurityContext": {
+      "type": "object"
+    },
+    "securityContext": {
+      "type": "object"
+    },
+    "resources": {
+      "type": "object"
+    },
+    "networkPolicy": {
+      "type": "object",
+      "required": [
+        "enabled",
+        "clientNamespace"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "clientNamespace": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "terminationGracePeriodSeconds": {
+      "type": "integer",
+      "minimum": 0
+    }
+  },
+  "additionalProperties": false
+}

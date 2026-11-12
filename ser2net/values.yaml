@@ -1,0 +1,107 @@
+# Default values for the ser2net chart.
+#
+# The image is built from images/ser2net/Dockerfile on Debian slim and
+# published by .github/workflows/container-images.yaml. The chart defaults to
+# the `4.6.4-1` build tag; the image workflow's digest PR additionally pins the
+# exact image by digest for immutable deployments.
+#
+# ser2net documentation:
+#   https://github.com/cminyard/ser2net
+#   ser2net.yaml(5), ser2net(8)
+
+nameOverride: ""
+fullnameOverride: ""
+
+image:
+  repository: ghcr.io/mkroman/ser2net
+  # -- Build tag published by the image workflow. Ignored when `digest` is set.
+  tag: "4.6.4-1"
+  # -- Pin the image by digest; replaces the tag when set. The image workflow
+  #    opens a PR that sets this to the digest of the built image.
+  digest: ""
+  pullPolicy: IfNotPresent
+
+# -- List of image pull secrets for private registries.
+imagePullSecrets: []
+
+# -- Number of bridge replicas. Zigbee2MQTT needs exclusive access to the
+#    coordinator, so keep this at one.
+replicaCount: 1
+
+service:
+  # -- Keep the bridge cluster-internal. The protocol is raw, unauthenticated
+  #    serial data and must not be exposed outside the cluster.
+  type: ClusterIP
+  # -- TCP port Zigbee2MQTT connects to (`tcp://<host>:<port>`).
+  port: 6638
+
+serial:
+  # -- Host serial device. Prefer the stable /dev/serial/by-id/... path once
+  #    it is known on the selected node. Keep the device node on the node at
+  #    this path; the chart mounts it into the container.
+  devicePath: /dev/ttyUSB0
+  # -- hostPath type. Use CharDevice for a device node, or leave empty to
+  #    accept any existing path (for example a symlink).
+  hostPathType: CharDevice
+  # -- ser2net serialdev settings: baud rate, parity, data bits and stop bits.
+  #    A Z-Stack coordinator uses 115200 8N1.
+  settings: "115200n81"
+  # -- GID with access to the device on the node. Debian and Ubuntu use 20
+  #    (dialout); verify with `stat -c %g /dev/ttyUSB0`.
+  groupId: 20
+  # -- Ignore modem control lines. USB serial adapters generally do not
+  #    provide DCD/DSR, so this should stay enabled.
+  local: true
+
+# -- Node selector for the USB coordinator. The node-feature-discovery chart
+#    sets this label for the Silicon Labs CC2652RB adapter.
+nodeSelector:
+  feature.node.kubernetes.io/zigbee-coordinator: "true"
+
+tolerations: []
+affinity: {}
+
+podAnnotations: {}
+podLabels: {}
+
+# -- Pod-level security context. fsGroup makes the writable runtime mounts
+#    usable; `serial.groupId` is added to supplementalGroups by the Deployment
+#    template.
+podSecurityContext:
+  runAsUser: 1000
+  runAsGroup: 1000
+  runAsNonRoot: true
+  fsGroup: 1000
+  fsGroupChangePolicy: OnRootMismatch
+  seccompProfile:
+    type: RuntimeDefault
+
+# -- Container security context. The hostPath device is not added to the
+#    container device cgroup, so this one small process must be privileged to
+#    open it. It still runs as UID 1000, keeps a read-only root filesystem,
+#    and uses the device's group. Do not add capabilities here: a privileged
+#    container ignores the allowlist.
+securityContext:
+  privileged: true
+  allowPrivilegeEscalation: true
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+
+resources:
+  requests:
+    cpu: 10m
+    memory: 32Mi
+  limits:
+    cpu: 200m
+    memory: 128Mi
+
+networkPolicy:
+  # -- Restrict the bridge to the Zigbee2MQTT namespace.
+  enabled: true
+  # -- Namespace allowed to connect to the serial port.
+  clientNamespace: zigbee2mqtt
+
+# -- Grace period for ser2net to close the serial port and TCP connection.
+terminationGracePeriodSeconds: 10

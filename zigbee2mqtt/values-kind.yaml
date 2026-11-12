@@ -44,6 +44,10 @@ config:
     port: tcp://127.0.0.1:6638
     adapter: zstack
 
+networkPolicy:
+  # The e2e cluster has no ser2net bridge; the emulator is pod-local.
+  ser2netNamespace: ""
+
 # PostSync probe: subscribe to the bridge state topic on the e2e broker and
 # fail the Argo CD sync unless Zigbee2MQTT published its retained online
 # message (see templates/e2e/probe.yaml).

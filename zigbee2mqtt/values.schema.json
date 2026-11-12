@@ -162,7 +162,7 @@
     },
     "secret": {
       "type": "object",
-      "description": "Empty name disables the secret mount entirely (e2e anonymous MQTT).",
+      "description": "Empty name disables the secret mount and the committed SealedSecret template (e2e anonymous MQTT).",
       "properties": {
         "name": {
           "type": "string"
@@ -177,7 +177,8 @@
       "type": "object",
       "required": [
         "devicePath",
-        "groupId"
+        "groupId",
+        "privileged"
       ],
       "properties": {
         "devicePath": {
@@ -190,6 +191,10 @@
         "groupId": {
           "type": "integer",
           "minimum": 1
+        },
+        "privileged": {
+          "type": "boolean",
+          "description": "Run the Zigbee2MQTT container privileged when devicePath is set. A hostPath device is not added to the container device-cgroup allowlist, so an unprivileged container gets EPERM. Disable only when a device plugin or CDI allocates the device. Ignored when devicePath is empty."
         },
         "emulator": {
           "type": "object",

@@ -47,12 +47,16 @@ Helm chart for Applications sourced from external Git repositories.
 | quickwit                    | [`quickwit`](quickwit/)                         | [![App Status](https://argo-cd.infra.rwx.im/api/badge?name=quickwit)](https://argo-cd.infra.rwx.im/applications/quickwit) |
 | redis                       | [`redis`](redis/)                               | [![App Status](https://argo-cd.infra.rwx.im/api/badge?name=redis)](https://argo-cd.infra.rwx.im/applications/redis) |
 | sealed-secrets              | [`sealed-secrets`](sealed-secrets/)              | [![App Status](https://argo-cd.infra.rwx.im/api/badge?name=sealed-secrets)](https://argo-cd.infra.rwx.im/applications/sealed-secrets) |
+| ser2net                     | [`ser2net`](ser2net/)                           | [![App Status](https://argo-cd.infra.rwx.im/api/badge?name=ser2net)](https://argo-cd.infra.rwx.im/applications/ser2net) |
 | spegel                      | [`spegel`](spegel/)                              | [![App Status](https://argo-cd.infra.rwx.im/api/badge?name=spegel)](https://argo-cd.infra.rwx.im/applications/spegel) |
 | traefik                     | [`traefik`](traefik/)                           | [![App Status](https://argo-cd.infra.rwx.im/api/badge?name=traefik)](https://argo-cd.infra.rwx.im/applications/traefik) |
 | vector-agent                | [`vector`](vector/)                             | [![App Status](https://argo-cd.infra.rwx.im/api/badge?name=vector-agent)](https://argo-cd.infra.rwx.im/applications/vector-agent) |
 | vector-aggregator           | [`vector`](vector/)                             | [![App Status](https://argo-cd.infra.rwx.im/api/badge?name=vector-aggregator)](https://argo-cd.infra.rwx.im/applications/vector-aggregator) |
 | zeta                        | [`zeta`](zeta/)                                 | [![App Status](https://argo-cd.infra.rwx.im/api/badge?name=zeta)](https://argo-cd.infra.rwx.im/applications/zeta) |
 | zigbee2mqtt                 | [`zigbee2mqtt`](zigbee2mqtt/)                   | [![App Status](https://argo-cd.infra.rwx.im/api/badge?name=zigbee2mqtt)](https://argo-cd.infra.rwx.im/applications/zigbee2mqtt) |
+
+Container images built from this repository are documented in
+[`images/README.md`](images/README.md).
 
 ### External apps
 

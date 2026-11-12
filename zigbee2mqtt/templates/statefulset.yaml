@@ -3,6 +3,23 @@
 {{- if .Values.coordinator.devicePath }}
 {{- $_ := set $podSecurityContext "supplementalGroups" (list .Values.coordinator.groupId) }}
 {{- end }}
+{{- /*
+  A hostPath volume only binds the device node into the container; it does not
+  add the device number to the container's device-cgroup allowlist. Kubernetes
+  has no per-device pod API, so runc/containerd denies open(2) with EPERM
+  unless the container is privileged or a device plugin/CDI allocated the
+  device. A privileged container grants access to every device number, so keep
+  it scoped to the only container that talks to the coordinator. The init
+  container, emulator sidecar, and e2e probe stay unprivileged.
+*/}}
+{{- $containerSecurityContext := deepCopy .Values.securityContext }}
+{{- if and .Values.coordinator.devicePath .Values.coordinator.privileged }}
+{{- $_ := set $containerSecurityContext "privileged" true }}
+{{- /* Kubernetes rejects privileged with allowPrivilegeEscalation=false. */}}
+{{- $_ := set $containerSecurityContext "allowPrivilegeEscalation" true }}
+{{- /* A capability drop list is contradictory in privileged mode and does not gate device access. */}}
+{{- $_ := unset $containerSecurityContext "capabilities" }}
+{{- end }}
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -87,7 +104,7 @@ spec:
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           securityContext:
-            {{- toYaml .Values.securityContext | nindent 12 }}
+            {{- toYaml $containerSecurityContext | nindent 12 }}
           env:
             - name: TZ
               value: {{ .Values.timezone | quote }}

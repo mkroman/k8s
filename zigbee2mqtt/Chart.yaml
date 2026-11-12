@@ -2,8 +2,9 @@ apiVersion: v2
 name: zigbee2mqtt
 description: >-
   Zigbee2MQTT (Zigbee to MQTT bridge) on Kubernetes, following the official
-  container and configuration documentation. Requires a USB Zigbee coordinator
-  passed through from the node selected by the zigbee-coordinator NFD label.
+  container and configuration documentation. Reaches the USB coordinator
+  through the ser2net TCP bridge by default, with an optional direct hostPath
+  mode for the node selected by the zigbee-coordinator NFD label.
 type: application
 version: 0.1.0
 # renovate: datasource=github-releases depName=Koenkk/zigbee2mqtt

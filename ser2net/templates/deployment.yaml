@@ -1,0 +1,95 @@
+{{- /* The device group is only needed for the real serial device. */}}
+{{- $podSecurityContext := deepCopy .Values.podSecurityContext }}
+{{- $_ := set $podSecurityContext "supplementalGroups" (list .Values.serial.groupId) }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "ser2net.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "ser2net.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      {{- include "ser2net.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "ser2net.selectorLabels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml $podSecurityContext | nindent 8 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: ser2net
+          image: {{ include "ser2net.image" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          ports:
+            - name: serial
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          # No readiness/liveness probes: any TCP probe opens a real ser2net
+          # connection. With max-connections: 1 and kickolduser enabled, a
+          # probe would kick the active Zigbee2MQTT connection (or block it).
+          # The container exits if ser2net fails; Zigbee2MQTT retries the TCP
+          # connection while the bridge restarts.
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/ser2net
+              readOnly: true
+            - name: coordinator
+              mountPath: {{ .Values.serial.devicePath }}
+            - name: tmp
+              mountPath: /tmp
+            # ser2net takes UUCP locks under /var/lock; some distributions
+            # symlink it to /run/lock. Provide both because the image root
+            # filesystem is read-only.
+            - name: lock
+              mountPath: /var/lock
+            - name: lock
+              mountPath: /run/lock
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "ser2net.fullname" . }}
+        - name: coordinator
+          hostPath:
+            path: {{ .Values.serial.devicePath }}
+            {{- with .Values.serial.hostPathType }}
+            type: {{ . }}
+            {{- end }}
+        - name: tmp
+          emptyDir: {}
+        - name: lock
+          emptyDir: {}

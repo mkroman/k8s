@@ -1,0 +1,18 @@
+ser2net has been deployed.
+
+It exposes the coordinator on the node labelled:
+
+  feature.node.kubernetes.io/zigbee-coordinator=true
+
+Zigbee2MQTT should point at the bridge with:
+
+  config.serial.port: tcp://{{ include "ser2net.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.service.port }}
+
+The serial device is {{ .Values.serial.devicePath }}. The ser2net container
+must be privileged because a hostPath character device is not added to the
+container device cgroup; it still runs as UID 1000 with supplemental group
+{{ .Values.serial.groupId }}.
+
+The image is {{ include "ser2net.image" . }}.
+The raw TCP stream is unauthenticated. Keep the Service cluster-internal and
+restrict the client namespace in networkPolicy.clientNamespace.
