@@ -14,7 +14,8 @@ Images built and published from this repository.
 - Publish multi-arch images (`linux/amd64`, `linux/arm64`) with BuildKit cache,
   SBOM, and provenance attestations.
 - Run a weekly scheduled rebuild that applies Debian security updates
-  (`APT_UPGRADE=true`), then let the digest PR update consumers.
+  (`APT_UPGRADE=true`) with the build cache disabled, then let the digest PR
+  update consumers.
 - Sign published images with cosign keyless from GitHub Actions.
 - Always publish an immutable `sha-<full commit sha>` tag. Mutable convenience
   tags are allowed only for bootstrap/release use.

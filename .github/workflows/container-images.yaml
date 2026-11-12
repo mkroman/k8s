@@ -84,6 +84,11 @@ jobs:
             APT_UPGRADE=${{ github.event_name == 'schedule' }}
           sbom: true
           provenance: mode=max
+          # Scheduled security builds must execute apt-get update/upgrade
+          # against current repository metadata, not reuse cached layers or a
+          # locally cached base image.
+          no-cache: ${{ github.event_name == 'schedule' }}
+          pull: ${{ github.event_name == 'schedule' }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 

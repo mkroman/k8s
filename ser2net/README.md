@@ -50,9 +50,11 @@ on manual dispatch, and on a weekly schedule for security updates. It builds
 - semver tags for `v*` releases.
 
 Builds include SBOM and provenance attestations and are signed with cosign
-keyless. The weekly scheduled build passes `APT_UPGRADE=true`, so the image
-picks up current Debian security updates for the base packages and the
-installed ser2net package, even when this repository has not changed. The
+keyless. The weekly scheduled build passes `APT_UPGRADE=true`, disables the
+Docker build cache, and forces the base image to be pulled, so it executes
+`apt-get update`/`upgrade` against current repository metadata and picks up
+Debian security updates for the base packages and the installed ser2net
+package, even when this repository has not changed. The
 workflow's follow-up job resolves the digest of the new image and opens a PR
 that sets `image.digest` in `values.yaml`. Once that PR is merged, the
 Deployment uses `repository@sha256:...` and is immutable; `image.tag` is kept
