@@ -178,6 +178,11 @@ been run against a physical coordinator.
 
 ## Known gaps
 
+- No readiness or liveness probes. Any TCP probe opens a real ser2net
+  connection; with `max-connections: 1` and `kickolduser: true` it would kick
+  the active Zigbee2MQTT connection or block it. Kubernetes restarts the
+  container if ser2net exits, and Zigbee2MQTT retries the TCP connection while
+  the bridge restarts.
 - No e2e entry: kind has no USB serial device. Zigbee2MQTT's e2e uses the
   in-pod coordinator emulator instead.
 - ser2net logs a harmless `Unable to start mdns: Out of memory` line at

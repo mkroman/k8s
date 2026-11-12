@@ -57,14 +57,11 @@ spec:
             - name: serial
               containerPort: {{ .Values.service.port }}
               protocol: TCP
-          readinessProbe:
-            tcpSocket:
-              port: serial
-            periodSeconds: {{ .Values.probes.readiness.periodSeconds }}
-          livenessProbe:
-            tcpSocket:
-              port: serial
-            periodSeconds: {{ .Values.probes.liveness.periodSeconds }}
+          # No readiness/liveness probes: any TCP probe opens a real ser2net
+          # connection. With max-connections: 1 and kickolduser enabled, a
+          # probe would kick the active Zigbee2MQTT connection (or block it).
+          # The container exits if ser2net fails; Zigbee2MQTT retries the TCP
+          # connection while the bridge restarts.
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:

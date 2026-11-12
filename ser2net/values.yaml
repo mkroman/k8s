@@ -97,12 +97,6 @@ resources:
     cpu: 200m
     memory: 128Mi
 
-probes:
-  readiness:
-    periodSeconds: 10
-  liveness:
-    periodSeconds: 30
-
 networkPolicy:
   # -- Restrict the bridge to the Zigbee2MQTT namespace.
   enabled: true

@@ -9,7 +9,6 @@
     "podSecurityContext",
     "securityContext",
     "resources",
-    "probes",
     "networkPolicy"
   ],
   "properties": {
@@ -137,42 +136,6 @@
     },
     "resources": {
       "type": "object"
-    },
-    "probes": {
-      "type": "object",
-      "required": [
-        "readiness",
-        "liveness"
-      ],
-      "properties": {
-        "readiness": {
-          "type": "object",
-          "required": [
-            "periodSeconds"
-          ],
-          "properties": {
-            "periodSeconds": {
-              "type": "integer",
-              "minimum": 1
-            }
-          },
-          "additionalProperties": false
-        },
-        "liveness": {
-          "type": "object",
-          "required": [
-            "periodSeconds"
-          ],
-          "properties": {
-            "periodSeconds": {
-              "type": "integer",
-              "minimum": 1
-            }
-          },
-          "additionalProperties": false
-        }
-      },
-      "additionalProperties": false
     },
     "networkPolicy": {
       "type": "object",
