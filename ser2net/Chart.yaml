@@ -6,6 +6,9 @@ description: >-
   TCP, so the application itself does not need hostPath or privileged access.
 type: application
 version: 0.1.0
+# Keep appVersion, SER2NET_VERSION in .github/workflows/container-images.yaml,
+# and image.tag in values.yaml in sync. Renovate tracks upstream releases, but
+# the Debian package revision must be checked before bumping all three.
 # renovate: datasource=github-releases depName=cminyard/ser2net
 appVersion: "4.6.4"
 kubeVersion: ">=1.26.0-0"
@@ -14,6 +17,7 @@ home: https://github.com/cminyard/ser2net
 sources:
   - https://github.com/cminyard/ser2net
   - https://github.com/cminyard/gensio
+  - https://github.com/mkroman/k8s/tree/main/images/ser2net
 keywords:
   - ser2net
   - serial
@@ -23,5 +27,5 @@ maintainers:
 annotations:
   artifacthub.io/license: GPL-2.0-only
   artifacthub.io/images: |
-    - name: debian
-      image: docker.io/library/debian:13.7-slim
+    - name: ser2net
+      image: ghcr.io/mkroman/ser2net:4.6.4-1

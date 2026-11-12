@@ -4,12 +4,10 @@
   "type": "object",
   "required": [
     "image",
-    "ser2net",
     "service",
     "serial",
     "podSecurityContext",
     "securityContext",
-    "installSecurityContext",
     "resources",
     "probes",
     "networkPolicy"
@@ -36,8 +34,12 @@
           "minLength": 1
         },
         "tag": {
+          "type": "string"
+        },
+        "digest": {
           "type": "string",
-          "minLength": 1
+          "pattern": "^$|^sha256:[a-f0-9]{64}$",
+          "description": "Pin the image by digest; replaces tag when set."
         },
         "pullPolicy": {
           "type": "string",
@@ -52,24 +54,6 @@
     },
     "imagePullSecrets": {
       "type": "array"
-    },
-    "ser2net": {
-      "type": "object",
-      "required": [
-        "version",
-        "root"
-      ],
-      "properties": {
-        "version": {
-          "type": "string",
-          "minLength": 1
-        },
-        "root": {
-          "type": "string",
-          "pattern": "^/"
-        }
-      },
-      "additionalProperties": false
     },
     "replicaCount": {
       "type": "integer",
@@ -103,6 +87,7 @@
       "type": "object",
       "required": [
         "devicePath",
+        "hostPathType",
         "settings",
         "groupId",
         "local"
@@ -111,6 +96,9 @@
         "devicePath": {
           "type": "string",
           "pattern": "^/"
+        },
+        "hostPathType": {
+          "type": "string"
         },
         "settings": {
           "type": "string",
@@ -145,9 +133,6 @@
       "type": "object"
     },
     "securityContext": {
-      "type": "object"
-    },
-    "installSecurityContext": {
       "type": "object"
     },
     "resources": {
@@ -193,8 +178,7 @@
       "type": "object",
       "required": [
         "enabled",
-        "clientNamespace",
-        "allowPackageDownload"
+        "clientNamespace"
       ],
       "properties": {
         "enabled": {
@@ -203,9 +187,6 @@
         "clientNamespace": {
           "type": "string",
           "minLength": 1
-        },
-        "allowPackageDownload": {
-          "type": "boolean"
         }
       },
       "additionalProperties": false

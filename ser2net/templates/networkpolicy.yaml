@@ -22,20 +22,6 @@ spec:
       ports:
         - protocol: TCP
           port: {{ .Values.service.port }}
-  egress:
-    {{- if .Values.networkPolicy.allowPackageDownload }}
-    # DNS, plus Debian archive access for the install init container. This is
-    # broad by destination because the policy cannot select only init
-    # containers; it is limited to the ports apt needs.
-    - ports:
-        - protocol: UDP
-          port: 53
-        - protocol: TCP
-          port: 53
-    - ports:
-        - protocol: TCP
-          port: 80
-        - protocol: TCP
-          port: 443
-    {{- end }}
+  # ser2net only accepts connections; it never initiates one.
+  egress: []
 {{- end }}

@@ -1,10 +1,9 @@
 # Default values for the ser2net chart.
 #
-# The bridge intentionally uses only the official Debian image and the Debian
-# ser2net package. There is no official ser2net container image; instead an
-# init container downloads the pinned package and extracts it into a shared
-# emptyDir, and the main container runs that binary as UID 1000. This keeps
-# the supply chain limited to Docker Official Images and Debian's archive.
+# The image is built from images/ser2net/Dockerfile on a distroless base and
+# published by .github/workflows/container-images.yaml. The chart defaults to
+# the `4.6.4-1` build tag; the image workflow's digest PR additionally pins the
+# exact image by digest for immutable deployments.
 #
 # ser2net documentation:
 #   https://github.com/cminyard/ser2net
@@ -14,25 +13,16 @@ nameOverride: ""
 fullnameOverride: ""
 
 image:
-  # -- Docker Official Image, used by both the install init container and the
-  #    ser2net container. Keep the Debian suite in sync with
-  #    `ser2net.version` below.
-  repository: docker.io/library/debian
-  # renovate: datasource=docker depName=debian
-  tag: "13.7-slim"
+  repository: ghcr.io/mkroman/ser2net
+  # -- Build tag published by the image workflow. Ignored when `digest` is set.
+  tag: "4.6.4-1"
+  # -- Pin the image by digest; replaces the tag when set. The image workflow
+  #    opens a PR that sets this to the digest of the built image.
+  digest: ""
   pullPolicy: IfNotPresent
 
 # -- List of image pull secrets for private registries.
 imagePullSecrets: []
-
-# -- Debian package installed by the init container. Pin the version so the
-#    extracted userspace does not change between Pod restarts. Check the
-#    available version with `apt-cache policy ser2net` inside the image.
-ser2net:
-  version: "4.6.4-1"
-  # -- Directory in the shared emptyDir where ser2net and its dependencies
-  #    are extracted. The main container runs the binary from here.
-  root: /ser2net-root
 
 # -- Number of bridge replicas. Zigbee2MQTT needs exclusive access to the
 #    coordinator, so keep this at one.
@@ -48,8 +38,11 @@ service:
 serial:
   # -- Host serial device. Prefer the stable /dev/serial/by-id/... path once
   #    it is known on the selected node. Keep the device node on the node at
-  #    this path; the chart does not create it.
+  #    this path; the chart mounts it into the container.
   devicePath: /dev/ttyUSB0
+  # -- hostPath type. Use CharDevice for a device node, or leave empty to
+  #    accept any existing path (for example a symlink).
+  hostPathType: CharDevice
   # -- ser2net serialdev settings: baud rate, parity, data bits and stop bits.
   #    A Z-Stack coordinator uses 115200 8N1.
   settings: "115200n81"
@@ -71,9 +64,9 @@ affinity: {}
 podAnnotations: {}
 podLabels: {}
 
-# -- Pod-level security context. fsGroup makes the extracted package tree
-#    readable by the unprivileged ser2net process; `serial.groupId` is added
-#    to supplementalGroups by the Deployment template.
+# -- Pod-level security context. fsGroup makes the writable runtime mounts
+#    usable; `serial.groupId` is added to supplementalGroups by the Deployment
+#    template.
 podSecurityContext:
   runAsUser: 1000
   runAsGroup: 1000
@@ -96,14 +89,6 @@ securityContext:
   runAsUser: 1000
   runAsGroup: 1000
 
-# -- The install init container needs root for apt-get/dpkg-deb. It has no
-#    device access and writes only to the shared emptyDir.
-installSecurityContext:
-  allowPrivilegeEscalation: false
-  runAsNonRoot: false
-  runAsUser: 0
-  runAsGroup: 0
-
 resources:
   requests:
     cpu: 10m
@@ -119,15 +104,10 @@ probes:
     periodSeconds: 30
 
 networkPolicy:
-  # -- Restrict the bridge to the Zigbee2MQTT namespace and the package
-  #    download used by the init container.
+  # -- Restrict the bridge to the Zigbee2MQTT namespace.
   enabled: true
   # -- Namespace allowed to connect to the serial port.
   clientNamespace: zigbee2mqtt
-  # -- Allow DNS and HTTP(S) egress so the init container can download the
-  #    pinned Debian package. Disable if the package is available from a
-  #    local mirror or the image is pre-baked.
-  allowPackageDownload: true
 
 # -- Grace period for ser2net to close the serial port and TCP connection.
 terminationGracePeriodSeconds: 10

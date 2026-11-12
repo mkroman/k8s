@@ -37,3 +37,12 @@ app.kubernetes.io/managed-by: {{ .Release.Service | quote }}
 app.kubernetes.io/name: {{ include "ser2net.name" . | quote }}
 app.kubernetes.io/instance: {{ .Release.Name | quote }}
 {{- end -}}
+
+{{/* Render repository@digest when pinned, otherwise repository:tag. */}}
+{{- define "ser2net.image" -}}
+{{- if .Values.image.digest -}}
+{{- printf "%s@%s" .Values.image.repository .Values.image.digest -}}
+{{- else -}}
+{{- printf "%s:%s" .Values.image.repository (.Values.image.tag | default .Chart.AppVersion) -}}
+{{- end -}}
+{{- end -}}

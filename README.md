@@ -55,6 +55,9 @@ Helm chart for Applications sourced from external Git repositories.
 | zeta                        | [`zeta`](zeta/)                                 | [![App Status](https://argo-cd.infra.rwx.im/api/badge?name=zeta)](https://argo-cd.infra.rwx.im/applications/zeta) |
 | zigbee2mqtt                 | [`zigbee2mqtt`](zigbee2mqtt/)                   | [![App Status](https://argo-cd.infra.rwx.im/api/badge?name=zigbee2mqtt)](https://argo-cd.infra.rwx.im/applications/zigbee2mqtt) |
 
+Container images built from this repository are documented in
+[`images/README.md`](images/README.md).
+
 ### External apps
 
 | App                         | Source                                                            | Status |

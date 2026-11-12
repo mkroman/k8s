@@ -23,24 +23,49 @@ proxy:
 - the bridge is reachable only from the configured client namespace over
   ClusterIP.
 
-## Trusted image
+## Image
 
-There is no official ser2net container image. This chart deliberately avoids
-third-party images:
+The image is built from [`images/ser2net/Dockerfile`](../images/ser2net/Dockerfile)
+in this repository. It is a multi-stage build:
 
-- the only image is the Docker Official Image
-  `docker.io/library/debian:13.7-slim`;
-- an init container downloads the pinned Debian package
-  `ser2net=4.6.4-1` with `apt-get --download-only` and extracts it, together
-  with its Debian dependencies, into a shared `emptyDir`;
-- the main container runs that binary as UID 1000 with a read-only root
-  filesystem.
+- builder: official `debian:13.7-slim`, with the pinned package
+  `ser2net=4.6.4-1`;
+- runtime: `gcr.io/distroless/base-nossl-debian13:nonroot`, with only the
+  ser2net binary, the `net`, `serialdev`, and `mdns` gensio modules, and their
+  shared-library closure copied in.
 
-The init container needs egress to the Debian archive on every Pod start.
-`networkPolicy.allowPackageDownload` allows DNS plus TCP 80/443 for that.
-Disable it only if the package is supplied by a local mirror or a future
-prebuilt image. If the cluster has no archive access, this chart will not
-start; build a pinned image from the same Debian package instead.
+The distroless runtime has no shell, package manager, or SSL modules. The
+`base-nossl` variant is used instead of `base-debian13` because the bridge only
+speaks raw TCP; SSL support would add OpenSSL for no benefit. `static-debian13`
+is not usable here because ser2net and gensio are dynamically linked.
+
+### Publishing and immutability
+
+`.github/workflows/container-images.yaml` builds `linux/amd64` and
+`linux/arm64` images on pull requests and publishes them on `main` and version
+tags. It pushes:
+
+- `sha-<full commit sha>` — the immutable build tag;
+- `4.6.4-1` on `main` — the human-readable build tag (the digest pin takes
+  precedence in the chart);
+- semver tags for `v*` releases.
+
+Builds include SBOM and provenance attestations and are signed with cosign
+keyless. The workflow's follow-up job resolves the digest of the new image and
+opens a PR that sets `image.digest` in `values.yaml`. Once that PR is merged,
+the Deployment uses `repository@sha256:...` and is immutable; `image.tag` is
+kept as the human-readable build tag.
+
+Verify a published image:
+
+```bash
+cosign verify \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  --certificate-identity-regexp 'https://github.com/mkroman/k8s/.github/workflows/container-images.yaml@.*' \
+  ghcr.io/mkroman/ser2net@sha256:<digest>
+```
+
+If the GHCR package is private, set `imagePullSecrets` in the chart.
 
 ## Components
 
@@ -49,7 +74,7 @@ start; build a pinned image from the same Debian package instead.
 | Deployment | One ser2net process, pinned to the coordinator node |
 | ConfigMap | `ser2net.yaml`: raw TCP listener and serial device |
 | Service | ClusterIP endpoint consumed by Zigbee2MQTT |
-| NetworkPolicy | Ingress only from the client namespace; DNS/HTTP(S) egress for the package install |
+| NetworkPolicy | Ingress only from the client namespace; no egress |
 
 ## Prerequisites
 
@@ -59,7 +84,8 @@ start; build a pinned image from the same Debian package instead.
   Labs CC2652RB adapter.
 - The serial device at `serial.devicePath` (default `/dev/ttyUSB0`). Prefer
   the stable `/dev/serial/by-id/...` path once it is known; keep the
-  corresponding `/dev/serial/by-id` symlink on the node.
+  corresponding `/dev/serial/by-id` symlink on the node (leave
+  `serial.hostPathType` empty for a symlink).
 - The device's group GID. Debian and Ubuntu use 20 (`dialout`); verify with
   `stat -c %g /dev/ttyUSB0` and set `serial.groupId`.
 - Zigbee2MQTT configured with
@@ -70,8 +96,14 @@ start; build a pinned image from the same Debian package instead.
 ## Configuration
 
 ```yaml
+image:
+  repository: ghcr.io/mkroman/ser2net
+  tag: "4.6.4-1"
+  digest: ""          # set by the image workflow's digest PR
+
 serial:
   devicePath: /dev/ttyUSB0
+  hostPathType: CharDevice
   settings: "115200n81"
   groupId: 20
   local: true
@@ -108,9 +140,8 @@ one (`kickolduser`), matching Zigbee2MQTT's exclusive use of the coordinator.
   device group through `supplementalGroups`. Privileged mode grants access to
   every device number, so keep this workload on the dedicated coordinator
   node and do not add anything else to the container.
-- The init container runs as root only to run `apt-get` and `dpkg-deb`. It has
-  no device mount, no service-account token and no privileges beyond the
-  default container capabilities.
+- The distroless runtime has no shell or package manager. Only the ser2net
+  binary, three gensio modules, and their library closure are present.
 - The Service is `ClusterIP`; the protocol is raw, unauthenticated serial data.
   Do not expose it with an Ingress, NodePort or LoadBalancer. If the bridge
   must cross an untrusted network, put an authenticated TLS tunnel in front
@@ -122,6 +153,7 @@ one (`kickolduser`), matching Zigbee2MQTT's exclusive use of the coordinator.
 ## Validation
 
 ```bash
+docker build -t ser2net:test images/ser2net
 helm lint ser2net
 helm template ser2net ser2net --namespace ser2net > /tmp/ser2net.yaml
 kubeconform -strict -summary /tmp/ser2net.yaml
@@ -130,19 +162,18 @@ yamllint --no-warnings --config-file hack/ci/yamllint.yaml \
 ./hack/ci/validate-helm.sh ser2net
 ```
 
-The rendered chart has been exercised against the real Debian package and a
-PTY pair: ser2net carried data in both directions between a TCP client and the
-serial device. The chart has not been run against a physical coordinator.
+The image has been exercised with a real PTY pair: ser2net carried data in
+both directions between a TCP client and the serial device. The chart has not
+been run against a physical coordinator.
 
 ## Known gaps
 
 - No e2e entry: kind has no USB serial device. Zigbee2MQTT's e2e uses the
   in-pod coordinator emulator instead.
-- The package install requires archive access at Pod start, as described above.
 - ser2net logs a harmless `Unable to start mdns: Out of memory` line at
   startup. gensio initializes its optional mDNS backend before per-port
-  settings are applied; there is no avahi in the container. The message is
-  not an OOM and does not affect raw TCP.
+  settings are applied; there is no avahi daemon in the container. The message
+  is not an OOM and does not affect raw TCP.
 - Raw TCP loses USB modem-control semantics (DTR/RTS). If the coordinator
   needs them for a reset or bootloader path, test it or use a device plugin
   instead.
