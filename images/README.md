@@ -18,6 +18,7 @@ Images built and published from this repository.
 - Pin deployments by digest. The image workflow resolves the digest of the
   image it just built and opens a PR that updates the consuming chart's
   `image.digest`; the tag stays as a human-readable build tag.
-- Keep the image's runtime as small as the application allows. For `ser2net`,
-  the `base-nossl` distroless variant is used because the bridge only needs
-  raw TCP; SSL support would add OpenSSL for no benefit.
+- Prefer a simple, robust runtime copy over a hand-maintained library closure.
+  `ser2net` copies the full Debian multiarch library directory and all gensio
+  modules so a `dlopen()`ed dependency cannot be missed; optimize only when
+  there is a clear operational need.

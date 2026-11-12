@@ -30,14 +30,16 @@ in this repository. It is a multi-stage build:
 
 - builder: official `debian:13.7-slim`, with the pinned package
   `ser2net=4.6.4-1`;
-- runtime: `gcr.io/distroless/base-nossl-debian13:nonroot`, with only the
-  ser2net binary, the `net`, `serialdev`, and `mdns` gensio modules, and their
-  shared-library closure copied in.
+- runtime: `gcr.io/distroless/base-nossl-debian13:nonroot`, with the ser2net
+  binary, the full Debian multiarch library directory, and all gensio modules
+  copied in.
 
-The distroless runtime has no shell, package manager, or SSL modules. The
-`base-nossl` variant is used instead of `base-debian13` because the bridge only
-speaks raw TCP; SSL support would add OpenSSL for no benefit. `static-debian13`
-is not usable here because ser2net and gensio are dynamically linked.
+The runtime copy is deliberately simple rather than a hand-maintained
+dependency closure, which could miss a `dlopen()`ed library. The image is
+larger than a curated copy, but it is more robust across ser2net/gensio
+updates. The distroless runtime has no shell or package manager.
+`static-debian13` is not usable here because ser2net and gensio are
+dynamically linked.
 
 ### Publishing and immutability
 
@@ -140,8 +142,9 @@ one (`kickolduser`), matching Zigbee2MQTT's exclusive use of the coordinator.
   device group through `supplementalGroups`. Privileged mode grants access to
   every device number, so keep this workload on the dedicated coordinator
   node and do not add anything else to the container.
-- The distroless runtime has no shell or package manager. Only the ser2net
-  binary, three gensio modules, and their library closure are present.
+- The distroless runtime has no shell or package manager. It contains the
+  ser2net binary, the Debian multiarch library directory, and the gensio
+  modules.
 - The Service is `ClusterIP`; the protocol is raw, unauthenticated serial data.
   Do not expose it with an Ingress, NodePort or LoadBalancer. If the bridge
   must cross an untrusted network, put an authenticated TLS tunnel in front

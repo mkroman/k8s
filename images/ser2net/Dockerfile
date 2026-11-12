@@ -10,36 +10,18 @@ RUN set -eux; \
     apt-get install -y --no-install-recommends "ser2net=${SER2NET_VERSION}"; \
     rm -rf /var/lib/apt/lists/*
 
-# Assemble only the runtime files used by the raw TCP-to-serial path: the
-# binary, the net/serialdev/mdns gensio modules, and the shared libraries
-# those files load. The SSL and other protocol modules are intentionally
-# omitted; Zigbee2MQTT uses a plain tcp:// transport.
+# Keep this simple: copy the binary, the full multiarch library directory from
+# the same Debian release, and all gensio modules. The extra size is preferred
+# over a hand-maintained dependency closure that can miss a dlopen()ed library.
 # Debian 13 uses usrmerge, so /lib is a symlink to /usr/lib.
 RUN set -eux; \
-    mkdir -p /rootfs; \
-    cp -a --parents /usr/sbin/ser2net /rootfs; \
-    gensio_dir="$(dirname "$(find /usr/libexec -type f -name 'libgensio_serialdev.so' | head -n 1)")"; \
-    for module in \
-      libgensio_net.so \
-      libgensio_serialdev.so \
-      libgensio_mdns.so; do \
-      cp -a --parents "${gensio_dir}/${module}" /rootfs; \
-    done; \
-    { \
-      ldd /usr/sbin/ser2net || true; \
-      ldd "${gensio_dir}/libgensio_net.so" || true; \
-      ldd "${gensio_dir}/libgensio_serialdev.so" || true; \
-      ldd "${gensio_dir}/libgensio_mdns.so" || true; \
-    } | awk '/=> \// {print $3}' | sort -u > /tmp/ser2net-libs; \
-    while IFS= read -r lib; do \
-      [ -n "${lib}" ] || continue; \
-      case "${lib}" in \
-        /lib/*) dest="/usr/lib/${lib#/lib/}" ;; \
-        *) dest="${lib}" ;; \
-      esac; \
-      mkdir -p "/rootfs$(dirname "${dest}")"; \
-      cp -aL "${lib}" "/rootfs${dest}"; \
-    done < /tmp/ser2net-libs
+    mkdir -p /rootfs/usr/sbin /rootfs/usr/lib /rootfs/usr/share; \
+    cp -a /usr/sbin/ser2net /rootfs/usr/sbin/; \
+    cp -a /usr/lib/*-linux-gnu /rootfs/usr/lib/; \
+    cp -a /usr/libexec /rootfs/usr/; \
+    if [ -d /usr/share/ser2net ]; then \
+      cp -a /usr/share/ser2net /rootfs/usr/share/; \
+    fi
 
 FROM gcr.io/distroless/base-nossl-debian13:nonroot@sha256:e6b0f82595aa1edde72c8054de7a9dca30f0f8f54820c37a167c0ddfc21c5c67
 
