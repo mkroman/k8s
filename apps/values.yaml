@@ -14,6 +14,9 @@ spec:
     targetRevision: HEAD
 
 # -- List of Argo CD projects.
+#    namespaceResourceWhitelist is exclusive and also filters the Argo CD UI
+#    resource tree. Projects that use it must list controller-created kinds
+#    such as Pod and ReplicaSet if those children should be visible.
 projects:
   - name: agentgateway
     description: "Agentgateway control plane for AI, MCP and A2A traffic (Kubernetes Gateway API)"
@@ -163,6 +166,11 @@ projects:
         kind: Service
       - group: apps
         kind: Deployment
+      # Show the Deployment's ReplicaSet and Pod in the Argo CD tree.
+      - group: apps
+        kind: ReplicaSet
+      - group: ""
+        kind: Pod
       - group: batch
         kind: Job
       - group: networking.k8s.io
@@ -369,6 +377,9 @@ projects:
         kind: ServiceAccount
       - group: apps
         kind: DaemonSet
+      # Show the DaemonSet Pod in the Argo CD tree.
+      - group: ""
+        kind: Pod
       - group: batch
         kind: Job
       - group: networking.k8s.io
@@ -396,6 +407,9 @@ projects:
         kind: ServiceAccount
       - group: apps
         kind: StatefulSet
+      # Show the StatefulSet Pod in the Argo CD tree.
+      - group: ""
+        kind: Pod
       - group: networking.k8s.io
         kind: NetworkPolicy
       - group: monitoring.coreos.com
@@ -428,6 +442,14 @@ projects:
         kind: Service
       - group: apps
         kind: Deployment
+      # Argo CD only renders resources allowed by the project whitelist.
+      # ReplicaSets and Pods are created by the Deployment controller, not by
+      # this Application, but without these entries the UI tree stops at the
+      # Deployment even though the Pods are running.
+      - group: apps
+        kind: ReplicaSet
+      - group: ""
+        kind: Pod
       - group: networking.k8s.io
         kind: NetworkPolicy
 
@@ -444,6 +466,9 @@ projects:
         kind: PersistentVolumeClaim
       - group: ""
         kind: Service
+      # Show the StatefulSet Pod in the Argo CD resource tree.
+      - group: ""
+        kind: Pod
       - group: apps
         kind: StatefulSet
       - group: networking.k8s.io
