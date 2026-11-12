@@ -146,6 +146,8 @@ connection: &zigbee
 
 Only one client may use the port at a time. A new connection replaces the old
 one (`kickolduser`), matching Zigbee2MQTT's exclusive use of the coordinator.
+The Deployment carries a `checksum/config` annotation, so changing the
+ConfigMap rolls ser2net; ser2net itself does not reload the file automatically.
 
 ## Security notes
 

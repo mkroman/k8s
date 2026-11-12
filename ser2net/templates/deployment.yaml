@@ -16,10 +16,13 @@ spec:
       {{- include "ser2net.selectorLabels" . | nindent 6 }}
   template:
     metadata:
-      {{- with .Values.podAnnotations }}
       annotations:
+        # ser2net does not reload its config automatically; roll the Pod when
+        # the ConfigMap changes so the new serial line settings take effect.
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
         {{- toYaml . | nindent 8 }}
-      {{- end }}
+        {{- end }}
       labels:
         {{- include "ser2net.selectorLabels" . | nindent 8 }}
         {{- with .Values.podLabels }}
