@@ -39,9 +39,10 @@ manager. The image is about 165 MB uncompressed and about 41 MB compressed for
 
 ### Publishing and immutability
 
-`.github/workflows/container-images.yaml` builds `linux/amd64` and
-`linux/arm64` images on pull requests and publishes them on `main` and version
-tags. It pushes:
+`.github/workflows/container-images.yaml` runs only when `images/ser2net/`
+changes, when the workflow itself changes, or on manual dispatch. It builds
+`linux/amd64` and `linux/arm64` images on pull requests and publishes them on
+`main` and version tags. It pushes:
 
 - `sha-<full commit sha>` — the immutable build tag;
 - `4.6.4-1` on `main` — the human-readable build tag (the digest pin takes
@@ -140,7 +141,9 @@ one (`kickolduser`), matching Zigbee2MQTT's exclusive use of the coordinator.
   node and do not add anything else to the container.
 - The image is Debian slim, so it includes a shell and package manager. The
   container still runs as UID 1000 with a read-only root filesystem; treat the
-  extra userland as attack surface and rebuild the image for package updates.
+  extra userland as attack surface. Base-image bumps come from Renovate;
+  dispatch the image workflow after bumping `SER2NET_VERSION` or when a
+  package rebuild is needed.
 - The Service is `ClusterIP`; the protocol is raw, unauthenticated serial data.
   Do not expose it with an Ingress, NodePort or LoadBalancer. If the bridge
   must cross an untrusted network, put an authenticated TLS tunnel in front

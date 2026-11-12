@@ -12,10 +12,6 @@ on:
       - images/ser2net/**
       - .github/workflows/container-images.yaml
   workflow_dispatch:
-  schedule:
-    # Rebuild weekly so base-image and Debian package security updates are
-    # picked up even when this repository does not change.
-    - cron: "17 4 * * 1"
 
 permissions:
   contents: read
