@@ -95,9 +95,11 @@ If the GHCR package is private, set `imagePullSecrets` in the chart.
 - The device's group GID. Debian and Ubuntu use 20 (`dialout`); verify with
   `stat -c %g /dev/ttyUSB0` and set `serial.groupId`.
 - Zigbee2MQTT configured with
-  `config.serial.port: tcp://ser2net.ser2net.svc.cluster.local:6638` (adjust
-  the release name/namespace if different). Its NetworkPolicy must allow
-  egress to this namespace and port.
+  `config.serial.port: tcp://ser2net.ser2net.svc.cluster.local:6638` and
+  `config.serial.adapter: zstack` (adjust the release name/namespace if
+  different). A TCP path cannot be auto-discovered as a USB adapter, so the
+  adapter type must be explicit. Its NetworkPolicy must allow egress to this
+  namespace and port.
 
 ## Configuration
 

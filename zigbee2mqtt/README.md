@@ -27,9 +27,11 @@ but this chart deliberately follows the official container deployment instead:
 This chart keeps deployment and scalar settings in structured `config` values
 and the large device/group inventories in `files/devices.yaml` and
 `files/groups.yaml`. On first start an init container copies
-`configuration.yaml`, `devices.yaml`, and `groups.yaml` into the data volume,
-then leaves the volume alone. Separating the inventories avoids Helm coalescing
-deleting explicit `null` values (for example a device-level
+`configuration.yaml`, `devices.yaml`, and `groups.yaml` into the data volume.
+Chart-managed `config` keys are then applied as environment overrides, so the
+PVC keeps runtime-owned keys while Git changes still take effect; see
+[Configuration](#configuration). Separating the inventories avoids Helm
+coalescing deleting explicit `null` values (for example a device-level
 `homeassistant.name: null`) and keeps the files diff-friendly.
 
 ### Configuration options considered
@@ -61,7 +63,8 @@ Zigbee2MQTT YAML and are not reshaped by Helm.
 - The [ser2net](../ser2net/) Application is healthy on the coordinator node,
   or the chart is switched to direct-device mode. The default
   `config.serial.port` is
-  `tcp://ser2net.ser2net.svc.cluster.local:6638`.
+  `tcp://ser2net.ser2net.svc.cluster.local:6638` and `config.serial.adapter`
+  is `zstack` (a TCP path cannot be auto-discovered as a USB adapter).
   - ser2net must be scheduled on the node labelled
     `feature.node.kubernetes.io/zigbee-coordinator=true` and must have access
     to the serial device. See the [ser2net chart README](../ser2net/README.md).
@@ -86,6 +89,7 @@ The default is a TCP serial bridge:
 config:
   serial:
     port: tcp://ser2net.ser2net.svc.cluster.local:6638
+    adapter: zstack
 coordinator:
   devicePath: ""   # no hostPath, no /run/udev, no USB nodeSelector
 ```
@@ -189,16 +193,28 @@ Changing or omitting the network key requires re-pairing every device.
 `config` contains the scalar Zigbee2MQTT settings and is rendered with
 `toYaml`. Device and group inventories are the chart files
 `files/devices.yaml` and `files/groups.yaml`; the template reads them verbatim.
-All three files are written to `/app/data` only when the corresponding file
-does not already exist. This is intentional: after first start the PVC is the
-source of truth, so changes made in the frontend, device pairing, and
-Zigbee2MQTT's own migrations are not overwritten by a Git sync.
+`devices.yaml` and `groups.yaml` are written to `/app/data` only when the
+corresponding file does not already exist, so device pairing and frontend
+group edits are not clobbered by a Git sync.
+
+`config` is also rendered as `ZIGBEE2MQTT_CONFIG_*` environment variables on the
+Zigbee2MQTT container. Zigbee2MQTT applies those on top of
+`configuration.yaml`, without persisting them. This means:
+
+- chart changes to `config` are part of the Pod template and roll the
+  StatefulSet automatically;
+- the PVC remains the source of truth for runtime-owned keys not present in
+  the chart, such as `advanced.network_key`, `permit_join`, and frontend edits;
+- secret references such as `!secret.yaml password` are not turned into env
+  vars, so the mounted Secret keeps working;
+- arrays and objects are JSON-encoded for the env override;
+- removing a key from `config` stops overriding it and lets the PVC value
+  reappear; clear it on the PVC if that is not what you want.
 
 - To change a scalar setting, edit `config` in `values.yaml` (or use
-  `--set config.mqtt.server=...`), then remove the corresponding key from the
-  generated `configuration.yaml` on the PVC and restart. Do not delete the whole
-  file unless you have the network key/data backup; Zigbee2MQTT may have
-  written the generated network key into it.
+  `--set config.mqtt.server=...`). Argo CD rolls the StatefulSet and the new
+  env override takes effect. Do not delete `configuration.yaml` from the PVC
+  unless you have the network key/data backup.
 - To change devices or groups, edit `files/devices.yaml` or
   `files/groups.yaml`, then replace the matching file on the PVC and restart.
   Using the frontend is safer for groups while the app is running. These files
@@ -305,6 +321,11 @@ yamllint --no-warnings --config-file hack/ci/yamllint.yaml \
   zigbee2mqtt/Chart.yaml zigbee2mqtt/values.yaml
 ./hack/ci/validate-helm.sh zigbee2mqtt
 ```
+
+The environment overrides were exercised with the real 2.14.3 image against an
+existing config containing `serial.port: /dev/ttyUSB0`. Zigbee2MQTT used the
+rendered TCP endpoint and `adapter: zstack` instead of the old device path.
+Secret references were checked to ensure they are not emitted as env vars.
 
 The rendered chart has been exercised against the real 2.14.3 image as UID
 1000 with a read-only root filesystem, a writable data directory, and the

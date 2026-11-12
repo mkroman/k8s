@@ -47,7 +47,8 @@ service:
 
 # -- Scalar Zigbee2MQTT settings, rendered into configuration.yaml with
 #    `toYaml`. This is the part that is convenient to override with values or
-#    `--set`; it is still seeded only on first start.
+#    `--set`; chart-defined keys are passed as ZIGBEE2MQTT_CONFIG_* env
+#    overrides, so changes roll the Pod while runtime-owned PVC keys remain.
 #
 #    Large inventories live in the chart's YAML files instead, because Helm
 #    coalescing deletes explicit `null` values from values maps:
@@ -77,6 +78,9 @@ config:
     #    the `ser2net` namespace. If `coordinator.devicePath` is set instead,
     #    this must exactly match that device path (direct USB mode).
     port: tcp://ser2net.ser2net.svc.cluster.local:6638
+    # -- A TCP serial path cannot be auto-discovered as a USB adapter, so the
+    #    adapter type must be explicit. The CC2652RB uses zstack.
+    adapter: zstack
   advanced:
     pan_id: 6755
     log_level: info
