@@ -9,6 +9,7 @@ locally so failures can be reproduced without pushing.
 | --- | --- |
 | `lint-yaml.sh` | Plain YAML syntax and duplicate keys. Helm templates are excluded because they contain Go templating. |
 | `validate-kustomize.sh` | Every `kustomization.yaml` builds, then kubeconform validates the rendered manifests. |
+| `validate-app-of-apps.sh` | The root `apps` Application keeps `ServerSideApply=true` and `ServerSideDiff=true`, so Argo CD's controller-owned delete-hook finalizers stay out of the app-of-apps diff. |
 | `validate-helm.sh` | Every chart builds its dependencies, lints, and renders; kubeconform validates the result. |
 | `validate-dashboards.py` | Grafana dashboard JSON: datasource references, variable convention, panel IDs, and removed panel types. |
 | `install-tools.sh` | Reads `tools.txt`, downloads each pinned release, verifies its SHA-256, and installs the binary. |
@@ -64,7 +65,7 @@ Install the tools from the manifest into a directory on `PATH`:
 export PATH="${HOME}/.local/bin:${PATH}"
 ```
 
-Also install `kubectl` (or `kustomize`), Helm 3.x, and yamllint 1.38+.
+Also install `kubectl` (or `kustomize`), Helm 3.x, yamllint 1.38+, and `yq`.
 
 Run from anywhere in the repository:
 
@@ -72,13 +73,14 @@ Run from anywhere in the repository:
 ./hack/ci/lint-yaml.sh
 ./hack/ci/validate-dashboards.py
 ./hack/ci/validate-kustomize.sh
+./hack/ci/validate-app-of-apps.sh
 ./hack/ci/validate-helm.sh           # every chart
 ./hack/ci/validate-helm.sh spegel    # one chart, useful while iterating
 ```
 
 ## Workflows
 
-- `.github/workflows/validate-manifests.yaml` runs the YAML, Kustomize, and Helm checks above.
+- `.github/workflows/validate-manifests.yaml` runs the YAML, Kustomize, app-of-apps, and Helm checks above.
 - `.github/workflows/validate-dashboards.yaml` runs the dashboard check when
   files under `grafana/dashboards/` or the validator change.
 - `.github/workflows/lint-ci.yaml` runs actionlint, shellcheck, and zizmor.

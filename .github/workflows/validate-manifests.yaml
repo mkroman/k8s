@@ -52,11 +52,13 @@ jobs:
         uses: azure/setup-kubectl@bda439f5f36b99b262ebdcd3613869bddb064c8e # v5.2.0
         with:
           version: ${{ env.KUBECTL_VERSION }}
-      - name: Install kubeconform
+      - name: Install kubeconform and yq
         # GitHub-hosted ubuntu-latest already has $HOME/.local/bin on PATH.
-        run: ./hack/ci/install-tools.sh "${HOME}/.local/bin" kubeconform
+        run: ./hack/ci/install-tools.sh "${HOME}/.local/bin" kubeconform yq
       - name: Build and validate
         run: ./hack/ci/validate-kustomize.sh
+      - name: Validate app-of-apps sync policy
+        run: ./hack/ci/validate-app-of-apps.sh
 
   helm:
     name: Helm templates
