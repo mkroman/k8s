@@ -1,0 +1,4 @@
+# Base instance of the chart. The ApplicationSet template always passes a
+# single values file per element, so the default instance gets an explicit
+# empty override set instead of none at all.
+{}
