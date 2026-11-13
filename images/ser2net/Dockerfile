@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1
+# syntax=docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
 
 # This is intentionally a normal Debian image rather than distroless: it keeps
 # the Dockerfile simple and lets the package manager own ser2net and its
