@@ -12,10 +12,12 @@ Deeper docs: `hack/ci/README.md` (CI scripts, tool manifest),
   - `projects`: AppProjects
   - `namespaces`: every Namespace, with Pod Security labels. Applications do
     not use `CreateNamespace`, so a new namespace must be added here.
-  - `newApplications`: local apps
-  - `applications`: external repos via `apps-of-apps/<name>.yaml`
-- A chart directory with no `newApplications` entry is not deployed (for
-  example `immich`, `kanidm`, `flaresolverr`).
+  - `applications`: local apps
+  - `applicationSets`: multi-instance charts, one element per Application.
+    Element names are the Application names; renaming or removing an element
+    deletes that Application and its resources.
+- A chart directory with no `applications` or `applicationSets` entry is not
+  deployed (for example `immich`, `kanidm`, `flaresolverr`).
 - AppProject defaults in `apps/templates/appproject.yaml`: if
   `clusterResourceWhitelist` is omitted it renders `[]`, so no cluster-scoped
   kinds are allowed. If neither namespace list is set, ResourceQuota,
@@ -126,8 +128,10 @@ docker, kind, kubectl, argocd, yq and jq.
 - Never commit plaintext Secrets. SealedSecrets come from per-app
   `make secrets` (`op2secret | kubeseal`), which needs 1Password and cluster
   access. Ask the user to regenerate them.
-- To register a new app: add a project, namespace and `newApplications`
-  entry in `apps/values.yaml`, and add a row to the `README.md` table.
+- To register a new app: add a project, namespace and `applications` entry
+  in `apps/values.yaml`, and add a row to the `README.md` table. An
+  additional instance of an existing chart is an `applicationSets` element
+  instead.
 
 ## Cluster / containerd
 
