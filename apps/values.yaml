@@ -860,9 +860,12 @@ applicationSets:
       repoURL: https://github.com/mkroman/k8s
       path: chadgpt
     elements:
+      # The base instance passes the chart's own values.yaml; Helm loads it
+      # implicitly anyway, so this is a no-op — but every element carries
+      # exactly one values file by design.
       - name: chadgpt
         project: chadgpt
-        valueFile: values-base.yaml
+        valueFile: values.yaml
       # Instance for the #magistr IRC channel.
       - name: chadgpt-magistr
         project: chadgpt-magistr
@@ -878,7 +881,7 @@ applicationSets:
       path: mqtt2prometheus
     elements:
       - name: mqtt2prometheus
-        valueFile: values-base.yaml
+        valueFile: values.yaml
       # Extra instance exporting MQTT topic values as Prometheus metrics;
       # shares the mqtt2prometheus namespace.
       - name: mqtt2prometheus-mqtt-topic
