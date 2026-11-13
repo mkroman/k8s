@@ -10,7 +10,7 @@ version: 0.1.0
 # and image.tag in values.yaml in sync. Renovate tracks upstream releases, but
 # the Debian package revision must be checked before bumping all three.
 # renovate: datasource=github-releases depName=cminyard/ser2net
-appVersion: "4.6.4"
+appVersion: "4.6.8"
 kubeVersion: ">=1.26.0-0"
 
 home: https://github.com/cminyard/ser2net
