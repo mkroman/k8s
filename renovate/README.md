@@ -76,6 +76,8 @@ access that is tagged with the `managed-by-renovate` topic:
   prFooter: "",
   reviewers: [],
   repositoryCache: "enabled",
+  persistRepoData: true,
+  configValidationError: true,
   onboardingConfig: {
     extends: ["config:recommended", "config:best-practices", ":disableRateLimiting"]
   }
@@ -96,9 +98,12 @@ Key values (full reference with documentation inline in [`values.yaml`](values.y
 | --- | --- | --- |
 | `image.repository` | `renovate/renovate` | Official image, default ("slim") flavor recommended by the docs |
 | `image.tag` | `.Chart.AppVersion` | Pinned image tag; use `x.y.z-full` for the full flavor |
-| `cronjob.schedule` | `"@hourly"` | Run cadence (docs recommend hourly) |
+| `cronjob.schedule` | `"17 * * * *"` | Hourly cadence, offset from the top of the hour |
 | `cronjob.concurrencyPolicy` | `Forbid` | Prevents overlapping runs |
 | `cronjob.backoffLimit` | `0` | No immediate retries; next run happens on schedule |
+| `cronjob.startingDeadlineSeconds` | `300` | Do not start a run more than five minutes late |
+| `cronjob.activeDeadlineSeconds` | `1800` | Stop a stuck run before it blocks the next tick |
+| `cronjob.ttlSecondsAfterFinished` | `86400` | Delete finished Jobs/Pods after one day |
 | `renovate.config` | see above | Global config, rendered to `config.json` (ConfigMap) |
 | `renovate.existingConfigMap` | `""` | Use an existing ConfigMap with a `config.json` key instead |
 | `renovate.existingSecret` | `renovate-env` | **Recommended** credential source; Secret consumed via `envFrom` |
@@ -132,6 +137,10 @@ Operational notes from the docs:
 - **Caching**: `repositoryCache: enabled` and `persistRepoData` only help
   across runs when `persistence.enabled=true`; otherwise each run starts with a
   cold cache ([file/directory usage](https://docs.renovatebot.com/examples/self-hosting/#filedirectory-usage)).
+- **Failure visibility**: `configValidationError: true` makes an invalid
+  repository config fail the Job instead of logging a warning and exiting
+  successfully. The monitoring stack alerts on failed Jobs and on a missing
+  successful run.
 - **Memory**: the main Renovate process is capped by
   `NODE_OPTIONS=--max-old-space-size=2048`, while the pod limit is `3Gi`. Node
   otherwise derives a heap of roughly half the cgroup limit and can abort while

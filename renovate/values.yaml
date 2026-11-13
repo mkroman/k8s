@@ -33,8 +33,9 @@ imagePullSecrets: []
 
 cronjob:
   # -- Cron schedule. The official docs recommend running Renovate hourly.
+  #    Offset from minute zero to avoid the top-of-hour API and cron burst.
   #    https://docs.renovatebot.com/getting-started/running/#hosting-renovate
-  schedule: "@hourly"
+  schedule: "17 * * * *"
   # -- Concurrency policy. "Forbid" prevents overlapping runs, as shown in the
   #    official Kubernetes example.
   concurrencyPolicy: Forbid
@@ -45,21 +46,21 @@ cronjob:
   # -- Number of failed finished jobs to retain (logs are useful for
   #    troubleshooting token/config problems).
   failedJobsHistoryLimit: 3
-  # -- Deadline in seconds for starting the job if it misses its schedule.
-  #    Set to a number (e.g. 300) to enforce; null means "no deadline".
-  startingDeadlineSeconds: null
+  # -- Deadline for starting a run that missed its schedule. Bounds how stale a
+  #    run can become after controller downtime.
+  startingDeadlineSeconds: 300
   # -- Time zone for the schedule, e.g. "Etc/UTC" (requires Kubernetes >= 1.27).
   timeZone: ""
-  # -- Auto-delete finished Job/Pods after this many seconds.
-  #    Set to a number (e.g. 600) to enable; null disables TTL cleanup.
-  ttlSecondsAfterFinished: null
+  # -- Auto-delete finished Job/Pods after one day. Keeps logs long enough to
+  #    investigate failures without accumulating history forever.
+  ttlSecondsAfterFinished: 86400
   # -- Pod retry count for failed runs. 0 avoids hammering the platform API
   #    (and burning rate limits) when a run fails repeatedly; failures are
   #    retried at the next schedule tick instead.
   backoffLimit: 0
-  # -- Maximum wall-clock duration of a single run in seconds.
-  #    Set to a number to enforce; null disables the deadline.
-  activeDeadlineSeconds: null
+  # -- Maximum wall-clock duration of a single run. Stops a hung run from
+  #    blocking every later run, because concurrencyPolicy is Forbid.
+  activeDeadlineSeconds: 1800
   # -- Additional annotations for the CronJob object.
   annotations: {}
 
@@ -87,9 +88,16 @@ renovate:
       - mkroman
     prFooter: ""
     reviewers: []
-    # Cache repository metadata between runs for faster, cheaper runs.
+    # Cache repository metadata and clones between runs for faster, cheaper
+    # runs. The PVC below keeps both caches across CronJob invocations.
     # https://docs.renovatebot.com/self-hosted-configuration/#repositorycache
+    # https://docs.renovatebot.com/self-hosted-configuration/#persistrepodata
     repositoryCache: enabled
+    persistRepoData: true
+    # Fail the Job on repository config validation errors instead of logging a
+    # warning and exiting successfully.
+    # https://docs.renovatebot.com/self-hosted-configuration/#configvalidationerror
+    configValidationError: true
     onboardingConfig:
       extends:
         - config:recommended
