@@ -101,15 +101,15 @@ Key values (full reference with documentation inline in [`values.yaml`](values.y
 | `cronjob.backoffLimit` | `0` | No immediate retries; next run happens on schedule |
 | `renovate.config` | see above | Global config, rendered to `config.json` (ConfigMap) |
 | `renovate.existingConfigMap` | `""` | Use an existing ConfigMap with a `config.json` key instead |
-| `renovate.existingSecret` | `""` | **Recommended** credential source; Secret consumed via `envFrom` |
+| `renovate.existingSecret` | `renovate-env` | **Recommended** credential source; Secret consumed via `envFrom` |
 | `renovate.secrets` | `{}` | Opt-in: create a Secret from a map of env vars (avoid for real tokens) |
-| `env` | `LOG_LEVEL: info`, `LOG_FORMAT: plain` | Container env; use `LOG_FORMAT: json` for parsable logs |
+| `env` | `LOG_LEVEL: info`, `LOG_FORMAT: json`, `NODE_OPTIONS: --max-old-space-size=2048` | Container env; keep the heap cap below the memory limit |
 | `args` | `[]` | Extra CLI args, e.g. explicit repo list |
-| `persistence.enabled` | `false` | Mount a PVC at `/tmp/renovate` so `repositoryCache: enabled` survives runs |
+| `persistence.enabled` | `true` | Mount a PVC at `/tmp/renovate` so `repositoryCache: enabled` survives runs |
 | `serviceAccount.create` | `true` | Dedicated ServiceAccount with token mounting disabled |
 | `podSecurityContext` | non-root, UID/GID `12021` | Matches the official image user |
 | `containerSecurityContext` | no privilege escalation, caps dropped | Hardened by default |
-| `resources` | `512Mi` request / `1Gi` limit | Raise memory for large monorepos |
+| `resources` | `1Gi` request / `3Gi` limit | Raise memory for large monorepos |
 | `networkPolicy.enabled` | `false` | Opt-in egress policy (DNS + web) |
 
 ## Operation
@@ -132,6 +132,11 @@ Operational notes from the docs:
 - **Caching**: `repositoryCache: enabled` and `persistRepoData` only help
   across runs when `persistence.enabled=true`; otherwise each run starts with a
   cold cache ([file/directory usage](https://docs.renovatebot.com/examples/self-hosting/#filedirectory-usage)).
+- **Memory**: the main Renovate process is capped by
+  `NODE_OPTIONS=--max-old-space-size=2048`, while the pod limit is `3Gi`. Node
+  otherwise derives a heap of roughly half the cgroup limit and can abort while
+  the container still has free memory. `toolSettings.nodeMaxMemory` only applies
+  to child package managers (pnpm, yarn, Gradle), not the main process.
 - **Security**: self-hosted Renovate trusts the developers of the repositories
   it monitors; review the
   [security guidance](https://docs.renovatebot.com/security-and-permissions/) —

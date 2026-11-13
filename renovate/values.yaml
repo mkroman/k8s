@@ -136,6 +136,10 @@ args: []
 env:
   LOG_LEVEL: info
   LOG_FORMAT: json
+  # Node derives its default old-space heap from the cgroup memory limit. Keep
+  # an explicit cap below the container limit so the lookup phase does not hit
+  # V8's heap limit while the pod still has memory headroom.
+  NODE_OPTIONS: "--max-old-space-size=2048"
 
 # -- Extra envFrom sources (Secrets/ConfigMaps) applied after the credential
 #    Secret. Do not use this for the credential Secret itself; use
@@ -193,14 +197,16 @@ containerSecurityContext:
     drop:
       - ALL
 
-# -- Container resource requests/limits. Renovate is memory-hungry on large
-#    repositories; raise the memory limit if runs get OOM-killed.
+# -- Container resource requests/limits. The memory limit also determines the
+#    default V8 heap size Node picks from the cgroup limit. This repository's
+#    lookup phase peaks around 1.6 GiB; a 2 GiB limit leaves Node with only
+#    ~1 GiB of old space. Raise the limit for larger repositories.
 resources:
   requests:
     cpu: 1
-    memory: 512Mi
+    memory: 1Gi
   limits:
-    memory: 2Gi
+    memory: 3Gi
 
 # -- Priority class name for the pod.
 priorityClassName: ""
