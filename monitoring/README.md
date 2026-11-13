@@ -72,6 +72,14 @@ not an option here.
   `nonResourceURLs: ["/metrics"]` rule. `base/manifests/clusterrole.yaml` is the
   source of truth.
 
+## Alert rules
+
+`prometheus/base/manifests/prometheusrule.renovate.yaml` alerts on failed
+Renovate Jobs and on a missing successful run. It carries the
+`metrics.uplink.io/monitor: prometheus` label directly, because the rule is in
+`base/` rather than the labelled `scrape/` directory. The base and kind
+overlays both deploy it; only the production overlay adds Alertmanager.
+
 ## Authentication
 
 `ServiceMonitor` endpoints use `bearerTokenFile`, which reads Prometheus's

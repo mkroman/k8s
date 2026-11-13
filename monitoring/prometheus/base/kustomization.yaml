@@ -6,5 +6,6 @@ resources:
   - ./manifests/clusterrolebinding.yaml
   - ./manifests/serviceaccount.yaml
   - ./manifests/prometheus.yaml
+  - ./manifests/prometheusrule.renovate.yaml
   - ./manifests/service.yaml
   - ./manifests/servicemonitor.yaml

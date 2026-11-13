@@ -1,0 +1,26 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: renovate
+  labels:
+    metrics.uplink.io/monitor: prometheus
+spec:
+  groups:
+    - name: renovate
+      rules:
+        - alert: RenovateJobFailed
+          expr: kube_job_status_failed{namespace="renovate", job_name=~"renovate-.*"} > 0
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: 'Renovate job {{ $labels.job_name }} failed'
+            description: 'Check `kubectl -n renovate logs job/{{ $labels.job_name }}` for the failure cause.'
+        - alert: RenovateStale
+          expr: time() - kube_cronjob_status_last_successful_time{namespace="renovate", cronjob="renovate"} > 10800
+          for: 10m
+          labels:
+            severity: critical
+          annotations:
+            summary: 'Renovate has not completed successfully in three hours'
+            description: 'The hourly CronJob is failing or no longer being scheduled. Check the Job history and the CronJob events in the renovate namespace.'
