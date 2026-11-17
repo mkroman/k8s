@@ -278,7 +278,7 @@ e2e:
   enabled: false
   # -- Image providing mosquitto_sub for the probe. The eclipse-mosquitto
   #    image ships the MQTT clients; keep the tag pinned.
-  probeImage: eclipse-mosquitto:2.0.22
+  probeImage: eclipse-mosquitto:2.0.23
   # -- Broker the probe subscribes on. Required when e2e.enabled is true;
   #    set it to the e2e mosquitto Service in values-kind.yaml.
   mqtt:
