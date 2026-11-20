@@ -215,7 +215,7 @@ postgres:
   image:
     # Docker Hub is rate limited; use Google's pull-through mirror in CI.
     repository: mirror.gcr.io/library/postgres
-    tag: "18.7"
+    tag: "19.0"
     pullPolicy: IfNotPresent
   database: magistr
   username: postgres
