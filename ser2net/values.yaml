@@ -18,7 +18,7 @@ image:
   tag: "4.6.4-1"
   # -- Pin the image by digest; replaces the tag when set. The image workflow
   #    opens a PR that sets this to the digest of the built image.
-  digest: ""
+  digest: "sha256:4fb24b60226422435cf5797300e2e3b98fada2e39638a0b987236389bcf13168"
   pullPolicy: IfNotPresent
 
 # -- List of image pull secrets for private registries.
