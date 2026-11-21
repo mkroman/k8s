@@ -11,13 +11,11 @@ Kustomize overlay that deploys Argo CD itself plus a single `Application`
 
 ### [`apps/`](apps/)
 
-Helm chart that renders `AppProject` and `Application` resources. This is the
-[app of apps][cluster-bootstrapping] pattern — all local workload Argo CD
-Applications are defined here.
-
-### [`apps-of-apps/`](apps-of-apps/)
-
-Helm chart for Applications sourced from external Git repositories.
+Helm chart that renders `AppProject`, `Application` and `ApplicationSet`
+resources. This is the [app of apps][cluster-bootstrapping] pattern — all
+local workload Argo CD Applications are defined here. Charts deployed as
+multiple instances are declared as `applicationSets` entries, with one
+element per Application.
 
 [cluster-bootstrapping]: https://argo-cd.readthedocs.io/en/stable/operator-manual/cluster-bootstrapping/
 
@@ -57,14 +55,6 @@ Helm chart for Applications sourced from external Git repositories.
 
 Container images built from this repository are documented in
 [`images/README.md`](images/README.md).
-
-### External apps
-
-| App                         | Source                                                            | Status |
-|-----------------------------|-------------------------------------------------------------------|--------|
-| meta                        | [mkroman/k8s-meta-apps](https://github.com/mkroman/k8s-meta-apps) | [![App Status](https://argo-cd.infra.rwx.im/api/badge?name=meta)](https://argo-cd.infra.rwx.im/applications/meta) |
-| meta-oss                    | [mkroman/k8s-meta-apps](https://github.com/mkroman/k8s-meta-apps) | [![App Status](https://argo-cd.infra.rwx.im/api/badge?name=meta-oss)](https://argo-cd.infra.rwx.im/applications/meta-oss) |
-| meta-webhook                | [mkroman/k8s-meta-apps](https://github.com/mkroman/k8s-meta-apps) | [![App Status](https://argo-cd.infra.rwx.im/api/badge?name=meta-webhook)](https://argo-cd.infra.rwx.im/applications/meta-webhook) |
 
 ## Prerequisites
 

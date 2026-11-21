@@ -1,0 +1,102 @@
+{{- /*
+Renders one ApplicationSet per .Values.applicationSets entry, for charts
+deployed as multiple instances (one list element per Application).
+
+Element fields:
+  name       Application name (required). Must stay stable: renaming or
+             removing an element deletes the Application and its resources.
+  valueFile  Single Helm values file for the instance (required). The
+             ApplicationSet controller templates each list item separately,
+             so only one file per element is supported.
+  project    AppProject (optional, falls back to the applicationSet-level
+             project).
+  namespace  Destination namespace (optional, falls back to .name).
+  preserveResourcesOnDeletion
+             ApplicationSet-level escape hatch: when true, the template omits
+             the Argo CD finalizer, so deleting an Application (element
+             removed, ApplicationSet deleted) preserves its cluster resources
+             until the Application is recreated. Mutually exclusive with the
+             template finalizers: the controller only honors this flag when
+             the template carries no finalizers of its own.
+
+The spec.template Go template expressions are written as Helm literals
+(``{{`...`}}``) so Helm passes them through verbatim for the
+ApplicationSet controller to render per element.
+*/}}
+{{- range .Values.applicationSets }}
+{{- $appSet := . }}
+{{- $appSetName := required "A valid applicationSet .name is required" .name }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: {{ $appSetName | quote }}
+  namespace: {{ $.Values.argocdNamespace }}
+  {{- with .annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  goTemplate: true
+  goTemplateOptions:
+    - missingkey=error
+  {{- if .preserveResourcesOnDeletion }}
+  syncPolicy:
+    preserveResourcesOnDeletion: true
+  {{- end }}
+  generators:
+    - list:
+        elements:
+          {{- range .elements }}
+          - name: {{ required (printf "element .name is required in applicationSet %s" $appSetName) .name | quote }}
+            project: {{ .project | default $appSet.project | required (printf "element .project or applicationSet .project is required in applicationSet %s" $appSetName) | quote }}
+            namespace: {{ .namespace | default .name | quote }}
+            valueFile: {{ required (printf "element .valueFile is required in applicationSet %s" $appSetName) .valueFile | quote }}
+          {{- end }}
+  template:
+    metadata:
+      name: '{{`{{ .name }}`}}'
+      {{- if not .preserveResourcesOnDeletion }}
+      finalizers:
+        # The qualified foreground finalizer matches the chart's Application
+        # default. Without explicit finalizers the ApplicationSet controller
+        # adds the unqualified variant, which triggers Kubernetes' finalizer
+        # warning and uses background cascading deletion.
+        #
+        # Omitted while preserveResourcesOnDeletion is set: the controller
+        # only honors that flag when the template has no finalizers.
+        - resources-finalizer.argocd.argoproj.io/foreground
+      {{- end }}
+    spec:
+      project: '{{`{{ .project }}`}}'
+      destination:
+        name: "in-cluster"
+        namespace: '{{`{{ .namespace }}`}}'
+      source:
+        repoURL: {{ required (printf "source.repoURL is required for applicationSet %s" $appSetName) $appSet.source.repoURL | quote }}
+        {{- if not $appSet.source.targetRevision }}
+        targetRevision: "HEAD"
+        {{- end }}
+        path: {{ required (printf "source.path is required for applicationSet %s" $appSetName) $appSet.source.path | quote }}
+        {{- with omit $appSet.source "repoURL" "targetRevision" "path" "helm" }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        helm:
+          valueFiles:
+            - '{{`{{ .valueFile }}`}}'
+      {{- if .syncPolicy }}
+      syncPolicy:
+        {{- toYaml .syncPolicy | nindent 8 }}
+      {{- else }}
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        retry:
+          limit: 5
+          backoff:
+            duration: 5s
+            factor: 2
+            maxDuration: 3m
+      {{- end }}
+{{- end }}
