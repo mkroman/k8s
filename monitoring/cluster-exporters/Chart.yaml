@@ -8,5 +8,5 @@ dependencies:
     version: 9.0.1
     repository: https://prometheus-community.github.io/helm-charts
   - name: prometheus-node-exporter
-    version: 5.2.0
+    version: 6.0.0
     repository: https://prometheus-community.github.io/helm-charts
