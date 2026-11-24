@@ -73,8 +73,12 @@ jobs:
         uses: azure/setup-helm@2f5e7bc67f1f9972ab16657bb795f36d8f04de0e # v5.1.0
         with:
           version: ${{ env.HELM_VERSION }}
-      - name: Install kubeconform
+      - name: Install kubeconform and yq
         # GitHub-hosted ubuntu-latest already has $HOME/.local/bin on PATH.
-        run: ./hack/ci/install-tools.sh "${HOME}/.local/bin" kubeconform
-      - name: Render and validate
+        run: ./hack/ci/install-tools.sh "${HOME}/.local/bin" kubeconform yq
+      - name: Render and validate every chart
         run: ./hack/ci/validate-helm.sh
+      - name: Validate chart cases
+        run: ./hack/ci/validate-chart-cases.sh
+      - name: Validate e2e probe contract
+        run: ./hack/ci/validate-e2e-contract.sh

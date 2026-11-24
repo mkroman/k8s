@@ -1,0 +1,61 @@
+# Default values are documented in values.yaml.
+# This file is used by hack/e2e/run-app.sh and the Stalwart contract tests.
+replicaCount: 1
+
+service:
+  mail:
+    type: ClusterIP
+
+persistence:
+  storageClass: standard
+  size: 1Gi
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 256Mi
+  limits:
+    cpu: "1"
+    memory: 1Gi
+
+recoveryAdmin:
+  enabled: true
+  # Clear the production existingSecret; the kind release uses the
+  # chart-managed test Secret.
+  existingSecret: ""
+  # Test-only credential for the disposable kind cluster. Never use this in a
+  # production values file.
+  password: e2e-stalwart-admin
+
+certificate:
+  enabled: true
+  create: true
+  existingSecret: ""
+  secretName: ""
+  commonName: mail.example.test
+  dnsNames:
+    - mail.example.test
+  issuerRef:
+    kind: ClusterIssuer
+    name: selfsigned
+    group: cert-manager.io
+  reload:
+    enabled: false
+    credentialsSecret: ""
+
+metrics:
+  serviceMonitor:
+    enabled: true
+  prometheusRule:
+    enabled: true
+  auth:
+    existingSecret: ""
+
+networkPolicy:
+  managementIngress:
+    namespaces:
+      - monitoring
+
+e2e:
+  enabled: true
+  # probeImage comes from hack/e2e/values-common.yaml (global.e2e).

@@ -1,0 +1,38 @@
+Stalwart has been deployed.
+
+Stalwart keeps its configuration in its data store, not in this chart. Only
+`config.json` (the DataStore connection) is rendered here.
+
+{{- if .Values.recoveryAdmin.enabled }}
+
+First sign-in:
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "stalwart.adminServiceName" . }} 8080:8080
+  open http://127.0.0.1:8080/admin
+
+Use the recovery administrator from the configured Secret. Create a permanent
+administrator, then remove `recoveryAdmin` from values and run `helm upgrade`.
+Leaving the recovery administrator enabled leaves a full-access master
+credential in the pod environment.
+{{- else }}
+
+No recovery administrator is configured. For the first install, create a
+Secret containing `STALWART_RECOVERY_ADMIN=username:password`, set
+`recoveryAdmin.enabled=true` and `recoveryAdmin.existingSecret`, and upgrade.
+{{- end }}
+
+Mail/HTTP Service:
+  kubectl -n {{ .Release.Namespace }} get svc {{ include "stalwart.fullname" . }}
+  type: {{ .Values.service.mail.type }}
+
+Management listener (ClusterIP only):
+  kubectl -n {{ .Release.Namespace }} get svc {{ include "stalwart.adminServiceName" . }}
+
+Important:
+  - Port 8080 is plain HTTP and must never be exposed by the mail LoadBalancer.
+  - Ensure a public IP, matching PTR record, DNS records, and open port 25.
+  - Back up the PVC and `config.json` before minor or major upgrades.
+  - The default Log tracer writes to `/var/log/stalwart`; switch to a Stdout
+    tracer in the WebUI for cluster log collection.
+  - The TLS certificate Secret is mounted, but Stalwart does not use it until
+    you create the `Certificate` object that points at
+    `/etc/stalwart/tls/tls.crt` and `/etc/stalwart/tls/tls.key`.

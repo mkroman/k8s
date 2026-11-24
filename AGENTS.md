@@ -13,9 +13,8 @@ inputs), `spegel/README.md` (containerd).
   - `projects`: AppProjects
   - `namespaces`: every Namespace, with Pod Security labels. Applications do
     not use `CreateNamespace`, so a new namespace must be added here.
-  - `newApplications`: local apps
-  - `applications`: external repos via `apps-of-apps/<name>.yaml`
-- A chart directory with no `newApplications` entry is not deployed (for
+  - `applications`: local apps; external repositories live in `apps-of-apps/`
+- A chart directory with no `applications` entry is not deployed (for
   example `immich`, `kanidm`, `flaresolverr`).
 - AppProject defaults in `apps/templates/appproject.yaml`: if
   `clusterResourceWhitelist` is omitted it renders `[]`, so no cluster-scoped
@@ -105,6 +104,8 @@ Repository checks:
 ./hack/ci/lint-yaml.sh                      # plain YAML; skips templates/, charts/, workflows
 ./hack/ci/validate-helm.sh spegel           # one chart: dep build, lint, render, kubeconform
 ./hack/ci/validate-helm.sh                  # every chart (CI)
+./hack/ci/validate-chart-cases.sh           # data-driven render/negative chart cases
+./hack/ci/validate-e2e-contract.sh          # shared Argo CD e2e probe contract
 ./hack/ci/validate-kustomize.sh             # every kustomization.yaml
 ./hack/ci/validate-app-of-apps.sh           # root app keeps SSA + server-side diff
 ./hack/ci/validate-dashboards.py            # grafana/dashboards/*.json; datasources must use $datasource
@@ -154,6 +155,14 @@ astrarium run --app spegel --reuse-cluster --fast-fail
   `zigbee2mqtt` `coordinator.devicePath`).
 - Astrarium relies on Argo CD sync plus diagnostics. Static chart validation
   still happens in `hack/ci/validate-helm.sh`.
+- E2E probes carry `app.kubernetes.io/component: e2e-probe` and
+  `e2e.uplink.io/app: <release>` labels. `hack/ci/validate-e2e-contract.sh`
+  enforces the shared probe contract. Shared probe image/timeout defaults live
+  in `hack/e2e/values-common.yaml` and are injected as `global.e2e`.
+- Apps can opt into the generic in-cluster upgrade test with an `upgrade`
+  block in `hack/e2e/apps.yaml`. `astrarium upgrade` installs into
+  `<namespace>-rollout` with Helm, then checks pod replacement, marker
+  persistence and PVC retention. Do not add a per-app shell script.
 
 ## Probe conventions
 
@@ -194,7 +203,7 @@ astrarium run --app spegel --reuse-cluster --fast-fail
 - Never commit plaintext Secrets. SealedSecrets come from per-app
   `make secrets` (`op2secret | kubeseal`), which needs 1Password and cluster
   access. Ask the user to regenerate them.
-- To register a new app: add a project, namespace and `newApplications`
+- To register a new app: add a project, namespace and `applications`
   entry in `apps/values.yaml`, and add a row to the `README.md` table.
 
 ## Cluster / containerd

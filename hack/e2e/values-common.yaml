@@ -1,0 +1,11 @@
+# Shared defaults for the Argo CD e2e harness.
+#
+# run-app.sh injects this as `global.e2e` into every child Application whose
+# chart exposes an `e2e` key. Charts use:
+#   .Values.e2e.probeImage | default .Values.global.e2e.probeImage
+# so an app-specific value in values-kind.yaml still wins.
+global:
+  e2e:
+    # renovate: datasource=docker depName=mirror.gcr.io/library/busybox
+    probeImage: mirror.gcr.io/library/busybox:1.37.0@sha256:66a6306db78bf2dbf3487f293aa8d6990d8e506fdffab9cc43fe422becf886e4
+    timeoutSeconds: 180

@@ -1,0 +1,401 @@
+# Default values for the Stalwart mail and collaboration server chart.
+#
+# Stalwart keeps almost all of its configuration in its data store. This chart
+# renders only `/etc/stalwart/config.json` (the DataStore connection) into a
+# ConfigMap and mounts the data directory; domains, listeners, TLS certificate
+# objects, DKIM, DNS management, accounts and the Prometheus exporter are
+# configured through the WebUI, `stalwart-cli`, or a declarative plan.
+#
+# Official documentation:
+#   Kubernetes: https://stalw.art/docs/cluster/orchestration/kubernetes/
+#   Reference chart: https://stalw.art/docs/cluster/orchestration/kubernetes-chart/
+#   Security: https://stalw.art/docs/install/security/
+#   Backup: https://stalw.art/docs/management/backup/
+#   Tracers: https://stalw.art/docs/telemetry/tracing/tracers/
+#   Prometheus: https://stalw.art/docs/telemetry/metrics/prometheus/
+
+nameOverride: ""
+fullnameOverride: ""
+
+image:
+  # -- Official Stalwart image. GHCR (`ghcr.io/stalwartlabs/stalwart`) is an
+  #    alternative mirror.
+  repository: stalwartlabs/stalwart
+  # -- Image tag. Defaults to `v` + `.Chart.AppVersion` when empty.
+  tag: ""
+  # -- Image digest. When set, replaces the tag (`repository@digest`).
+  digest: ""
+  pullPolicy: IfNotPresent
+
+# -- List of image pull secrets for private registries.
+imagePullSecrets: []
+
+# -- The chart supports one replica only. A second replica without a shared
+#    data store, blob/search store, Keep or Redis, and a coordinator would be a
+#    separate server with its own data. Clustering needs a separate deployment
+#    model.
+replicaCount: 1
+
+serviceAccount:
+  # -- Create a ServiceAccount for the pod.
+  create: true
+  # -- Annotations to add to the ServiceAccount.
+  annotations: {}
+  # -- ServiceAccount name. Defaults to the fullname.
+  name: ""
+  # -- Never mount a Kubernetes API token; Stalwart does not talk to the API.
+  automountServiceAccountToken: false
+
+# -- Annotations for the Stalwart pod.
+podAnnotations: {}
+# -- Additional labels for the Stalwart pod.
+podLabels: {}
+
+podSecurityContext:
+  # -- Run as the unprivileged `stalwart` user from the official image.
+  runAsNonRoot: true
+  runAsUser: 2000
+  runAsGroup: 2000
+  fsGroup: 2000
+  fsGroupChangePolicy: OnRootMismatch
+  seccompProfile:
+    type: RuntimeDefault
+  # AppArmor is intentionally opt-in: set appArmorProfile.type here and in
+  # containerSecurityContext on nodes that enable AppArmor. Kind nodes do not.
+  # The restricted Pod Security Standard rejects Unconfined, so leave it unset
+  # on hosts without AppArmor.
+
+containerSecurityContext:
+  # -- Restricted Pod Security baseline. The image carries a
+  #    `cap_net_bind_service` file capability; the restricted profile empties
+  #    the bounding set, so NET_BIND_SERVICE must be added back for the
+  #    default listeners on ports below 1024.
+  runAsNonRoot: true
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+    add:
+      - NET_BIND_SERVICE
+  seccompProfile:
+    type: RuntimeDefault
+
+service:
+  mail:
+    # -- Mail/HTTP Service. Keep ClusterIP unless a layer-4 load balancer is
+    #    available. SMTP, IMAP, POP3 and ManageSieve cannot be carried by an
+    #    HTTP Ingress.
+    type: ClusterIP
+    annotations: {}
+    # -- Preserve the client source address for auto-ban and rate limits when
+    #    using NodePort or LoadBalancer.
+    externalTrafficPolicy: Local
+    # -- Optional static load balancer address (cloud providers or MetalLB).
+    loadBalancerIP: ""
+    # -- Optional load balancer class.
+    loadBalancerClass: ""
+    # -- Optional source ranges for a LoadBalancer service.
+    loadBalancerSourceRanges: []
+    # -- Optional IP family policy for dual-stack clusters.
+    ipFamilyPolicy: ""
+    # -- Optional IP families for dual-stack clusters.
+    ipFamilies: []
+    # -- Service ports. Set a port to 0 to leave it out of the Service. A
+    #    non-zero port must correspond to a listener configured in Stalwart;
+    #    the default listeners are 25, 465, 993, 443, 995, 4190 and 8080.
+    ports:
+      smtp: 25
+      smtps: 465
+      imaps: 993
+      https: 443
+      # The default server also listens on 995 (POP3S) and 4190
+      # (ManageSieve); leave them closed unless clients need them.
+      pop3s: 0
+      sieve: 0
+      # These listeners are not created by the default configuration. Add a
+      # NetworkListener in Stalwart before exposing them here.
+      submission: 0
+      imap: 0
+      pop3: 0
+      http: 0
+    # -- Additional Service ports for custom listeners. Each entry needs
+    #    `name`, `port` and `targetPort`.
+    extraPorts: []
+  admin:
+    # -- ClusterIP Service for the plain HTTP management listener. It is used
+    #    for `kubectl port-forward`, the cert reload CronJob, ServiceMonitor,
+    #    and the optional Ingress. Never add it to the mail LoadBalancer.
+    enabled: true
+    port: 8080
+    annotations: {}
+
+ingress:
+  # -- Optional HTTP Ingress for the management listener. This is an advanced
+  #    reverse-proxy mode: terminate TLS at the ingress, set `publicUrl`, and
+  #    configure Stalwart's trusted proxy networks. The mail protocols are not
+  #    handled by an Ingress.
+  enabled: false
+  className: ""
+  annotations: {}
+  # -- Ingress controller namespace to allow through the NetworkPolicy.
+  controllerNamespace: ""
+  hosts: []
+  #  - host: mail.example.org
+  #    paths:
+  #      - path: /
+  #        pathType: Prefix
+  tls: []
+
+persistence:
+  # -- Mount a persistent volume at `/var/lib/stalwart`. Required for RocksDB.
+  enabled: true
+  # -- Use an existing PVC instead of a StatefulSet volumeClaimTemplate. Useful
+  #    for restoring a Longhorn snapshot or cloned volume.
+  existingClaim: ""
+  accessMode: ReadWriteOnce
+  # -- StorageClass for the data volume. The repo's production storage class.
+  storageClass: ssd-gp1x3
+  size: 50Gi
+  # -- Optional static PV name and selector.
+  volumeName: ""
+  selector: {}
+  annotations: {}
+  retentionPolicy:
+    # -- Keep the PVC when the StatefulSet is deleted or scaled down.
+    whenDeleted: Retain
+    whenScaled: Retain
+
+# -- `config.json` contents. Only the DataStore belongs here. Do not put
+#    plaintext secrets in this object; the ConfigMap is not secret. For an
+#    external data store, use an `authSecret` with an `EnvironmentVariable` or
+#    `File` source and supply the value through `extraEnvFrom`.
+config:
+  "@type": RocksDb
+  path: /var/lib/stalwart
+
+recoveryAdmin:
+  # -- Enable the `STALWART_RECOVERY_ADMIN` credential. Required for the first
+  #    install because the chart always renders `config.json` and the server
+  #    never enters bootstrap mode. This is a full-access credential and must
+  #    be removed after a permanent administrator exists.
+  enabled: false
+  # -- Existing Secret containing the combined `username:password` value.
+  existingSecret: ""
+  existingSecretKey: STALWART_RECOVERY_ADMIN
+  # -- Username used when `password` is set below.
+  username: admin
+  # -- Test-only convenience for the kind/e2e environment. Never commit a
+  #    production password here; use `existingSecret` with a SealedSecret.
+  password: ""
+
+recoveryMode:
+  # -- Start in recovery mode, which suspends the mail listeners and exposes
+  #    only the management listener. Use it to apply a declarative plan or
+  #    regain access.
+  enabled: false
+  port: 8080
+  logLevel: info
+  # -- Optional bind address for the recovery listener.
+  bind: ""
+
+# -- Cluster role name. Leave empty for a single-node install.
+role: ""
+# -- Push notification shard, counted from 1. Only for clustered deployments.
+pushShard: ""
+
+# -- Public base URL published in discovery documents, for example
+#    `https://mail.rwx.im`. Set this when clients reach Stalwart through a URL
+#    other than `https://<defaultHostname>`.
+publicUrl: ""
+# -- Public HTTPS port when `publicUrl` is not set.
+httpsPort: ""
+# -- Add missing permissions to default roles at startup. Meant for one restart
+#    after an upgrade; remove afterwards.
+updateRolePermissions: false
+# -- Optional Tokio worker thread count. Empty uses one per CPU.
+tokioWorkerThreads: ""
+
+# -- Non-sensitive environment variables.
+extraEnv: {}
+# -- Environment sources, for example a Secret containing a database password.
+extraEnvFrom: []
+# -- Additional volumes and mounts, for example manually managed TLS files.
+extraVolumes: []
+extraVolumeMounts: []
+# -- Additional init containers.
+extraInitContainers: []
+
+resources:
+  # -- Memory limits matter: RocksDB sizes its block cache and the message
+  #    memory budget from the container/cgroup limit. See the README's memory
+  #    section before lowering the limit.
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: "2"
+    memory: 2Gi
+
+probes:
+  # -- `exec` uses curl against loopback, which is not affected by a default-deny
+  #    NetworkPolicy and does not depend on kubelet reaching the pod. Use
+  #    `httpGet` only when the CNI allows node-to-pod probes.
+  mode: exec
+  liveness:
+    enabled: true
+    path: /healthz/live
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  readiness:
+    enabled: true
+    path: /healthz/ready
+    initialDelaySeconds: 5
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  startup:
+    enabled: true
+    path: /healthz/live
+    periodSeconds: 5
+    timeoutSeconds: 5
+    failureThreshold: 30
+
+lifecycle:
+  # -- Wait for Service endpoints to stop sending new connections before SIGTERM.
+  preStopSleepSeconds: 10
+
+terminationGracePeriodSeconds: 60
+revisionHistoryLimit: 3
+minReadySeconds: 10
+updateStrategy:
+  type: RollingUpdate
+
+# -- Optional scheduling controls.
+nodeSelector: {}
+tolerations: []
+affinity: {}
+topologySpreadConstraints: []
+priorityClassName: ""
+
+networkPolicy:
+  # -- Create a default-deny NetworkPolicy with explicit mail, management and
+  #    egress rules. The CNI must enforce NetworkPolicy.
+  enabled: true
+  managementIngress:
+    # -- Namespaces allowed to reach the management port (in addition to the
+    #    release namespace). Add `monitoring` for ServiceMonitor and `traefik`
+    #    when the optional Ingress is used.
+    namespaces: []
+    # -- CIDRs allowed to reach the management port. Add the node CIDR when
+    #    using `httpGet` probes in a CNI that enforces policy on kubelet traffic.
+    cidrs: []
+  # -- Additional raw ingress rules.
+  extraIngress: []
+  egress:
+    # -- Allow all egress. This disables the explicit rules below.
+    allowAll: false
+    # -- Allow outbound SMTP delivery and relay traffic on 25, 465 and 587.
+    allowSmtp: true
+    # -- Allow HTTPS for the WebUI bundle, spam rules, ASN data, ACME, DNS
+    #    provider APIs and licensing.
+    allowHttps: true
+    # -- Allow outbound HTTP on port 80. Keep false to block cloud metadata
+    #    endpoints and plaintext APIs.
+    allowHttp: false
+    # -- Allow the configured external PostgreSQL or MySQL port.
+    allowDatabase: true
+    # -- Additional raw egress rules.
+    extraEgress: []
+
+certificate:
+  # -- Create/mount a cert-manager certificate. The Stalwart `Certificate`
+  #    object still has to point at the mounted files; see the README.
+  enabled: false
+  # -- Create a cert-manager `Certificate` resource. Set to false when using
+  #    an existing Secret.
+  create: true
+  # -- Existing Secret with `tls.crt` and `tls.key`. Used when `create` is
+  #    false, or to override the generated Secret.
+  existingSecret: ""
+  # -- Secret name for the generated Certificate.
+  secretName: ""
+  commonName: ""
+  dnsNames: []
+  #  - mail.rwx.im
+  issuerRef:
+    kind: ClusterIssuer
+    name: letsencrypt-prod
+    group: cert-manager.io
+  privateKey:
+    rotationPolicy: Always
+  duration: ""
+  renewBefore: ""
+  annotations: {}
+  reload:
+    # -- Run a CronJob that calls `Action/ReloadTlsCertificates` so renewed
+    #    files are loaded without a pod restart. Requires `credentialsSecret`.
+    enabled: false
+    schedule: "17 */6 * * *"
+    # -- Secret with CLI credentials (`STALWART_USER` + `STALWART_PASSWORD`, or
+    #    `STALWART_TOKEN`). The chart sets `STALWART_URL` to the admin Service.
+    credentialsSecret: ""
+    url: ""
+    image:
+      repository: stalwartlabs/cli
+      tag: "2.0.0"
+      pullPolicy: IfNotPresent
+    resources:
+      requests:
+        cpu: 10m
+        memory: 16Mi
+      limits:
+        cpu: 100m
+        memory: 64Mi
+
+metrics:
+  serviceMonitor:
+    # -- Create a ServiceMonitor for the repo Prometheus. The Stalwart
+    #    Prometheus exporter must also be enabled in the database.
+    enabled: false
+    interval: 30s
+    scrapeTimeout: 10s
+    # -- Additional labels for the ServiceMonitor.
+    additionalLabels: {}
+    # -- Label used for the Prometheus job. Using the instance keeps multiple
+    #    Stalwart releases distinguishable.
+    jobLabel: app.kubernetes.io/instance
+    relabelings: []
+    metricRelabelings: []
+  prometheusRule:
+    # -- Create PrometheusRule alerts. Requires serviceMonitor.enabled.
+    enabled: false
+    additionalLabels: {}
+    queueBacklogThreshold: 100
+  auth:
+    # -- Existing Secret with the metrics basic-auth credentials. The same
+    #    Secret is mounted at `/etc/stalwart/metrics` for Stalwart's Metrics
+    #    object (`authSecret` file source).
+    existingSecret: ""
+    usernameKey: username
+    passwordKey: password
+
+logs:
+  # -- EmptyDir size limit for `/var/log/stalwart`. The default Log tracer
+  #    writes daily files there; switch to a Stdout tracer in the WebUI for
+  #    cluster log collection.
+  sizeLimit: 1Gi
+tmp:
+  # -- EmptyDir size limit for `/tmp`.
+  sizeLimit: 512Mi
+
+e2e:
+  # -- Deploy the PostSync probe Job. Enabled only by values-kind.yaml.
+  enabled: false
+  # -- Probe image. Defaults to `global.e2e.probeImage` injected by the e2e
+  #    harness.
+  probeImage: ""
+  # -- Probe timeout in seconds. Defaults to `global.e2e.timeoutSeconds`.
+  timeoutSeconds: 180

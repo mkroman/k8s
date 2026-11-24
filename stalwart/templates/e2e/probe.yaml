@@ -1,0 +1,115 @@
+{{- if .Values.e2e.enabled }}
+{{- $probeImage := include "stalwart.probeImage" . }}
+{{- $timeout := int (include "stalwart.probeTimeout" .) }}
+{{- if or (eq (int .Values.service.mail.ports.smtp) 0) (eq (int .Values.service.mail.ports.smtps) 0) (eq (int .Values.service.mail.ports.imaps) 0) (eq (int .Values.service.mail.ports.https) 0) }}
+{{- fail "e2e.enabled requires smtp, smtps, imaps and https Service ports to be non-zero" }}
+{{- end }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: e2e-{{ include "stalwart.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/component: e2e-probe
+    e2e.uplink.io/app: {{ .Release.Name | quote }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "10"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  activeDeadlineSeconds: {{ add $timeout 60 }}
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: e2e-probe
+        e2e.uplink.io/app: {{ .Release.Name | quote }}
+    spec:
+      automountServiceAccountToken: false
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: probe
+          image: {{ $probeImage | quote }}
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          env:
+            - name: ADMIN_HOST
+              value: {{ include "stalwart.adminServiceName" . | quote }}
+            - name: ADMIN_PORT
+              value: {{ .Values.service.admin.port | quote }}
+            - name: MAIL_HOST
+              value: {{ include "stalwart.fullname" . | quote }}
+            - name: SMTP_PORT
+              value: {{ .Values.service.mail.ports.smtp | quote }}
+            - name: SMTPS_PORT
+              value: {{ .Values.service.mail.ports.smtps | quote }}
+            - name: IMAPS_PORT
+              value: {{ .Values.service.mail.ports.imaps | quote }}
+            - name: HTTPS_PORT
+              value: {{ .Values.service.mail.ports.https | quote }}
+            - name: TIMEOUT_SECONDS
+              value: {{ $timeout | quote }}
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              set -euo pipefail
+              deadline=$(( $(date +%s) + TIMEOUT_SECONDS ))
+
+              until wget -q -O /dev/null -T 5 \
+                "http://${ADMIN_HOST}:${ADMIN_PORT}/healthz/ready"; do
+                if [ "$(date +%s)" -ge "${deadline}" ]; then
+                  echo "FAIL: readiness endpoint did not become healthy within ${TIMEOUT_SECONDS}s" >&2
+                  exit 1
+                fi
+                sleep 2
+              done
+              echo "PASS: readiness endpoint is healthy"
+
+              smtp_ok=0
+              while [ "$(date +%s)" -lt "${deadline}" ]; do
+                if printf 'QUIT\r\n' | nc -w 5 "${MAIL_HOST}" "${SMTP_PORT}" |
+                  grep -q '^220'; then
+                  smtp_ok=1
+                  break
+                fi
+                sleep 2
+              done
+              if [ "${smtp_ok}" != "1" ]; then
+                echo "FAIL: no SMTP banner on ${MAIL_HOST}:${SMTP_PORT} within ${TIMEOUT_SECONDS}s" >&2
+                exit 1
+              fi
+              echo "PASS: SMTP banner received"
+
+              # The HTTPS listener is checked at TCP level. A functional TLS
+              # handshake requires a Stalwart Certificate object pointing at
+              # the mounted cert-manager files, which is database configuration
+              # and not created by this chart.
+              for port in "${SMTPS_PORT}" "${IMAPS_PORT}" "${HTTPS_PORT}"; do
+                if ! nc -z -w 5 "${MAIL_HOST}" "${port}"; then
+                  echo "FAIL: TCP listener ${MAIL_HOST}:${port} is not reachable" >&2
+                  exit 1
+                fi
+              done
+              echo "PASS: SMTPS, IMAPS and HTTPS listeners accept connections"
+{{- end }}

@@ -38,4 +38,4 @@ ingressRoute:
 e2e:
   enabled: true
   probeNamespace: monitoring
-  probeImage: mirror.gcr.io/library/busybox:1.37.0@sha256:66a6306db78bf2dbf3487f293aa8d6990d8e506fdffab9cc43fe422becf886e4
+  # probeImage comes from hack/e2e/values-common.yaml (global.e2e).

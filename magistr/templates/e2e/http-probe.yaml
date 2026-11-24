@@ -1,6 +1,7 @@
 {{- if .Values.e2e.enabled }}
-{{- $probeImage := required "e2e.probeImage is required when e2e.enabled is true" .Values.e2e.probeImage }}
-{{- $timeout := int (required "e2e.timeoutSeconds is required when e2e.enabled is true" .Values.e2e.timeoutSeconds) }}
+{{- $globalE2E := (.Values.global | default dict).e2e | default dict }}
+{{- $probeImage := required "e2e.probeImage or global.e2e.probeImage is required when e2e.enabled is true" (default $globalE2E.probeImage .Values.e2e.probeImage) }}
+{{- $timeout := int (default 180 (default $globalE2E.timeoutSeconds .Values.e2e.timeoutSeconds)) }}
 {{- $fullname := include "magistr.fullname" . }}
 {{- /* The probe pod must not carry the application's name/instance labels: the app Service
        selects on those, and a probe pod without the http port would become a bad endpoint. */}}
@@ -13,6 +14,7 @@ metadata:
     app.kubernetes.io/name: {{ printf "%s-e2e" $fullname }}
     app.kubernetes.io/instance: {{ .Release.Name }}
     app.kubernetes.io/component: e2e-probe
+    e2e.uplink.io/app: {{ .Release.Name | quote }}
   annotations:
     helm.sh/hook: post-install,post-upgrade
     helm.sh/hook-weight: "10"

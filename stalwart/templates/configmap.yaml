@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "stalwart.configMapName" . }}
+  labels:
+    {{- include "stalwart.labels" . | nindent 4 }}
+    app.kubernetes.io/component: config
+data:
+  # Stalwart only stores the DataStore connection in config.json. Everything
+  # else lives in the database and is managed through the WebUI or CLI.
+  config.json: |
+    {{- .Values.config | toPrettyJson | nindent 4 }}

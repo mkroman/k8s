@@ -36,17 +36,34 @@
 # can create pods directly (not through Argo CD), and deleting an Application
 # can leave its post-delete hook resources behind; either kind of leftover can
 # keep the image in use or confuse a probe's own pod selection.
+#
+# Shared probe defaults live in values-common.yaml; run-app.sh injects them as
+# `global.e2e` into every child Application whose chart exposes an `e2e` key.
+# `defaults.upgrade` centralises the generic upgrade test settings.
+#
+# upgrade opts an app into the generic in-cluster upgrade test. run-app.sh
+# installs the same chart into `<namespace>-rollout` with the same kind value
+# files, verifies the rollout, and checks PVC retention. `data_path` is
+# optional and is used for a write/read marker inside a mounted data volume.
 helm_repositories:
   - name: quickwit
     url: https://helm.quickwit.io
   - name: vector
     url: https://helm.vector.dev
 
+defaults:
+  upgrade:
+    timeoutSeconds: 600
+    securityProfile: restricted
+    verifyPvcRetention: true
+
 apps:
   agentgateway:
     requires:
       - gateway-api
       - prometheus-operator
+    extra_manifests:
+      - argo-cd/overlays/production/manifests/repository.cr-agentgateway-dev.yaml
   # The ServiceMonitor is disabled in values-kind.yaml because Prometheus
   # Operator depends on cert-manager, so there is nothing to assert here.
   cert-manager: {}
@@ -152,6 +169,60 @@ apps:
       pod_label_selectors:
         - e2e.spegel.io/pull
         - app.kubernetes.io/component in (cleanup,cleanup-wait)
+  stalwart:
+    requires:
+      - cert-manager
+      - prometheus-operator
+    timeout_seconds: 900
+    upgrade:
+      enabled: true
+      container: stalwart
+      data_path: /var/lib/stalwart
+    resources:
+      - apiVersion: apps/v1
+        kind: StatefulSet
+        namespace: stalwart
+        name: stalwart
+      - apiVersion: v1
+        kind: Service
+        namespace: stalwart
+        name: stalwart
+      - apiVersion: v1
+        kind: Service
+        namespace: stalwart
+        name: stalwart-admin
+      - apiVersion: v1
+        kind: ConfigMap
+        namespace: stalwart
+        name: stalwart-config
+      - apiVersion: v1
+        kind: ServiceAccount
+        namespace: stalwart
+        name: stalwart
+      - apiVersion: v1
+        kind: PersistentVolumeClaim
+        namespace: stalwart
+        name: data-stalwart-0
+      - apiVersion: networking.k8s.io/v1
+        kind: NetworkPolicy
+        namespace: stalwart
+        name: stalwart
+      - apiVersion: cert-manager.io/v1
+        kind: Certificate
+        namespace: stalwart
+        name: stalwart
+      - apiVersion: v1
+        kind: Secret
+        namespace: stalwart
+        name: stalwart-tls
+      - apiVersion: monitoring.coreos.com/v1
+        kind: ServiceMonitor
+        namespace: stalwart
+        name: stalwart
+      - apiVersion: monitoring.coreos.com/v1
+        kind: PrometheusRule
+        namespace: stalwart
+        name: stalwart
   traefik:
     requires:
       - prometheus-operator

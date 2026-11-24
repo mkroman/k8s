@@ -1,0 +1,432 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Stalwart chart values",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "image",
+    "service",
+    "persistence",
+    "config",
+    "resources"
+  ],
+  "properties": {
+    "global": {
+      "type": "object"
+    },
+    "nameOverride": {
+      "type": "string"
+    },
+    "fullnameOverride": {
+      "type": "string"
+    },
+    "image": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository"
+      ],
+      "properties": {
+        "repository": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tag": {
+          "type": "string"
+        },
+        "digest": {
+          "type": "string"
+        },
+        "pullPolicy": {
+          "type": "string",
+          "enum": [
+            "Always",
+            "IfNotPresent",
+            "Never"
+          ]
+        }
+      }
+    },
+    "imagePullSecrets": {
+      "type": "array"
+    },
+    "replicaCount": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "serviceAccount": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "create": {
+          "type": "boolean"
+        },
+        "annotations": {
+          "type": "object"
+        },
+        "name": {
+          "type": "string"
+        },
+        "automountServiceAccountToken": {
+          "type": "boolean"
+        }
+      }
+    },
+    "podAnnotations": {
+      "type": "object"
+    },
+    "podLabels": {
+      "type": "object"
+    },
+    "podSecurityContext": {
+      "type": "object"
+    },
+    "containerSecurityContext": {
+      "type": "object"
+    },
+    "service": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mail",
+        "admin"
+      ],
+      "properties": {
+        "mail": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "ports"
+          ],
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": [
+                "ClusterIP",
+                "NodePort",
+                "LoadBalancer"
+              ]
+            },
+            "annotations": {
+              "type": "object"
+            },
+            "externalTrafficPolicy": {
+              "type": "string",
+              "enum": [
+                "Cluster",
+                "Local"
+              ]
+            },
+            "loadBalancerIP": {
+              "type": "string"
+            },
+            "loadBalancerClass": {
+              "type": "string"
+            },
+            "loadBalancerSourceRanges": {
+              "type": "array"
+            },
+            "ipFamilyPolicy": {
+              "type": "string"
+            },
+            "ipFamilies": {
+              "type": "array"
+            },
+            "ports": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "smtp": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 65535
+                },
+                "smtps": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 65535
+                },
+                "imaps": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 65535
+                },
+                "https": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 65535
+                },
+                "pop3s": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 65535
+                },
+                "sieve": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 65535
+                },
+                "submission": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 65535
+                },
+                "imap": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 65535
+                },
+                "pop3": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 65535
+                },
+                "http": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 65535
+                }
+              }
+            },
+            "extraPorts": {
+              "type": "array"
+            }
+          }
+        },
+        "admin": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "enabled",
+            "port"
+          ],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "port": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 65535
+            },
+            "annotations": {
+              "type": "object"
+            }
+          }
+        }
+      }
+    },
+    "ingress": {
+      "type": "object"
+    },
+    "persistence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "existingClaim": {
+          "type": "string"
+        },
+        "accessMode": {
+          "type": "string",
+          "enum": [
+            "ReadWriteOnce",
+            "ReadWriteOncePod"
+          ]
+        },
+        "storageClass": {
+          "type": "string"
+        },
+        "size": {
+          "type": "string"
+        },
+        "volumeName": {
+          "type": "string"
+        },
+        "selector": {
+          "type": "object"
+        },
+        "annotations": {
+          "type": "object"
+        },
+        "retentionPolicy": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "whenDeleted": {
+              "type": "string",
+              "enum": [
+                "Retain",
+                "Delete"
+              ]
+            },
+            "whenScaled": {
+              "type": "string",
+              "enum": [
+                "Retain",
+                "Delete"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "config": {
+      "type": "object",
+      "required": [
+        "@type"
+      ]
+    },
+    "recoveryAdmin": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "existingSecret": {
+          "type": "string"
+        },
+        "existingSecretKey": {
+          "type": "string"
+        },
+        "username": {
+          "type": "string"
+        },
+        "password": {
+          "type": "string"
+        }
+      }
+    },
+    "recoveryMode": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535
+        },
+        "logLevel": {
+          "type": "string"
+        },
+        "bind": {
+          "type": "string"
+        }
+      }
+    },
+    "role": {
+      "type": "string"
+    },
+    "pushShard": {
+      "type": "string"
+    },
+    "publicUrl": {
+      "type": "string"
+    },
+    "httpsPort": {
+      "type": "string"
+    },
+    "updateRolePermissions": {
+      "type": "boolean"
+    },
+    "tokioWorkerThreads": {
+      "type": "string"
+    },
+    "extraEnv": {
+      "type": "object"
+    },
+    "extraEnvFrom": {
+      "type": "array"
+    },
+    "extraVolumes": {
+      "type": "array"
+    },
+    "extraVolumeMounts": {
+      "type": "array"
+    },
+    "extraInitContainers": {
+      "type": "array"
+    },
+    "resources": {
+      "type": "object"
+    },
+    "probes": {
+      "type": "object"
+    },
+    "lifecycle": {
+      "type": "object"
+    },
+    "terminationGracePeriodSeconds": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "revisionHistoryLimit": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "minReadySeconds": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "updateStrategy": {
+      "type": "object"
+    },
+    "nodeSelector": {
+      "type": "object"
+    },
+    "tolerations": {
+      "type": "array"
+    },
+    "affinity": {
+      "type": "object"
+    },
+    "topologySpreadConstraints": {
+      "type": "array"
+    },
+    "priorityClassName": {
+      "type": "string"
+    },
+    "networkPolicy": {
+      "type": "object"
+    },
+    "certificate": {
+      "type": "object"
+    },
+    "metrics": {
+      "type": "object"
+    },
+    "logs": {
+      "type": "object"
+    },
+    "tmp": {
+      "type": "object"
+    },
+    "e2e": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "probeImage": {
+          "type": "string"
+        },
+        "timeoutSeconds": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    }
+  }
+}

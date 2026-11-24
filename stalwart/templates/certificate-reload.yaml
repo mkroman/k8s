@@ -1,0 +1,71 @@
+{{- if and .Values.certificate.enabled .Values.certificate.reload.enabled }}
+{{- $adminHost := include "stalwart.adminServiceName" . }}
+{{- $url := default (printf "http://%s:%v" $adminHost .Values.service.admin.port) .Values.certificate.reload.url }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "stalwart.fullname" . }}-reload-tls
+  labels:
+    {{- include "stalwart.labels" . | nindent 4 }}
+    app.kubernetes.io/component: cert-reload
+spec:
+  schedule: {{ .Values.certificate.reload.schedule | quote }}
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 300
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      activeDeadlineSeconds: 120
+      backoffLimit: 1
+      template:
+        metadata:
+          labels:
+            {{- include "stalwart.selectorLabels" . | nindent 12 }}
+            app.kubernetes.io/component: cert-reload
+        spec:
+          automountServiceAccountToken: false
+          restartPolicy: OnFailure
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65532
+            runAsGroup: 65532
+            fsGroup: 65532
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: reload
+              image: {{ printf "%s:%s" .Values.certificate.reload.image.repository .Values.certificate.reload.image.tag | quote }}
+              imagePullPolicy: {{ .Values.certificate.reload.image.pullPolicy }}
+              args:
+                - create
+                - Action/ReloadTlsCertificates
+              env:
+                - name: STALWART_URL
+                  value: {{ $url | quote }}
+                - name: HOME
+                  value: /tmp
+                - name: XDG_CACHE_HOME
+                  value: /tmp/.cache
+                - name: XDG_DATA_HOME
+                  value: /tmp/.local/share
+              envFrom:
+                - secretRef:
+                    name: {{ .Values.certificate.reload.credentialsSecret }}
+              resources:
+                {{- toYaml .Values.certificate.reload.resources | nindent 16 }}
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop:
+                    - ALL
+                seccompProfile:
+                  type: RuntimeDefault
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: tmp
+              emptyDir: {}
+{{- end }}

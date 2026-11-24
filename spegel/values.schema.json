@@ -5,6 +5,10 @@
   "additionalProperties": false,
   "required": ["spegel"],
   "properties": {
+    "global": {
+      "type": "object",
+      "description": "Shared e2e defaults injected by the harness."
+    },
     "e2e": {
       "type": "object",
       "additionalProperties": false,

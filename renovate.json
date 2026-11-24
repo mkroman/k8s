@@ -51,9 +51,10 @@
     },
     {
       "customType": "regex",
-      "description": "Update images pinned in kind-only values overrides",
+      "description": "Update images pinned in kind-only values overrides and shared e2e defaults",
       "managerFilePatterns": [
-        "/(^|/)values-kind\\.ya?ml$/"
+        "/(^|/)values-kind\\.ya?ml$/",
+        "/^hack\\/e2e\\/values-common\\.ya?ml$/"
       ],
       "matchStrings": [
         "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\n\\s*[A-Za-z0-9_]+: [^:\\s]+:(?<currentValue>\\S+)"
@@ -69,12 +70,13 @@
       "pinDigests": false
     },
     {
-      "description": "Do not add image digests in kind-only values overrides",
+      "description": "Do not add image digests in kind-only values overrides or shared e2e defaults",
       "matchManagers": [
         "custom.regex"
       ],
       "matchFileNames": [
-        "**/values-kind.yaml"
+        "**/values-kind.yaml",
+        "hack/e2e/values-common.yaml"
       ],
       "pinDigests": false
     },
