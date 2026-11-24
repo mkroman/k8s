@@ -51,3 +51,11 @@ patches:
 - path: deployment-patch.yaml
 - path: service-patch.yaml
 - path: sealedsecret-delete.yaml
+# The broker uses an emptyDir in this overlay, so the base PVC would remain
+# Pending forever and keep the Application from becoming Healthy.
+- patch: |-
+    $patch: delete
+    apiVersion: v1
+    kind: PersistentVolumeClaim
+    metadata:
+      name: mosquitto-data

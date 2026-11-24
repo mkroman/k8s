@@ -24,6 +24,11 @@ throwaway kind cluster:
    projected volume (configMap + secret) for a plain ConfigMap volume with
    that config. Anonymous access is **e2e-only**; production keeps the
    password-protected listener.
+4. **The local-path PVC is unnecessary here.** This test proves MQTT
+   connectivity, not storage. The overlay switches `/mosquitto/data` to an
+   `emptyDir` and deletes the base PVC, so a slow or permission-sensitive
+   local-path volume cannot crash-loop the broker or leave a Pending PVC in
+   the Application health.
 
 ## Layout note
 
@@ -67,9 +72,10 @@ the copy from this overlay or the build will fail with a duplicate resource.
   `hook-delete-policy: BeforeHookCreation,HookSucceeded`. It publishes a
   retained message to `e2e/probe` (publish-before-subscribe is race-free
   because of the retain flag), subscribes and requires the exact message
-  back with `-C 1 -W 30`, and clears the retained message. A timeout, empty
-  payload, or wrong payload fails the Job. It has no Kubernetes API access
-  and needs no RBAC.
+  back, and clears the retained message. The publish/subscribe pair retries
+  for up to 90 seconds so a broker that is not ready yet cannot fail the
+  PostSync hook prematurely. A timeout, empty payload, or wrong payload
+  fails the Job. It has no Kubernetes API access and needs no RBAC.
 - The Job intentionally does **not** set `spec.selector`: the API server
   rejects a hand-written selector on a Job, and the generated
   `batch.kubernetes.io/controller-uid`/`job-name` labels can never match the
@@ -77,5 +83,5 @@ the copy from this overlay or the build will fail with a duplicate resource.
 - Broker pods are tagged `app.kubernetes.io/component: broker` and the
   Service selector requires that label. If the app labels were ever added to
   the probe pod, it still could not become a Service endpoint.
-- `deployment-patch.yaml` also sets `fsGroup: 1883` defensively so the
-  local-path PVC is writable by UID 1883.
+- `deployment-patch.yaml` keeps `fsGroup: 1883` so the data mount and any
+  future writable volume remain usable by the image's UID.

@@ -25,6 +25,9 @@ spec:
         projected: null
         configMap:
           name: mosquitto-config
+      # The e2e test proves MQTT connectivity, not local-path storage. Keep
+      # production on its PVC, but use pod-local storage here so a slow or
+      # permission-sensitive local-path volume cannot crash-loop the broker.
       - name: mosquitto-data
-        persistentVolumeClaim:
-          claimName: mosquitto-data
+        persistentVolumeClaim: null
+        emptyDir: {}

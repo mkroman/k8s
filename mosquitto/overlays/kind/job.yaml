@@ -42,12 +42,24 @@ spec:
         - -ec
         args:
         - |
-          mosquitto_pub -h mosquitto -p 1883 -t e2e/probe -m e2e-roundtrip-ok -r
-          msg="$(mosquitto_sub -h mosquitto -p 1883 -t e2e/probe -C 1 -W 30)"
-          [ "$msg" = e2e-roundtrip-ok ] || {
-            echo "probe failed: expected 'e2e-roundtrip-ok', got '${msg}'" >&2
-            exit 1
-          }
+          set -eu
+          deadline=$(( $(date +%s) + 90 ))
+          msg=""
+          while :; do
+            if mosquitto_pub -h mosquitto -p 1883 -t e2e/probe \
+                -m e2e-roundtrip-ok -r &&
+              msg="$(mosquitto_sub -h mosquitto -p 1883 -t e2e/probe \
+                -C 1 -W 10)" &&
+              [ "$msg" = e2e-roundtrip-ok ]; then
+              break
+            fi
+            if [ "$(date +%s)" -ge "${deadline}" ]; then
+              echo "probe failed: no matching retained message within 90s (last: '${msg}')" >&2
+              exit 1
+            fi
+            echo "broker not ready for a publish/subscribe round-trip yet; retrying"
+            sleep 2
+          done
           mosquitto_pub -h mosquitto -p 1883 -t e2e/probe -n -r
           echo "mqtt round-trip ok"
         securityContext:
