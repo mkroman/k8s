@@ -20,13 +20,13 @@ throwaway kind cluster:
    unhealthy forever. The overlay deletes the SealedSecret (`$patch: delete`).
 3. **Credentials are unnecessary in e2e.** The overlay generates its own
    `mosquitto.conf` (derived from the base one: only `allow_anonymous true`
-   and the removal of `password_file` differ) and swaps the Deployment's
-   projected volume (configMap + secret) for a plain ConfigMap volume with
-   that config. Anonymous access is **e2e-only**; production keeps the
-   password-protected listener.
+   and the removal of `password_file` differ) and replaces the Deployment's
+   config ConfigMap. It also removes the production password-file volume and
+   mount, because the SealedSecret cannot be decrypted in kind. Anonymous
+   access is **e2e-only**; production keeps the password-protected listener.
 4. **The local-path PVC is unnecessary here.** This test proves MQTT
-   connectivity, not storage. The overlay switches `/mosquitto/data` to an
-   `emptyDir` and deletes the base PVC, so a slow or permission-sensitive
+   connectivity, not storage. The overlay switches `/var/lib/mosquitto` to
+   an `emptyDir` and deletes the base PVC, so a slow or permission-sensitive
    local-path volume cannot crash-loop the broker or leave a Pending PVC in
    the Application health.
 
@@ -43,12 +43,26 @@ overlay instead.
 The base app generates its ConfigMap with `configMapGenerator`, which appends
 a content hash to the name. The overlay adds a separate, deterministic
 `mosquitto-e2e-config` ConfigMap with `disableNameSuffixHash: true`, and the
-Deployment patch mounts it explicitly with `defaultMode: 0644`.
+Deployment patch mounts it explicitly with `defaultMode: 0644`. This keeps the
+e2e resource assertion stable and avoids `behavior: replace`.
 
-Do not use `behavior: replace` here. It is sensitive to how the cluster's
-Kustomize/Argo CD version merges the base hash-suffixed resource and can leave
-the pod mounting an empty ConfigMap; the broker then exits with
-`Unable to open config file /mosquitto/config/mosquitto.conf`.
+## AppArmor-safe paths
+
+Ubuntu 26.04 ships an AppArmor profile for `/usr/sbin/mosquitto` that permits
+reading `/etc/mosquitto/**` and writing `/var/lib/mosquitto/mosquitto.db`.
+GitHub Actions runners load that profile. Kind pods run without an AppArmor
+profile, so the host profile applies to the mosquitto binary inside the
+container and it cannot read `/mosquitto/config/mosquitto.conf`; the broker
+then exits 3 with:
+
+```
+Error: Unable to open config file /mosquitto/config/mosquitto.conf.
+```
+
+The chart therefore mounts the config and password files at `/etc/mosquitto`
+and mounts the data volume at `/var/lib/mosquitto`. Both files use `subPath`
+so AppArmor sees regular files at those paths instead of ConfigMap/Secret
+atomic-writer symlink targets.
 
 ## NetworkPolicy
 

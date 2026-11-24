@@ -46,7 +46,7 @@ spec:
           deadline=$(( $(date +%s) + 90 ))
           msg=""
           while :; do
-            if mosquitto_pub -h mosquitto -p 1883 -t e2e/probe \
+            if timeout 10s mosquitto_pub -h mosquitto -p 1883 -t e2e/probe \
                 -m e2e-roundtrip-ok -r &&
               msg="$(mosquitto_sub -h mosquitto -p 1883 -t e2e/probe \
                 -C 1 -W 10)" &&
@@ -60,7 +60,7 @@ spec:
             echo "broker not ready for a publish/subscribe round-trip yet; retrying"
             sleep 2
           done
-          mosquitto_pub -h mosquitto -p 1883 -t e2e/probe -n -r
+          timeout 10s mosquitto_pub -h mosquitto -p 1883 -t e2e/probe -n -r
           echo "mqtt round-trip ok"
         securityContext:
           allowPrivilegeEscalation: false
