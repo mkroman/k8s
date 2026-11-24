@@ -41,12 +41,14 @@ overlay instead.
 ## Deterministic ConfigMap naming
 
 The base app generates its ConfigMap with `configMapGenerator`, which appends
-a content hash to the name. The e2e harness asserts a ConfigMap literally
-named `mosquitto-config` exists. The overlay therefore runs its own generator
-over the same name with `behavior: replace` and
-`disableNameSuffixHash: true`: the hash-suffixed base ConfigMap is replaced
-wholesale by one unhashed ConfigMap, and the Deployment volume reference
-resolves to exactly that name.
+a content hash to the name. The overlay adds a separate, deterministic
+`mosquitto-e2e-config` ConfigMap with `disableNameSuffixHash: true`, and the
+Deployment patch mounts it explicitly with `defaultMode: 0644`.
+
+Do not use `behavior: replace` here. It is sensitive to how the cluster's
+Kustomize/Argo CD version merges the base hash-suffixed resource and can leave
+the pod mounting an empty ConfigMap; the broker then exits with
+`Unable to open config file /mosquitto/config/mosquitto.conf`.
 
 ## NetworkPolicy
 

@@ -118,7 +118,7 @@ apps:
       - apiVersion: v1
         kind: ConfigMap
         namespace: mosquitto
-        name: mosquitto-config
+        name: mosquitto-e2e-config
   node-feature-discovery:
     requires:
       - prometheus-operator
