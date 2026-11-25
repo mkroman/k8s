@@ -160,9 +160,18 @@ pub enum ClusterCommand {
         /// Override the cluster name.
         #[arg(long, value_name = "NAME")]
         name: Option<String>,
-        /// Keep the cluster after the command returns.
+        /// Override the kubeconfig path.
+        ///
+        /// Defaults to the first `KUBECONFIG` entry, then to
+        /// `cluster.kubeconfig` from the manifest.
+        #[arg(long, value_name = "PATH")]
+        kubeconfig: Option<PathBuf>,
+        /// Reuse an existing cluster instead of creating one.
         #[arg(long)]
-        keep: bool,
+        reuse: bool,
+        /// Override the kind node image.
+        #[arg(long, value_name = "IMAGE")]
+        node_image: Option<String>,
     },
     /// Delete a test cluster.
     Delete {
@@ -183,6 +192,9 @@ pub struct DoctorArgs {
     /// Treat a missing manifest as an error.
     #[arg(long)]
     pub require_config: bool,
+    /// Skip the optional Jaeger and registry mirror reachability checks.
+    #[arg(long)]
+    pub skip_services: bool,
 }
 
 /// Arguments for `astrarium manifest`.
