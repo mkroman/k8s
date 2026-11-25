@@ -83,7 +83,8 @@ jobs:
         else
           args+=(--all)
         fi
-        matrix="$(astrarium plan "${args[@]}" | jq -c .)"
+        plan_json="$(astrarium plan "${args[@]}")"
+        matrix="$(jq -c '.matrix' <<<"${plan_json}")"
         count="$(jq -r '.include | length' <<<"${matrix}")"
         echo "matrix=${matrix}" >>"${GITHUB_OUTPUT}"
         if [[ "${count}" -gt 0 ]]; then
