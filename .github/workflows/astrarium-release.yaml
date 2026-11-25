@@ -193,7 +193,7 @@ jobs:
     - name: Publish release
       run: |
         set -euo pipefail
-        gh release edit "${TAG}" --draft=false --verify-tag
+        gh release edit "${TAG}" --draft=false
     - name: Write summary
       if: always()
       env:
