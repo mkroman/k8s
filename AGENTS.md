@@ -54,6 +54,9 @@ Deeper docs: `hack/ci/README.md` (CI scripts, tool manifest),
 - Registry mirrors and Jaeger are defined in `astrium/compose.yaml`. The kind
   cluster must mount containerd `hosts.toml` mirrors. Prefer the host LAN IP,
   with a Docker bridge-gateway fallback.
+- `astrarium run --trace-file <path>` writes OTLP JSON that Jaeger UI can load
+  through Search -> Upload. The e2e workflow uploads it as an
+  `astrarium-<app>-trace` artifact; keep that path in failure diagnostics too.
 - Use the Astrarium RFD process for architectural changes: `astrium/rfd/`,
   states prediscussion/ideation/discussion/published/committed/abandoned,
   branch + PR discussion, `rfd/README.md` index, no direct pushes to main.
