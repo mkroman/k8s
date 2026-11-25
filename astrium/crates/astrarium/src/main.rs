@@ -13,7 +13,7 @@ use clap::Parser;
 use miette::{IntoDiagnostic, Result, miette};
 use tracing::info;
 
-use crate::cli::{Cli, Command, LogFormat, ManifestCommand};
+use crate::cli::{Cli, ClusterCommand, Command, LogFormat, ManifestCommand};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -27,11 +27,8 @@ async fn main() -> Result<()> {
     let needs_manifest = match &cli.command {
         Command::Version | Command::Completions { .. } | Command::Doctor(_) => false,
         Command::Manifest(args) => !matches!(args.command, ManifestCommand::Schema),
-        Command::Plan(_)
-        | Command::Run(_)
-        | Command::Upgrade(_)
-        | Command::Render(_)
-        | Command::Cluster(_) => true,
+        Command::Cluster(args) => matches!(args.command, ClusterCommand::Create { .. }),
+        Command::Plan(_) | Command::Run(_) | Command::Upgrade(_) | Command::Render(_) => true,
     };
 
     let manifest = if cli.config.exists() {

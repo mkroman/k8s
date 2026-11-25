@@ -11,7 +11,6 @@ use crate::cli::{ClusterArgs, ClusterCommand};
 
 /// Runs a cluster subcommand.
 pub async fn run(manifest: Option<&Manifest>, args: &ClusterArgs) -> Result<()> {
-    let manifest = manifest.ok_or_else(|| miette!("a manifest is required for `cluster`"))?;
     let cluster = KindCluster::new(RealCommandRunner);
 
     match &args.command {
@@ -21,6 +20,8 @@ pub async fn run(manifest: Option<&Manifest>, args: &ClusterArgs) -> Result<()> 
             reuse,
             node_image,
         } => {
+            let manifest =
+                manifest.ok_or_else(|| miette!("a manifest is required for `cluster create`"))?;
             if manifest.cluster.provider == ClusterProvider::Existing {
                 return Err(miette!(
                     "cluster.provider is \"existing\"; there is no kind cluster to create"
