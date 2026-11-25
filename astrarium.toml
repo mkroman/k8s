@@ -410,7 +410,7 @@ namespace = "magistr-prod"
 project = "magistr"
 source = "magistr"
 renderer = "helm"
-values = ["values-kind.yaml"]
+values = ["values-prod.yaml", "values-kind.yaml"]
 probe = true
 resources = [
   { api_version = "apps/v1", kind = "Deployment", namespace = "magistr-prod", name = "magistr" },

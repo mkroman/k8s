@@ -375,3 +375,176 @@ fn full_repository_plan_contains_every_e2e_app() {
         17
     );
 }
+
+#[test]
+fn run_help_lists_selection_flags() {
+    binary()
+        .args(["run", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("--app"))
+        .stdout(predicate::str::contains("--all"))
+        .stdout(predicate::str::contains("--keep-cluster"))
+        .stdout(predicate::str::contains("--reuse-cluster"))
+        .stdout(predicate::str::contains("--fast-fail"));
+}
+
+#[test]
+fn run_without_app_or_all_fails_before_creating_a_cluster() {
+    let directory = tempfile::tempdir().expect("tempdir");
+    let manifest = directory.path().join("astrarium.toml");
+    std::fs::write(&manifest, demo_manifest()).expect("manifest");
+
+    binary()
+        .args(["run", "--config"])
+        .arg(&manifest)
+        .env_remove("GITHUB_OUTPUT")
+        .env_remove("GITHUB_STEP_SUMMARY")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("select apps with --all or --app"));
+
+    assert!(
+        !directory.path().join(".astrium").exists(),
+        "the run must not prepare a cluster before validating the selection"
+    );
+}
+
+#[test]
+fn run_unknown_app_fails_without_creating_a_cluster() {
+    let directory = tempfile::tempdir().expect("tempdir");
+    let manifest = directory.path().join("astrarium.toml");
+    std::fs::write(&manifest, demo_manifest()).expect("manifest");
+
+    binary()
+        .args(["run", "--app", "missing", "--config"])
+        .arg(&manifest)
+        .env_remove("GITHUB_OUTPUT")
+        .env_remove("GITHUB_STEP_SUMMARY")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("unknown app \"missing\""));
+
+    assert!(!directory.path().join(".astrium").exists());
+}
+
+#[test]
+fn render_unknown_app_fails() {
+    let directory = tempfile::tempdir().expect("tempdir");
+    let manifest = directory.path().join("astrarium.toml");
+    std::fs::write(&manifest, demo_manifest()).expect("manifest");
+
+    binary()
+        .args(["render", "--app", "missing", "--config"])
+        .arg(&manifest)
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("is not declared"));
+}
+
+#[cfg(unix)]
+#[test]
+fn render_app_packages_a_helm_chart() {
+    use std::os::unix::fs::PermissionsExt as _;
+
+    let directory = tempfile::tempdir().expect("tempdir");
+    let chart = directory.path().join("demo");
+    std::fs::create_dir_all(chart.join("templates")).expect("chart");
+    std::fs::write(
+        chart.join("Chart.yaml"),
+        "apiVersion: v2\nname: demo\nversion: 0.1.0\n",
+    )
+    .expect("Chart.yaml");
+    std::fs::write(
+        chart.join("templates/configmap.yaml"),
+        "apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: demo\n",
+    )
+    .expect("template");
+
+    let fake_helm = directory.path().join("fake-helm");
+    std::fs::write(
+        &fake_helm,
+        r#"#!/bin/sh
+set -eu
+case "${1:-}" in
+  dependency) exit 0 ;;
+  template)
+    printf 'apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: demo\n'
+    exit 0
+    ;;
+  package)
+    mkdir -p "$4"
+    touch "$4/demo-$6.tgz"
+    exit 0
+    ;;
+  repo) exit 0 ;;
+  *) exit 0 ;;
+esac
+"#,
+    )
+    .expect("fake helm");
+    let mut permissions = std::fs::metadata(&fake_helm)
+        .expect("fake helm metadata")
+        .permissions();
+    permissions.set_mode(0o755);
+    std::fs::set_permissions(&fake_helm, permissions).expect("fake helm permissions");
+
+    let manifest = directory.path().join("astrarium.toml");
+    std::fs::write(
+        &manifest,
+        format!(
+            r#"
+[project]
+name = "test"
+root = "."
+
+[argocd]
+install = "argocd"
+
+[render]
+helm = "{}"
+dry_run = true
+timeout = "30s"
+
+[telemetry]
+enabled = false
+
+[registry]
+enabled = false
+mirrors = []
+
+[[projects]]
+name = "demo"
+destinations = [{{ namespace = "demo" }}]
+
+[[namespaces]]
+name = "demo"
+
+[[apps]]
+name = "demo"
+namespace = "demo"
+project = "demo"
+source = "demo"
+renderer = "helm"
+"#,
+            fake_helm.display()
+        ),
+    )
+    .expect("manifest");
+
+    let output = directory.path().join("out");
+    binary()
+        .args(["render", "--app", "demo", "--output"])
+        .arg(&output)
+        .arg("--config")
+        .arg(&manifest)
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("chart name: demo"))
+        .stdout(predicate::str::contains("chart version: 0.1.0"));
+
+    assert!(
+        output.join("demo-0.1.0.tgz").is_file(),
+        "the rendered chart must be packaged in the output directory"
+    );
+}

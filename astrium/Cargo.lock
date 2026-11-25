@@ -158,6 +158,7 @@ version = "0.1.0"
 dependencies = [
  "assert_cmd",
  "astrarium-core",
+ "astrarium-test-support",
  "clap",
  "clap_complete",
  "gix",
@@ -212,6 +213,9 @@ dependencies = [
 [[package]]
 name = "astrarium-test-support"
 version = "0.1.0"
+dependencies = [
+ "astrarium-core",
+]
 
 [[package]]
 name = "async-broadcast"
