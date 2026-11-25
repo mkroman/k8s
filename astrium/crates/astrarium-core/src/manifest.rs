@@ -3,9 +3,12 @@
 //! The manifest is the single source of truth for an Astrarium suite. It
 //! describes the namespaces and Argo CD projects Astrarium creates, the
 //! applications it renders and deploys, and the cluster and telemetry settings
-//! used for a run. It is deliberately independent of the production
-//! app-of-apps catalogue: there is no runtime adapter that reads
-//! `apps/values.yaml` or `hack/e2e/apps.yaml`.
+//! used for a run.
+//!
+//! A suite can either declare projects, namespaces and applications natively
+//! or opt into the read-only YAML catalogue adapter with a `[catalog]` table.
+//! The adapter imports the repository's existing app-of-apps catalogues before
+//! validation and never deploys the production `apps` chart.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs;
@@ -17,6 +20,10 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::types::{AppName, HumanDuration, NamespaceName, ProjectName, Revision, ValueError};
+
+mod catalog;
+
+pub use catalog::{CatalogConfig, CatalogError};
 
 /// An error while reading, parsing or validating an Astrarium manifest.
 #[derive(Debug, Error)]
@@ -86,6 +93,9 @@ pub enum ManifestError {
         /// The declaration that requires it.
         context: String,
     },
+    /// A YAML catalogue could not be read or converted.
+    #[error(transparent)]
+    Catalog(#[from] CatalogError),
 }
 
 impl ManifestError {
@@ -117,6 +127,13 @@ pub struct Manifest {
     /// Pull-through registry mirrors for kind nodes.
     #[serde(default)]
     pub registry: RegistryConfig,
+    /// Opt into the read-only YAML catalogue adapter.
+    ///
+    /// When present, the referenced catalogues populate the project,
+    /// namespace, application and Helm repository lists. Those native lists
+    /// must be empty.
+    #[serde(default)]
+    pub catalog: Option<CatalogConfig>,
     /// Helm repositories that must be registered before dependency builds.
     #[serde(default)]
     pub helm_repositories: Vec<HelmRepository>,
@@ -575,6 +592,7 @@ impl Manifest {
         let base = path.parent().unwrap_or_else(|| Path::new("."));
         manifest.path = Some(path.to_path_buf());
         manifest.absolute_root(base)?;
+        manifest.populate_catalog()?;
         manifest.validate()?;
         Ok(manifest)
     }
@@ -593,8 +611,33 @@ impl Manifest {
             source,
         })?;
         manifest.absolute_root(base_dir)?;
+        manifest.populate_catalog()?;
         manifest.validate()?;
         Ok(manifest)
+    }
+
+    fn populate_catalog(&mut self) -> Result<(), ManifestError> {
+        let Some(config) = self.catalog.clone() else {
+            return Ok(());
+        };
+        if !self.projects.is_empty()
+            || !self.namespaces.is_empty()
+            || !self.apps.is_empty()
+            || !self.helm_repositories.is_empty()
+        {
+            return Err(ManifestError::invalid(
+                "catalog mode cannot be combined with native [[projects]], [[namespaces]], [[apps]] or [[helm_repositories]] entries",
+            ));
+        }
+
+        let apps_path = self.resolve_path(&config.apps)?;
+        let e2e_path = self.resolve_path(&config.e2e)?;
+        let suite = catalog::load(&self.project.root, &apps_path, &e2e_path)?;
+        self.projects = suite.projects;
+        self.namespaces = suite.namespaces;
+        self.apps = suite.apps;
+        self.helm_repositories = suite.helm_repositories;
+        Ok(())
     }
 
     fn absolute_root(&mut self, base_dir: &Path) -> Result<(), ManifestError> {

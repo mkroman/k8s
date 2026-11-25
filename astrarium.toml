@@ -1,16 +1,27 @@
 # Astrarium suite for this repository.
 #
-# This is the native source of truth for the e2e suite. It is not an adapter for
-# `apps/values.yaml` or `hack/e2e/apps.yaml`; the test-relevant projects,
-# namespaces and applications are declared here on purpose. The production
-# `apps` chart remains the deployment source of truth.
+# This suite opts into the read-only YAML catalogue adapter instead of
+# duplicating the production app-of-apps definitions in TOML. `apps` points at
+# the production catalogue and `e2e` at the e2e subset:
+#   - only applications listed in `hack/e2e/apps.yaml` are included;
+#   - projects come from `apps/values.yaml`, reduced to the referenced ones;
+#   - namespaces are derived from application and project destinations, using
+#     the production labels when declared and empty specs for cluster-created
+#     namespaces such as kube-system and cnpg-system.
 #
-# The projects and namespaces mirror the production catalogue, reduced to the
-# applications exercised by `hack/e2e/apps.yaml`. `sync_policy` mirrors the
-# effective e2e policy: the legacy harness replaces Argo CD's per-app retry
-# block with `E2E_RETRY_LIMIT`/`E2E_RETRY_MAX_DURATION` (20 attempts, 5m), so
-# the manifest defaults (20, 5s backoff, 5m maximum) match it. `spegel` keeps
-# its cold-image override of zero retries.
+# The adapter is read-only and does not use the production `apps` chart for
+# deployment. Native `[[projects]]`, `[[namespaces]]`, `[[apps]]` and
+# `[[helm_repositories]]` tables remain supported for other repositories; a
+# single manifest must use one mode or the other.
+#
+# Conversion notes:
+#   - a production `syncPolicy` maps automated/prune/selfHeal/syncOptions; the
+#     e2e `retry_limit` override wins, otherwise the default is 20 attempts
+#     with a 5s backoff and a 5m maximum;
+#   - Helm apps append `values-kind.yaml` after the production value files;
+#   - an `overlays/kind` source also watches the production path;
+#   - `probe` stays false because the adapter does not inspect PostSync hooks;
+#     the run orchestrator does not use that field.
 #
 # RFDs: astrium/rfd/
 # Usage: astrarium plan
@@ -26,11 +37,17 @@ base_branch = "main"
 # shared automatically.
 shared_paths = [
   "astrarium.toml",
+  "apps/values.yaml",
+  "hack/e2e/apps.yaml",
   "hack/e2e/kind.yaml",
   "hack/e2e/argocd",
   "astrium",
   "astrium/compose.yaml",
 ]
+
+[catalog]
+apps = "apps/values.yaml"
+e2e = "hack/e2e/apps.yaml"
 
 [cluster]
 provider = "kind"
@@ -79,467 +96,6 @@ endpoint = "http://{host}:5002"
 upstream = "registry.k8s.io"
 endpoint = "http://{host}:5003"
 
-# Repositories from hack/e2e/apps.yaml. Only repository checks need them; Argo
-# CD resolves chart sources itself.
-[[helm_repositories]]
-name = "quickwit"
-url = "https://helm.quickwit.io"
-
-[[helm_repositories]]
-name = "vector"
-url = "https://helm.vector.dev"
-
-# ---------------------------------------------------------------------------
-# Projects
-# ---------------------------------------------------------------------------
-
-[[projects]]
-name = "agentgateway"
-description = "Agentgateway control plane for AI, MCP and A2A traffic (Kubernetes Gateway API)"
-destinations = [{ namespace = "agentgateway-system" }]
-cluster_resource_whitelist = [
-  { group = "apiextensions.k8s.io", kind = "CustomResourceDefinition" },
-  { group = "admissionregistration.k8s.io", kind = "ValidatingAdmissionPolicy" },
-  { group = "admissionregistration.k8s.io", kind = "ValidatingAdmissionPolicyBinding" },
-  { group = "gateway.networking.k8s.io", kind = "GatewayClass" },
-  { group = "rbac.authorization.k8s.io", kind = "ClusterRole" },
-  { group = "rbac.authorization.k8s.io", kind = "ClusterRoleBinding" },
-]
-
-[[projects]]
-name = "cert-manager"
-description = "Automated TLS certificate management via ACME"
-destinations = [
-  { namespace = "cert-manager" },
-  { namespace = "kube-system" },
-]
-cluster_resource_whitelist = [
-  { group = "rbac.authorization.k8s.io", kind = "ClusterRole" },
-  { group = "rbac.authorization.k8s.io", kind = "ClusterRoleBinding" },
-  { group = "admissionregistration.k8s.io", kind = "MutatingWebhookConfiguration" },
-  { group = "admissionregistration.k8s.io", kind = "ValidatingWebhookConfiguration" },
-  { group = "apiextensions.k8s.io", kind = "CustomResourceDefinition" },
-  { group = "cert-manager.io", kind = "ClusterIssuer" },
-]
-
-[[projects]]
-name = "cloudnative-pg"
-description = "CloudNativePG operator for PostgreSQL clusters"
-destinations = [{ namespace = "cnpg-system" }]
-cluster_resource_whitelist = [
-  { group = "rbac.authorization.k8s.io", kind = "ClusterRole" },
-  { group = "rbac.authorization.k8s.io", kind = "ClusterRoleBinding" },
-  { group = "admissionregistration.k8s.io", kind = "MutatingWebhookConfiguration" },
-  { group = "admissionregistration.k8s.io", kind = "ValidatingWebhookConfiguration" },
-  { group = "apiextensions.k8s.io", kind = "CustomResourceDefinition" },
-  # The chart also carries `name: cnpg-system` here. Argo CD's
-  # clusterResourceWhitelist is a GroupKind list, so the name is pruned in
-  # production as well.
-  { group = "", kind = "Namespace" },
-]
-
-[[projects]]
-name = "monitoring"
-description = "Cluster monitoring stack (Prometheus, Thanos, Grafana)"
-destinations = [
-  { namespace = "grafana" },
-  { namespace = "monitoring" },
-]
-cluster_resource_whitelist = [
-  { group = "rbac.authorization.k8s.io", kind = "ClusterRole" },
-  { group = "rbac.authorization.k8s.io", kind = "ClusterRoleBinding" },
-]
-# Opt out of the default ResourceQuota/LimitRange/NetworkPolicy blacklist.
-namespace_resource_blacklist = []
-
-[[projects]]
-name = "magistr"
-description = "magistr.dk IRC quote site"
-destinations = [{ namespace = "magistr-prod" }]
-# The e2e chart renders no ingress or NetworkPolicy, but keep the production
-# project's opt-out so a future policy is not silently denied.
-namespace_resource_blacklist = []
-
-[[projects]]
-name = "mosquitto"
-description = "Eclipse Mosquitto MQTT broker"
-destinations = [{ namespace = "mosquitto" }]
-namespace_resource_whitelist = [
-  { group = "", kind = "ConfigMap" },
-  { group = "", kind = "PersistentVolumeClaim" },
-  { group = "", kind = "Service" },
-  { group = "apps", kind = "Deployment" },
-  { group = "apps", kind = "ReplicaSet" },
-  { group = "", kind = "Pod" },
-  { group = "batch", kind = "Job" },
-  { group = "networking.k8s.io", kind = "NetworkPolicy" },
-  { group = "bitnami.com", kind = "SealedSecret" },
-]
-
-[[projects]]
-name = "node-feature-discovery"
-description = "Node Feature Discovery — hardware and OS feature labels for nodes"
-destinations = [{ namespace = "node-feature-discovery" }]
-cluster_resource_whitelist = [
-  { group = "apiextensions.k8s.io", kind = "CustomResourceDefinition" },
-  { group = "nfd.k8s-sigs.io", kind = "NodeFeatureRule" },
-  { group = "rbac.authorization.k8s.io", kind = "ClusterRole" },
-  { group = "rbac.authorization.k8s.io", kind = "ClusterRoleBinding" },
-]
-
-[[projects]]
-name = "prometheus-operator"
-description = "Manages the deployment and lifecycle of the Prometheus Operator and its CRDs"
-destinations = [{ namespace = "prometheus-operator" }]
-cluster_resource_whitelist = [
-  { group = "apiextensions.k8s.io", kind = "CustomResourceDefinition" },
-  { group = "rbac.authorization.k8s.io", kind = "ClusterRole" },
-  { group = "rbac.authorization.k8s.io", kind = "ClusterRoleBinding" },
-  { group = "admissionregistration.k8s.io", kind = "ValidatingWebhookConfiguration" },
-  { group = "admissionregistration.k8s.io", kind = "MutatingWebhookConfiguration" },
-]
-
-[[projects]]
-name = "sealed-secrets"
-description = "Bitnami Sealed Secrets — encrypt secrets for GitOps"
-destinations = [{ namespace = "kube-system" }]
-cluster_resource_whitelist = [
-  { group = "apiextensions.k8s.io", kind = "CustomResourceDefinition" },
-  { group = "rbac.authorization.k8s.io", kind = "ClusterRole" },
-  { group = "rbac.authorization.k8s.io", kind = "ClusterRoleBinding" },
-  { group = "admissionregistration.k8s.io", kind = "ValidatingWebhookConfiguration" },
-  { group = "admissionregistration.k8s.io", kind = "MutatingWebhookConfiguration" },
-]
-
-[[projects]]
-name = "spegel"
-description = "Spegel — stateless cluster-local P2P OCI registry mirror"
-destinations = [{ namespace = "spegel" }]
-namespace_resource_whitelist = [
-  { group = "", kind = "Pod" },
-  { group = "", kind = "Service" },
-  { group = "", kind = "ServiceAccount" },
-  { group = "apps", kind = "DaemonSet" },
-  { group = "batch", kind = "Job" },
-  { group = "networking.k8s.io", kind = "NetworkPolicy" },
-  { group = "rbac.authorization.k8s.io", kind = "Role" },
-  { group = "rbac.authorization.k8s.io", kind = "RoleBinding" },
-  { group = "monitoring.coreos.com", kind = "ServiceMonitor" },
-  { group = "autoscaling.k8s.io", kind = "VerticalPodAutoscaler" },
-]
-
-[[projects]]
-name = "traefik"
-description = "Traefik ingress controller"
-destinations = [{ namespace = "traefik" }]
-cluster_resource_whitelist = [
-  { group = "apiextensions.k8s.io", kind = "CustomResourceDefinition" },
-  { group = "rbac.authorization.k8s.io", kind = "ClusterRole" },
-  { group = "rbac.authorization.k8s.io", kind = "ClusterRoleBinding" },
-  { group = "networking.k8s.io", kind = "IngressClass" },
-]
-
-[[projects]]
-name = "vector-agent"
-description = "Node-local observability agent"
-destinations = [{ namespace = "vector" }]
-cluster_resource_whitelist = [
-  { group = "rbac.authorization.k8s.io", kind = "ClusterRole" },
-  { group = "rbac.authorization.k8s.io", kind = "ClusterRoleBinding" },
-]
-namespace_resource_whitelist = [
-  { group = "", kind = "ConfigMap" },
-  { group = "", kind = "Service" },
-  { group = "", kind = "ServiceAccount" },
-  { group = "apps", kind = "DaemonSet" },
-  { group = "", kind = "Pod" },
-  { group = "batch", kind = "Job" },
-  { group = "networking.k8s.io", kind = "NetworkPolicy" },
-  { group = "monitoring.coreos.com", kind = "PodMonitor" },
-]
-
-[[projects]]
-name = "vector-aggregator"
-description = "Cluster observability aggregator"
-destinations = [{ namespace = "vector" }]
-cluster_resource_whitelist = [
-  { group = "rbac.authorization.k8s.io", kind = "ClusterRole" },
-  { group = "rbac.authorization.k8s.io", kind = "ClusterRoleBinding" },
-]
-namespace_resource_whitelist = [
-  { group = "", kind = "ConfigMap" },
-  { group = "", kind = "Service" },
-  { group = "", kind = "ServiceAccount" },
-  { group = "apps", kind = "StatefulSet" },
-  { group = "", kind = "Pod" },
-  { group = "networking.k8s.io", kind = "NetworkPolicy" },
-  { group = "monitoring.coreos.com", kind = "PodMonitor" },
-]
-
-[[projects]]
-name = "zigbee2mqtt"
-description = "Zigbee2MQTT — Zigbee to MQTT bridge with a USB coordinator"
-destinations = [{ namespace = "zigbee2mqtt" }]
-namespace_resource_whitelist = [
-  { group = "", kind = "ConfigMap" },
-  { group = "", kind = "PersistentVolumeClaim" },
-  { group = "", kind = "Service" },
-  { group = "", kind = "Pod" },
-  { group = "apps", kind = "StatefulSet" },
-  { group = "networking.k8s.io", kind = "NetworkPolicy" },
-  { group = "batch", kind = "Job" },
-  { group = "bitnami.com", kind = "SealedSecret" },
-]
-
-# ---------------------------------------------------------------------------
-# Namespaces
-# ---------------------------------------------------------------------------
-
-[[namespaces]]
-name = "agentgateway-system"
-labels = { "pod-security.kubernetes.io/enforce" = "restricted", "pod-security.kubernetes.io/enforce-version" = "latest", "pod-security.kubernetes.io/audit" = "restricted", "pod-security.kubernetes.io/audit-version" = "latest", "pod-security.kubernetes.io/warn" = "restricted", "pod-security.kubernetes.io/warn-version" = "latest" }
-
-[[namespaces]]
-name = "cert-manager"
-
-# Created by the cloudnative-pg release in production. Astrarium creates every
-# destination namespace itself, so declare it here as well.
-[[namespaces]]
-name = "cnpg-system"
-
-[[namespaces]]
-name = "grafana"
-
-# kube-system already exists. It is declared because sealed-secrets and
-# cert-manager target it; applying the namespace is a no-op.
-[[namespaces]]
-name = "kube-system"
-
-[[namespaces]]
-name = "magistr-prod"
-
-[[namespaces]]
-name = "monitoring"
-
-[[namespaces]]
-name = "mosquitto"
-
-[[namespaces]]
-name = "node-feature-discovery"
-
-[[namespaces]]
-name = "prometheus-operator"
-
-[[namespaces]]
-name = "spegel"
-labels = { "pod-security.kubernetes.io/enforce" = "privileged", "pod-security.kubernetes.io/enforce-version" = "latest", "pod-security.kubernetes.io/audit" = "privileged", "pod-security.kubernetes.io/audit-version" = "latest", "pod-security.kubernetes.io/warn" = "privileged", "pod-security.kubernetes.io/warn-version" = "latest" }
-
-[[namespaces]]
-name = "traefik"
-
-[[namespaces]]
-name = "vector"
-
-[[namespaces]]
-name = "zigbee2mqtt"
-labels = { "pod-security.kubernetes.io/enforce" = "restricted", "pod-security.kubernetes.io/enforce-version" = "latest", "pod-security.kubernetes.io/audit" = "restricted", "pod-security.kubernetes.io/audit-version" = "latest", "pod-security.kubernetes.io/warn" = "restricted", "pod-security.kubernetes.io/warn-version" = "latest" }
-
-# ---------------------------------------------------------------------------
-# Applications
-# ---------------------------------------------------------------------------
-
-[[apps]]
-name = "cert-manager"
-namespace = "cert-manager"
-project = "cert-manager"
-source = "cert-manager"
-renderer = "helm"
-values = ["values-kind.yaml"]
-
-[[apps]]
-name = "gateway-api"
-namespace = "agentgateway-system"
-project = "agentgateway"
-source = "gateway-api"
-renderer = "kustomize"
-sync_policy = { sync_options = ["ApplyOutOfSyncOnly=true", "ServerSideApply=true"] }
-
-[[apps]]
-name = "prometheus-operator"
-namespace = "prometheus-operator"
-project = "prometheus-operator"
-source = "prometheus-operator"
-renderer = "kustomize"
-requires = ["cert-manager"]
-resources = [
-  { api_version = "monitoring.coreos.com/v1", kind = "ServiceMonitor", namespace = "prometheus-operator", name = "prometheus-operator" },
-]
-sync_policy = { sync_options = ["ApplyOutOfSyncOnly=true", "ServerSideApply=true"] }
-
-[[apps]]
-name = "cloudnative-pg"
-namespace = "cnpg-system"
-project = "cloudnative-pg"
-source = "cloudnative-pg"
-renderer = "kustomize"
-requires = ["cert-manager", "prometheus-operator"]
-sync_policy = { sync_options = ["ApplyOutOfSyncOnly=true", "ServerSideApply=true"] }
-
-[[apps]]
-name = "agentgateway"
-namespace = "agentgateway-system"
-project = "agentgateway"
-source = "agentgateway"
-renderer = "helm"
-requires = ["gateway-api", "prometheus-operator"]
-sync_policy = { sync_options = ["ApplyOutOfSyncOnly=true", "ServerSideApply=true"] }
-
-[[apps]]
-name = "grafana"
-namespace = "grafana"
-project = "monitoring"
-source = "grafana"
-renderer = "helm"
-values = ["values-kind.yaml"]
-requires = ["prometheus-operator"]
-probe = true
-
-[[apps]]
-name = "magistr"
-namespace = "magistr-prod"
-project = "magistr"
-source = "magistr"
-renderer = "helm"
-values = ["values-prod.yaml", "values-kind.yaml"]
-probe = true
-resources = [
-  { api_version = "apps/v1", kind = "Deployment", namespace = "magistr-prod", name = "magistr" },
-  { api_version = "v1", kind = "Service", namespace = "magistr-prod", name = "magistr" },
-  { api_version = "apps/v1", kind = "Deployment", namespace = "magistr-prod", name = "magistr-postgres" },
-]
-
-[[apps]]
-name = "monitoring"
-namespace = "monitoring"
-project = "monitoring"
-source = "monitoring/overlays/kind"
-renderer = "kustomize"
-requires = ["prometheus-operator"]
-timeout_seconds = 900
-# The overlay is below the monitoring tree. Watch the whole tree so a change to
-# a base component (Prometheus, Thanos, Alertmanager) selects this app too.
-watch = ["monitoring"]
-prometheus_targets = { namespace = "monitoring", service = "prometheus", port = 9090, jobs = ["kubelet", "kube-dns", "apiserver", "kube-scheduler", "kube-controller-manager"] }
-
-[[apps]]
-name = "cluster-exporters"
-namespace = "monitoring"
-project = "monitoring"
-source = "monitoring/cluster-exporters"
-renderer = "helm"
-requires = ["prometheus-operator"]
-
-[[apps]]
-name = "mosquitto"
-namespace = "mosquitto"
-project = "mosquitto"
-source = "mosquitto/overlays/kind"
-renderer = "kustomize"
-watch = ["mosquitto"]
-probe = true
-resources = [
-  { api_version = "apps/v1", kind = "Deployment", namespace = "mosquitto", name = "mosquitto" },
-  { api_version = "v1", kind = "ConfigMap", namespace = "mosquitto", name = "mosquitto-config" },
-]
-
-[[apps]]
-name = "node-feature-discovery"
-namespace = "node-feature-discovery"
-project = "node-feature-discovery"
-source = "node-feature-discovery"
-renderer = "helm"
-requires = ["prometheus-operator"]
-resources = [
-  { api_version = "nfd.k8s-sigs.io/v1alpha1", kind = "NodeFeatureRule", name = "silicon-labs-cc2652rb-usb" },
-  { api_version = "monitoring.coreos.com/v1", kind = "PodMonitor", namespace = "node-feature-discovery", name = "node-feature-discovery" },
-]
-
-[[apps]]
-name = "sealed-secrets"
-namespace = "kube-system"
-project = "sealed-secrets"
-source = "sealed-secrets"
-renderer = "kustomize"
-requires = ["prometheus-operator"]
-resources = [
-  { api_version = "monitoring.coreos.com/v1", kind = "PodMonitor", namespace = "kube-system", name = "sealed-secrets-controller" },
-]
-
-[[apps]]
-name = "spegel"
-namespace = "spegel"
-project = "spegel"
-source = "spegel"
-renderer = "helm"
-values = ["values-kind.yaml"]
-probe = true
-requires_fresh_image = true
-requires_containerd_config = true
-stale_probe_resources = { namespace = "spegel", resource_names = ["daemonset/spegel-cleanup"], pod_label_selectors = ["e2e.spegel.io/pull", "app.kubernetes.io/component in (cleanup,cleanup-wait)"] }
-# A retry would reuse the image pulled by the failed attempt, invalidating the
-# cold-image probe.
-sync_policy = { retry_limit = 0, sync_options = ["ApplyOutOfSyncOnly=true", "ServerSideApply=true"] }
-
-[[apps]]
-name = "traefik"
-namespace = "traefik"
-project = "traefik"
-source = "traefik"
-renderer = "helm"
-values = ["values-kind.yaml"]
-requires = ["prometheus-operator"]
-
-[[apps]]
-name = "vector-aggregator"
-namespace = "vector"
-project = "vector-aggregator"
-source = "vector"
-renderer = "helm"
-values = ["values-aggregator.yaml", "values-kind.yaml"]
-requires = ["prometheus-operator"]
-resources = [
-  { api_version = "networking.k8s.io/v1", kind = "NetworkPolicy", namespace = "vector", name = "vector-aggregator" },
-  { api_version = "v1", kind = "Service", namespace = "vector", name = "vector-aggregator" },
-  { api_version = "apps/v1", kind = "StatefulSet", namespace = "vector", name = "vector-aggregator" },
-  { api_version = "monitoring.coreos.com/v1", kind = "PodMonitor", namespace = "vector", name = "vector-aggregator" },
-]
-
-[[apps]]
-name = "vector-agent"
-namespace = "vector"
-project = "vector-agent"
-source = "vector"
-renderer = "helm"
-values = ["values-agent.yaml", "values-kind.yaml"]
-requires = ["prometheus-operator", "vector-aggregator"]
-probe = true
-resources = [
-  { api_version = "networking.k8s.io/v1", kind = "NetworkPolicy", namespace = "vector", name = "vector-agent" },
-  { api_version = "v1", kind = "Service", namespace = "vector", name = "vector-agent" },
-  { api_version = "monitoring.coreos.com/v1", kind = "PodMonitor", namespace = "vector", name = "vector-agent" },
-]
-
-[[apps]]
-name = "zigbee2mqtt"
-namespace = "zigbee2mqtt"
-project = "zigbee2mqtt"
-source = "zigbee2mqtt"
-renderer = "helm"
-values = ["values-kind.yaml"]
-requires = ["mosquitto"]
-timeout_seconds = 900
-probe = true
-resources = [
-  { api_version = "apps/v1", kind = "StatefulSet", namespace = "zigbee2mqtt", name = "zigbee2mqtt" },
-  { api_version = "v1", kind = "ConfigMap", namespace = "zigbee2mqtt", name = "zigbee2mqtt" },
-]
+# The catalog adapter also imports the Helm repositories from
+# `hack/e2e/apps.yaml`. Only repository checks need them; Argo CD resolves its
+# own chart sources.

@@ -281,9 +281,10 @@ cold node state declares `requires_fresh_image` and `stale_probe_resources`
 The shell harness remains the reference until Astrarium passes the smoke set
 twice on fresh clusters. `hack/e2e/run-app.sh`, `list-changed.sh`,
 `root-app.yaml`, `project.yaml`, and `apps.yaml` stay in place; no new shell e2e
-scripts are added. The test-relevant entries in `apps/values.yaml` and
-`hack/e2e/apps.yaml` are converted to `astrarium.toml` by hand, once, with no
-runtime adapter.
+scripts are added. This repository uses the read-only `[catalog]` adapter to
+import the test-relevant entries from `apps/values.yaml` and
+`hack/e2e/apps.yaml`; native `astrarium.toml` mode remains supported for
+repositories without those catalogues.
 
 `astrarium plan` is compared with `list-changed.sh` on historical base/head
 pairs; a difference is a bug until proven otherwise. A green smoke run means
