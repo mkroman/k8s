@@ -19,6 +19,13 @@ Applications are defined here.
 
 Helm chart for Applications sourced from external Git repositories.
 
+### [`astrium/`](astrium/)
+
+Astrarium, the end-to-end test orchestrator for the Argo CD app-of-apps suite.
+It is a Rust workspace with the `astrarium` binary, the `astrarium.toml` suite
+manifest at the repository root, and its own CI/release workflows. See
+[`astrium/README.md`](astrium/README.md).
+
 [cluster-bootstrapping]: https://argo-cd.readthedocs.io/en/stable/operator-manual/cluster-bootstrapping/
 
 ## Applications

@@ -47,6 +47,18 @@ asset=kind-linux-amd64
 binary=kind
 archive=raw
 
+# kustomize publishes slash-prefixed tags (kustomize/vX.Y.Z). The release
+# asset still carries the bare version, so keep the version, sha256 and asset
+# in sync when bumping this block.
+[kustomize]
+repo=kubernetes-sigs/kustomize
+version=kustomize/v5.8.3
+sha256=cb9e31198d3f63b44848bd0afc4c8efc56e6cfef9c93a4a39a211940e6decd61
+tag=${version}
+asset=kustomize_v5.8.3_linux_amd64.tar.gz
+binary=kustomize
+archive=tar.gz
+
 [kubeconform]
 repo=yannh/kubeconform
 version=v0.8.0
