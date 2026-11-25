@@ -5,7 +5,7 @@
 use std::path::{Path, PathBuf};
 
 use assert_cmd::Command;
-use gix::refs::transaction::PreviousValue;
+use gix::refs::transaction::{PreviousValue, RefEdit};
 use predicates::prelude::*;
 
 fn binary() -> Command {
@@ -68,8 +68,10 @@ impl Repo {
             .new_commit_as(signature, signature, "test commit", tree, parent)
             .expect("commit");
         let id = commit.id;
+        let reference = "refs/heads/main".try_into().expect("reference name");
+        let edit = RefEdit::update(reference, id, PreviousValue::Any, "commit test");
         self.repository
-            .reference("refs/heads/main", id, PreviousValue::Any, "commit test")
+            .edit_references_as([edit], Some(signature))
             .expect("update main");
         self.commits.push(id);
         id
