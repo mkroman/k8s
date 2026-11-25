@@ -12,6 +12,7 @@ use super::ClusterError;
 use super::registry::MirrorMount;
 
 const KIND: &str = "kind";
+const API_VERSION_KEY: &str = "apiVersion";
 const API_VERSION: &str = "kind.x-k8s.io/v1alpha4";
 const NODES: &str = "nodes";
 const EXTRA_MOUNTS: &str = "extraMounts";
@@ -54,9 +55,9 @@ pub fn generate(base: Option<&str>, mounts: &[MirrorMount]) -> Result<String, Cl
             Value::String("Cluster".to_owned()),
         );
     }
-    if !mapping.contains_key(API_VERSION) {
+    if !mapping.contains_key(API_VERSION_KEY) {
         mapping.insert(
-            Value::String(API_VERSION.to_owned()),
+            Value::String(API_VERSION_KEY.to_owned()),
             Value::String(API_VERSION.to_owned()),
         );
     }
@@ -206,6 +207,10 @@ kubeadmConfigPatches:
         let rendered = generate(Some(base_config()), &[mount("docker.io")]).expect("generated");
         let parsed = yaml_serde::from_str::<Value>(&rendered).expect("valid YAML");
         let mapping = parsed.as_mapping().expect("mapping");
+        assert_eq!(
+            mapping.get("apiVersion").and_then(Value::as_str),
+            Some("kind.x-k8s.io/v1alpha4")
+        );
         let nodes = mapping
             .get("nodes")
             .and_then(Value::as_sequence)
