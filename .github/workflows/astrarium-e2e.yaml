@@ -131,9 +131,20 @@ jobs:
         version: ${{ steps.version.outputs.version }}
         token: ${{ github.token }}
     - name: Install Helm
-      uses: azure/setup-helm@2f5e7bc67f1f9972ab16657bb795f36d8f04de0e # v5.1.0
-      with:
-        version: v3.22.1
+      env:
+        HELM_VERSION: v4.3.0
+        HELM_SHA256: 86584a54def73570558f66f5111cc53dfed56689637ae32c1201205d494f54fb
+      run: |
+        set -euo pipefail
+        tmp="$(mktemp -d)"
+        trap 'rm -rf "${tmp}"' EXIT
+        archive="helm-${HELM_VERSION}-linux-amd64.tar.gz"
+        curl -fsSL "https://get.helm.sh/${archive}" -o "${tmp}/${archive}"
+        printf '%s  %s\n' "${HELM_SHA256}" "${tmp}/${archive}" |
+          sha256sum --check --status
+        tar -xzf "${tmp}/${archive}" -C "${tmp}"
+        install -m 0755 "${tmp}/linux-amd64/helm" "${HOME}/.local/bin/helm"
+        helm version --short
     - name: Install kind and kustomize
       run: ./hack/ci/install-tools.sh "${HOME}/.local/bin" kind kustomize
     - name: Start local services
