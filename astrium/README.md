@@ -15,9 +15,11 @@ root.
 ## Status
 
 The workspace, native manifest, command-line shell, telemetry bootstrap and
-the local compose stack are in place. The first end-to-end app (`mosquitto`, a
-Kustomize overlay) is the M1 milestone. See `rfd/README.md` and the RFDs for the
-design, and `../astrarium.toml` for this repository's suite.
+the local compose stack are in place. `astrarium run --app <name>` is working
+end-to-end for the Kustomize and Helm smoke apps (`mosquitto`, `zigbee2mqtt`,
+`cert-manager`, `prometheus-operator`, `monitoring`, and the cold-image
+`spegel` probe). See `rfd/README.md` and the RFDs for the design, and
+`../astrarium.toml` for this repository's suite.
 
 ## Quick start
 

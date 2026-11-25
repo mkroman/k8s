@@ -43,8 +43,9 @@ Deeper docs: `hack/ci/README.md` (CI scripts, tool manifest),
   `cargo test --locked --all-features` before committing.
 - The Rust binary may invoke only `helm`, `kustomize`, and `kind`. Do git
   operations with `gix`, Kubernetes with `kube`, HTTP with `reqwest`, and dates
-  and times with `jiff`. CI workflow scripts may use `gh`, `docker compose`,
-  `tar`, `sha256sum`, etc.
+  and times with `jiff`. Cold-image removal and node config checks use the
+  Docker API through `bollard`, never the `docker` CLI. CI workflow scripts may
+  use `gh`, `docker compose`, `tar`, `sha256sum`, etc.
 - `astrarium.toml` is the source of truth for the e2e suite. Do not add a
   runtime adapter that reads `apps/values.yaml` or `hack/e2e/apps.yaml`.
   Create Namespaces, AppProjects, and Applications directly from Rust.
