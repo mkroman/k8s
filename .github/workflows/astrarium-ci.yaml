@@ -1,0 +1,105 @@
+name: Astrarium CI
+
+on:
+  pull_request:
+    paths:
+    - "astrium/**"
+    - "astrarium.toml"
+    - ".github/workflows/astrarium-*.yaml"
+    - ".github/actions/setup-astrarium/**"
+  push:
+    branches: [main]
+    paths:
+    - "astrium/**"
+    - "astrarium.toml"
+    - ".github/workflows/astrarium-*.yaml"
+    - ".github/actions/setup-astrarium/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: astrarium-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_VERSION: "1.100.0"
+
+jobs:
+  check:
+    name: Build and test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+    - name: Checkout
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+        fetch-depth: 1
+    - name: Install Rust
+      run: |
+        set -euo pipefail
+        if ! rustup toolchain list | grep -q "^${RUST_VERSION}"; then
+          rustup toolchain install "${RUST_VERSION}" \
+            --component clippy,rustfmt --profile minimal
+        fi
+        rustup component add --toolchain "${RUST_VERSION}" clippy rustfmt
+        rustup default "${RUST_VERSION}"
+        rustc --version
+        cargo --version
+    - name: Cache Cargo and target
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          astrium/target
+        key: ${{ runner.os }}-cargo-${{ env.RUST_VERSION }}-${{ hashFiles('astrium/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-${{ env.RUST_VERSION }}-
+    - name: Check formatting
+      working-directory: astrium
+      timeout-minutes: 5
+      run: cargo fmt --all --check
+    - name: Run Clippy
+      working-directory: astrium
+      timeout-minutes: 10
+      run: cargo clippy --locked --all-targets --all-features -- -D warnings
+    - name: Run tests
+      working-directory: astrium
+      timeout-minutes: 10
+      run: cargo test --locked --all-features
+    - name: Build documentation
+      working-directory: astrium
+      timeout-minutes: 10
+      run: cargo doc --locked --no-deps
+    - name: Build release binary
+      working-directory: astrium
+      timeout-minutes: 15
+      run: cargo build --locked --release
+    - name: Write summary
+      if: always()
+      env:
+        JOB_STATUS: ${{ job.status }}
+      run: |
+        set -euo pipefail
+        {
+          echo "## Astrarium CI"
+          echo
+          echo "Rust \`${RUST_VERSION}\` in \`astrium/\`."
+          echo
+          echo "| Check | Command |"
+          echo "| --- | --- |"
+          echo "| Format | \`cargo fmt --all --check\` |"
+          echo "| Lints | \`cargo clippy --locked --all-targets --all-features -- -D warnings\` |"
+          echo "| Tests | \`cargo test --locked --all-features\` |"
+          echo "| Docs | \`cargo doc --locked --no-deps\` |"
+          echo "| Release build | \`cargo build --locked --release\` |"
+          echo
+          echo "Result: **${JOB_STATUS}**."
+        } >>"${GITHUB_STEP_SUMMARY}"
