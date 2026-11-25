@@ -12,10 +12,13 @@ keywords.workspace = true
 categories.workspace = true
 
 [dependencies]
+axum.workspace = true
 futures.workspace = true
+http.workspace = true
 jiff.workspace = true
 k8s-openapi.workspace = true
 kube.workspace = true
+local-ip-address.workspace = true
 opentelemetry.workspace = true
 opentelemetry-otlp.workspace = true
 opentelemetry_sdk.workspace = true
@@ -24,6 +27,7 @@ schemars.workspace = true
 semver.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+sha2.workspace = true
 tempfile.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
@@ -33,6 +37,9 @@ tracing.workspace = true
 tracing-opentelemetry.workspace = true
 tracing-subscriber.workspace = true
 yaml_serde.workspace = true
+
+[dev-dependencies]
+insta.workspace = true
 
 [lints]
 workspace = true

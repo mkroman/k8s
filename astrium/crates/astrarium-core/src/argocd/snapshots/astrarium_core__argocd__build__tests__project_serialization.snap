@@ -1,0 +1,28 @@
+---
+source: crates/astrarium-core/src/argocd/build.rs
+expression: value
+---
+{
+  "apiVersion": "argoproj.io/v1alpha1",
+  "kind": "AppProject",
+  "metadata": {
+    "name": "demo",
+    "namespace": "argocd"
+  },
+  "spec": {
+    "clusterResourceWhitelist": [],
+    "description": "Demo project",
+    "destinations": [
+      {
+        "name": "in-cluster",
+        "namespace": "demo",
+        "server": "https://kubernetes.default.svc"
+      }
+    ],
+    "namespaceResourceWhitelist": [],
+    "sourceRepos": [
+      "*",
+      "http://127.0.0.1:1234"
+    ]
+  }
+}

@@ -2,6 +2,7 @@
 
 pub mod doctor;
 pub mod manifest;
+pub mod render;
 
 use miette::{IntoDiagnostic, Result};
 
@@ -35,7 +36,7 @@ pub async fn dispatch(cli: Cli, manifest: Option<&Manifest>) -> Result<()> {
         Command::Upgrade(_) => Err(miette::miette!(
             "`astrarium upgrade` is not implemented yet"
         )),
-        Command::Render(_) => Err(miette::miette!("`astrarium render` is not implemented yet")),
+        Command::Render(args) => render::run(manifest, &args).await,
         Command::Cluster(_) => Err(miette::miette!(
             "`astrarium cluster` is not implemented yet"
         )),

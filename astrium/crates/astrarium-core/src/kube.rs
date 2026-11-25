@@ -12,6 +12,7 @@ use kube::api::{
     ResourceExt as _,
 };
 use kube::core::{DynamicObject, GroupVersionKind};
+use kube::discovery::{Scope, pinned_kind};
 use kube::{Client, api::ApiResource};
 use thiserror::Error;
 
@@ -147,6 +148,95 @@ pub struct LogRequest {
     pub tail_lines: u32,
 }
 
+/// A Kubernetes object identified by API version and kind.
+///
+/// Manifest probes declare objects this way, so the client can resolve the
+/// plural resource name through API discovery instead of guessing it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ObjectReference {
+    /// The object's `apiVersion`.
+    pub api_version: String,
+    /// The object's `kind`.
+    pub kind: String,
+    /// The namespace, or `None` for a cluster-scoped object.
+    pub namespace: Option<String>,
+    /// The object name.
+    pub name: String,
+}
+
+impl ObjectReference {
+    /// Creates a reference to a namespaced object.
+    #[must_use]
+    pub fn namespaced(
+        api_version: impl Into<String>,
+        kind: impl Into<String>,
+        namespace: impl Into<String>,
+        name: impl Into<String>,
+    ) -> Self {
+        Self {
+            api_version: api_version.into(),
+            kind: kind.into(),
+            namespace: Some(namespace.into()),
+            name: name.into(),
+        }
+    }
+
+    /// Creates a reference to a cluster-scoped object.
+    #[must_use]
+    pub fn cluster(
+        api_version: impl Into<String>,
+        kind: impl Into<String>,
+        name: impl Into<String>,
+    ) -> Self {
+        Self {
+            api_version: api_version.into(),
+            kind: kind.into(),
+            namespace: None,
+            name: name.into(),
+        }
+    }
+}
+
+/// A request to the Kubernetes API service proxy.
+///
+/// The proxy reaches a Service through the API server, which is how Astrarium
+/// queries Prometheus without a port-forward or an extra CLI.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ProxyRequest {
+    /// The namespace of the Service.
+    pub namespace: String,
+    /// The Service name.
+    pub service: String,
+    /// The Service port number.
+    pub port: u16,
+    /// The path below `/proxy`, for example `/api/v1/targets?state=active`.
+    pub path: String,
+}
+
+impl ProxyRequest {
+    /// Creates a proxy request. A missing leading `/` is added to `path`.
+    #[must_use]
+    pub fn new(
+        namespace: impl Into<String>,
+        service: impl Into<String>,
+        port: u16,
+        path: impl Into<String>,
+    ) -> Self {
+        let path = path.into();
+        let path = if path.starts_with('/') {
+            path
+        } else {
+            format!("/{path}")
+        };
+        Self {
+            namespace: namespace.into(),
+            service: service.into(),
+            port,
+            path,
+        }
+    }
+}
+
 /// An error from the Kubernetes API boundary.
 #[derive(Debug, Error)]
 pub enum KubeError {
@@ -174,6 +264,44 @@ pub enum KubeError {
         /// The resource kind.
         kind: &'static str,
     },
+    /// A dynamically discovered resource could not be resolved.
+    #[error("failed to discover {api_version} {kind}: {source}")]
+    Discovery {
+        /// The requested API version.
+        api_version: String,
+        /// The requested kind.
+        kind: String,
+        /// The underlying kube error.
+        #[source]
+        source: Box<kube::Error>,
+    },
+    /// A request for an object identified by API version and kind failed.
+    #[error("Kubernetes API request failed for {api_version} {kind} {name}: {source}")]
+    ApiObject {
+        /// The requested API version.
+        api_version: String,
+        /// The requested kind.
+        kind: String,
+        /// The object name.
+        name: String,
+        /// The underlying kube error.
+        #[source]
+        source: Box<kube::Error>,
+    },
+    /// A namespaced object reference has no namespace.
+    #[error("{api_version} {kind} is namespaced; a namespace is required")]
+    MissingObjectNamespace {
+        /// The requested API version.
+        api_version: String,
+        /// The requested kind.
+        kind: String,
+    },
+    /// A request could not be built.
+    #[error("invalid Kubernetes API request: {message}")]
+    Request {
+        /// A description of the problem.
+        message: String,
+    },
 }
 
 impl KubeError {
@@ -190,6 +318,23 @@ fn is_not_found(error: &kube::Error) -> bool {
     matches!(error, kube::Error::Api(response) if response.code == 404)
 }
 
+fn split_api_version(api_version: &str) -> Result<(&str, &str), KubeError> {
+    if api_version.starts_with('/') {
+        return Err(KubeError::Request {
+            message: format!("apiVersion {api_version:?} has no group"),
+        });
+    }
+    let (group, version) = api_version
+        .split_once('/')
+        .map_or(("", api_version), |(group, version)| (group, version));
+    if version.is_empty() {
+        return Err(KubeError::Request {
+            message: format!("apiVersion {api_version:?} has no version"),
+        });
+    }
+    Ok((group, version))
+}
+
 /// Kubernetes operations used by Astrarium.
 pub trait KubeApi: Send + Sync {
     /// Applies an object with server-side apply.
@@ -202,6 +347,18 @@ pub trait KubeApi: Send + Sync {
 
     /// Fetches an object, returning `None` for HTTP 404.
     fn get(&self, key: ResourceKey) -> BoxFuture<'_, Result<Option<DynamicObject>, KubeError>>;
+
+    /// Fetches an object by `apiVersion` and `kind`.
+    ///
+    /// The plural resource name is resolved with Kubernetes API discovery.
+    /// Returns `None` for HTTP 404.
+    fn get_object(
+        &self,
+        reference: ObjectReference,
+    ) -> BoxFuture<'_, Result<Option<DynamicObject>, KubeError>>;
+
+    /// Performs a GET through the Kubernetes API service proxy.
+    fn service_proxy(&self, request: ProxyRequest) -> BoxFuture<'_, Result<String, KubeError>>;
 
     /// Lists objects.
     fn list(
@@ -305,6 +462,92 @@ impl KubeApi for KubeClient {
             api.get_opt(&key.name)
                 .await
                 .map_err(|source| KubeError::api(key.resource.kind, key.name, source))
+        })
+    }
+
+    fn get_object(
+        &self,
+        reference: ObjectReference,
+    ) -> BoxFuture<'_, Result<Option<DynamicObject>, KubeError>> {
+        Box::pin(async move {
+            let (group, version) = split_api_version(&reference.api_version)?;
+            let gvk = GroupVersionKind::gvk(group, version, &reference.kind);
+            let (api_resource, capabilities) =
+                pinned_kind(&self.client, &gvk)
+                    .await
+                    .map_err(|source| KubeError::Discovery {
+                        api_version: reference.api_version.clone(),
+                        kind: reference.kind.clone(),
+                        source: Box::new(source),
+                    })?;
+            let api: Api<DynamicObject> = match capabilities.scope {
+                Scope::Namespaced => {
+                    let namespace = reference.namespace.as_deref().ok_or_else(|| {
+                        KubeError::MissingObjectNamespace {
+                            api_version: reference.api_version.clone(),
+                            kind: reference.kind.clone(),
+                        }
+                    })?;
+                    Api::namespaced_with(self.client.clone(), namespace, &api_resource)
+                }
+                Scope::Cluster => Api::all_with(self.client.clone(), &api_resource),
+            };
+            api.get_opt(&reference.name)
+                .await
+                .map_err(|source| KubeError::ApiObject {
+                    api_version: reference.api_version,
+                    kind: reference.kind,
+                    name: reference.name,
+                    source: Box::new(source),
+                })
+        })
+    }
+
+    fn service_proxy(&self, request: ProxyRequest) -> BoxFuture<'_, Result<String, KubeError>> {
+        Box::pin(async move {
+            for (field, value) in [
+                ("namespace", request.namespace.as_str()),
+                ("service", request.service.as_str()),
+            ] {
+                if value.is_empty()
+                    || value.contains('/')
+                    || value.contains('?')
+                    || value.contains('#')
+                {
+                    return Err(KubeError::Request {
+                        message: format!("the {field} path segment {value:?} is invalid"),
+                    });
+                }
+            }
+            if request.path.contains(char::is_whitespace) {
+                return Err(KubeError::Request {
+                    message: "the proxy path must not contain whitespace".to_owned(),
+                });
+            }
+            let proxy_path = if request.path.starts_with('/') {
+                request.path.clone()
+            } else {
+                format!("/{}", request.path)
+            };
+            let path = format!(
+                "/api/v1/namespaces/{}/services/{}:{}/proxy{proxy_path}",
+                request.namespace, request.service, request.port
+            );
+            let http_request = http::Request::get(&path)
+                .header(http::header::ACCEPT, "application/json")
+                .body(Vec::new())
+                .map_err(|error| KubeError::Request {
+                    message: error.to_string(),
+                })?;
+            self.client
+                .request_text(http_request)
+                .await
+                .map_err(|source| KubeError::ApiObject {
+                    api_version: "v1".to_owned(),
+                    kind: "Service".to_owned(),
+                    name: format!("{}/{}:{}", request.namespace, request.service, request.port),
+                    source: Box::new(source),
+                })
         })
     }
 
@@ -574,5 +817,170 @@ mod tests {
             CUSTOM_RESOURCE_DEFINITION.api_resource().plural,
             "customresourcedefinitions"
         );
+    }
+
+    #[test]
+    fn splits_grouped_and_core_api_versions() {
+        assert_eq!(split_api_version("v1").expect("core"), ("", "v1"));
+        assert_eq!(
+            split_api_version("argoproj.io/v1alpha1").expect("grouped"),
+            ("argoproj.io", "v1alpha1")
+        );
+        assert!(split_api_version("/v1").is_err());
+        assert!(split_api_version("").is_err());
+    }
+}
+
+/// An in-memory [`KubeApi`] for unit tests.
+#[cfg(test)]
+pub(crate) mod testing {
+    use std::sync::Mutex;
+
+    use kube::core::DynamicObject;
+
+    use crate::BoxFuture;
+
+    use super::{
+        ApiResource, ApplyOptions, DeleteOptions, GroupVersionKind, KubeApi, KubeError, LogRequest,
+        ObjectReference, ProxyRequest, ResourceKey, ResourceType,
+    };
+
+    /// One recorded server-side apply.
+    #[derive(Clone, Debug)]
+    pub struct ApplyCall {
+        /// The object identity.
+        pub key: ResourceKey,
+        /// The applied object.
+        pub object: DynamicObject,
+        /// The apply options.
+        pub options: ApplyOptions,
+    }
+
+    /// A scriptable fake Kubernetes API.
+    #[derive(Debug, Default)]
+    pub struct FakeKubeApi {
+        state: Mutex<FakeState>,
+    }
+
+    #[derive(Debug, Default)]
+    struct FakeState {
+        applied: Vec<ApplyCall>,
+        objects: Vec<ObjectReference>,
+        proxies: Vec<ProxyRequest>,
+        proxy_response: String,
+    }
+
+    impl FakeKubeApi {
+        /// Creates an empty fake.
+        #[must_use]
+        pub fn new() -> Self {
+            Self::default()
+        }
+
+        /// Marks an object as existing for [`KubeApi::get_object`].
+        #[must_use]
+        pub fn with_object(self, reference: ObjectReference) -> Self {
+            self.lock().objects.push(reference);
+            self
+        }
+
+        /// Sets the body returned by [`KubeApi::service_proxy`].
+        #[must_use]
+        pub fn with_proxy_response(self, response: impl Into<String>) -> Self {
+            self.lock().proxy_response = response.into();
+            self
+        }
+
+        /// Returns every recorded apply in order.
+        #[must_use]
+        pub fn applied(&self) -> Vec<ApplyCall> {
+            self.lock().applied.clone()
+        }
+
+        /// Returns every recorded proxy request.
+        #[must_use]
+        pub fn proxy_requests(&self) -> Vec<ProxyRequest> {
+            self.lock().proxies.clone()
+        }
+
+        fn lock(&self) -> std::sync::MutexGuard<'_, FakeState> {
+            self.state.lock().expect("fake kube mutex")
+        }
+    }
+
+    impl KubeApi for FakeKubeApi {
+        fn apply(
+            &self,
+            key: ResourceKey,
+            object: DynamicObject,
+            options: ApplyOptions,
+        ) -> BoxFuture<'_, Result<DynamicObject, KubeError>> {
+            Box::pin(async move {
+                self.lock().applied.push(ApplyCall {
+                    key,
+                    object: object.clone(),
+                    options,
+                });
+                Ok(object)
+            })
+        }
+
+        fn get(
+            &self,
+            _key: ResourceKey,
+        ) -> BoxFuture<'_, Result<Option<DynamicObject>, KubeError>> {
+            Box::pin(async move { Ok(None) })
+        }
+
+        fn get_object(
+            &self,
+            reference: ObjectReference,
+        ) -> BoxFuture<'_, Result<Option<DynamicObject>, KubeError>> {
+            Box::pin(async move {
+                if self.lock().objects.contains(&reference) {
+                    let api_resource = ApiResource::from_gvk_with_plural(
+                        &GroupVersionKind::gvk("", "v1", "Object"),
+                        "objects",
+                    );
+                    let mut object = DynamicObject::new(&reference.name, &api_resource);
+                    object.metadata.namespace = reference.namespace;
+                    Ok(Some(object))
+                } else {
+                    Ok(None)
+                }
+            })
+        }
+
+        fn service_proxy(&self, request: ProxyRequest) -> BoxFuture<'_, Result<String, KubeError>> {
+            Box::pin(async move {
+                let response = {
+                    let mut state = self.lock();
+                    state.proxies.push(request);
+                    state.proxy_response.clone()
+                };
+                Ok(response)
+            })
+        }
+
+        fn list(
+            &self,
+            _resource: ResourceType,
+            _namespace: Option<String>,
+            _label_selector: Option<String>,
+        ) -> BoxFuture<'_, Result<Vec<DynamicObject>, KubeError>> {
+            Box::pin(async move { Ok(Vec::new()) })
+        }
+
+        fn delete(
+            &self,
+            _key: ResourceKey,
+            _options: DeleteOptions,
+        ) -> BoxFuture<'_, Result<(), KubeError>> {
+            Box::pin(async move { Ok(()) })
+        }
+
+        fn logs(&self, _request: LogRequest) -> BoxFuture<'_, Result<String, KubeError>> {
+            Box::pin(async move { Ok(String::new()) })
+        }
     }
 }

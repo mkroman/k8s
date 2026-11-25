@@ -139,9 +139,14 @@ pub struct RenderArgs {
     /// The app to render.
     #[arg(long = "app", value_name = "NAME")]
     pub app: String,
-    /// The output directory. Defaults to a temporary directory.
+    /// The output directory. Defaults to `.astrium/render/<app>` under the
+    /// project root.
     #[arg(long, value_name = "DIR")]
     pub output: Option<PathBuf>,
+    /// Override the packaged chart version. Defaults to the chart's version,
+    /// or `0.0.0` for a generated Kustomize wrapper.
+    #[arg(long, value_name = "SEMVER")]
+    pub chart_version: Option<String>,
 }
 
 /// Arguments for `astrarium cluster`.
