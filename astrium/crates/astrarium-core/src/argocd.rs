@@ -393,6 +393,7 @@ mod tests {
                 namespace: "alpha".to_owned(),
             }],
             cluster_resource_whitelist: Vec::new(),
+            cluster_resource_blacklist: Vec::new(),
             namespace_resource_whitelist: Some(Vec::new()),
             namespace_resource_blacklist: None,
         };

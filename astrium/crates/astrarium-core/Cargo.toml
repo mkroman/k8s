@@ -13,6 +13,7 @@ categories.workspace = true
 
 [dependencies]
 futures.workspace = true
+gix.workspace = true
 jiff.workspace = true
 k8s-openapi.workspace = true
 kube.workspace = true
