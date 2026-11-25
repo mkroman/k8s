@@ -391,7 +391,7 @@ fn git_error(context: &'static str) -> impl FnOnce(gix::Error) -> SelectionError
 
 #[cfg(test)]
 mod tests {
-    use gix::refs::transaction::PreviousValue;
+    use gix::refs::transaction::{PreviousValue, RefEdit};
 
     use super::*;
     use crate::plan::PreviousRunStatus;
@@ -520,22 +520,26 @@ values = ["values-b.yaml"]
                 .new_commit_as(signature, signature, message, tree, parent)
                 .unwrap();
             let id = commit.id;
-            self.repository
-                .reference(
-                    "refs/heads/main",
-                    id,
-                    PreviousValue::Any,
-                    format!("commit {message}"),
-                )
-                .unwrap();
+            self.update_reference("refs/heads/main", id, &format!("commit {message}"));
             self.commits.push(id);
             id
         }
 
-        fn reference(&self, name: &str, id: ObjectId) {
+        fn update_reference(&self, name: &str, id: ObjectId, message: &str) {
+            let reference = name.try_into().unwrap();
+            let edit = RefEdit::update(reference, id, PreviousValue::Any, message.to_owned());
+            let signature = gix::actor::SignatureRef {
+                name: "test".into(),
+                email: "test@example.com".into(),
+                time: "1700000000 +0000",
+            };
             self.repository
-                .reference(name, id, PreviousValue::Any, "test reference")
+                .edit_references_as([edit], Some(signature))
                 .unwrap();
+        }
+
+        fn reference(&self, name: &str, id: ObjectId) {
+            self.update_reference(name, id, "test reference");
         }
 
         fn manifest(&self) -> Manifest {
