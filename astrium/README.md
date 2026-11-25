@@ -44,9 +44,11 @@ astrium/target/release/astrarium run --app mosquitto
   suite. Astrarium creates `Namespace`, `AppProject` and `Application` objects
   directly; it does not bootstrap the production `apps` chart and does not read
   `apps/values.yaml` or `hack/e2e/apps.yaml` at runtime.
-- **Only three external programs.** The Rust binary invokes `helm`,
+- **Only three external CLI programs.** The Rust binary invokes `helm`,
   `kustomize` and `kind`. Git access uses `gix`, Kubernetes access uses `kube`,
-  HTTP uses `reqwest`, and dates/times use `jiff`.
+  HTTP uses `reqwest`, and dates/times use `jiff`. Cold-image removal and node
+  containerd checks use the Docker API through `bollard`, never the `docker`
+  CLI.
 - **A real chart repository.** Helm apps are packaged as-is and rendered by
   Argo CD with a typed `valuesObject`. Kustomize apps are rendered locally and
   wrapped in a tiny Helm chart so hooks and sync waves behave like Helm.
