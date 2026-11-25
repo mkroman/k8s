@@ -6,9 +6,12 @@
 # http://localhost:16686.
 #
 # The registry services are pull-through caches. Astrarium writes containerd
-# `hosts.toml` files into each kind node that point at these ports, so node
-# image pulls are served by the local cache. The caches bind to 0.0.0.0 because
-# kind nodes reach the host through the Docker bridge gateway in some setups.
+# `hosts.toml` files into each kind node that point workload image pulls at
+# these ports. `kindest/node` itself is pulled by the host Docker daemon before
+# the nodes exist, so it bypasses these caches; configure the host daemon's
+# registry-mirrors or pre-pull the node image if that pull is a bottleneck. The
+# caches bind to 0.0.0.0 because kind nodes reach the host through the Docker
+# bridge gateway in some setups.
 name: astrarium
 
 services:
