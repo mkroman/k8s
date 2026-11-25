@@ -26,8 +26,8 @@ use crate::cluster::{ClusterError, ClusterOptions, ClusterProvider, KindCluster}
 use crate::command::CommandRunner;
 use crate::diagnostics::{AppRequest, DiagnosticsCollector, DiagnosticsError, DiagnosticsRequest};
 use crate::kube::{
-    APPLICATION as APPLICATION_RESOURCE, ApplyOptions, KubeApi, KubeClient, KubeError, POD,
-    ResourceKey,
+    APPLICATION as APPLICATION_RESOURCE, ApplyOptions, DAEMON_SET, DEPLOYMENT, DeleteOptions, JOB,
+    KubeApi, KubeClient, KubeError, NAMESPACE, POD, ResourceKey, ResourceType, STATEFUL_SET,
 };
 use crate::manifest::{AppSpec, Manifest};
 use crate::plan::Plan;
@@ -139,6 +139,9 @@ pub enum RunError {
     /// A manifest value is invalid.
     #[error(transparent)]
     ValueError(#[from] ValueError),
+    /// The suite configuration cannot satisfy a run precondition.
+    #[error("{0}")]
+    Config(String),
     /// A filesystem operation failed.
     #[error("I/O error at {path}: {source}")]
     Io {
@@ -224,6 +227,11 @@ pub async fn run_suite(
     if let Err(error) = install_argo_cd(runner.as_ref(), &kube, manifest).await {
         warn!(%error, "Argo CD installation failed; keeping the cluster");
         return Err(error.into());
+    }
+
+    if let Err(error) = prepare_cold_start_apps(manifest, plan, &cluster, &handle, &kube).await {
+        warn!(%error, "cold-start preparation failed; keeping the cluster");
+        return Err(error);
     }
 
     let render_result =
@@ -366,6 +374,140 @@ pub async fn run_suite(
         kept_cluster: options.keep_cluster || !handle.created,
         diagnostics: None,
     })
+}
+
+async fn prepare_cold_start_apps(
+    manifest: &Manifest,
+    plan: &Plan,
+    cluster: &KindCluster<Arc<dyn CommandRunner>>,
+    handle: &crate::cluster::ClusterHandle,
+    kube: &dyn KubeApi,
+) -> Result<(), RunError> {
+    let mut verified_containerd = false;
+    for planned in &plan.apps {
+        let app = manifest
+            .app(planned.name.as_str())
+            .ok_or_else(|| RunError::MissingApp(planned.name.to_string()))?;
+        if app.requires_containerd_config && !verified_containerd {
+            cluster.verify_containerd_config(&handle.name).await?;
+            verified_containerd = true;
+        }
+        if app.stale_probe_resources.is_some() {
+            clear_stale_probe_resources(kube, app).await?;
+        }
+        if app.requires_fresh_image {
+            let image = fresh_image(manifest, app)?;
+            cluster
+                .remove_image_from_nodes(&handle.name, &image)
+                .await?;
+        }
+    }
+    Ok(())
+}
+
+fn fresh_image(manifest: &Manifest, app: &AppSpec) -> Result<String, RunError> {
+    let path = manifest.resolve_path(&app.source.join("values-kind.yaml"))?;
+    let source = std::fs::read_to_string(&path).map_err(|source| RunError::io(&path, source))?;
+    let value: serde_json::Value = yaml_serde::from_str(&source)
+        .map_err(|error| RunError::Config(format!("invalid {}: {error}", path.display())))?;
+    value
+        .pointer("/e2e/pullImage")
+        .and_then(serde_json::Value::as_str)
+        .filter(|image| !image.trim().is_empty())
+        .map(ToOwned::to_owned)
+        .ok_or_else(|| {
+            RunError::Config(format!(
+                "app {} requires a fresh image but {} has no e2e.pullImage",
+                app.name,
+                path.display()
+            ))
+        })
+}
+
+async fn clear_stale_probe_resources(kube: &dyn KubeApi, app: &AppSpec) -> Result<(), RunError> {
+    let Some(stale) = &app.stale_probe_resources else {
+        return Ok(());
+    };
+    let namespace = stale.namespace.as_str();
+    if kube
+        .get(ResourceKey::cluster(NAMESPACE, namespace))
+        .await?
+        .is_none()
+    {
+        return Ok(());
+    }
+
+    for resource in &stale.resource_names {
+        let (kind, name) = resource.split_once('/').ok_or_else(|| {
+            RunError::Config(format!(
+                "stale resource {resource:?} for {} must be kind/name",
+                app.name
+            ))
+        })?;
+        let resource_type = stale_resource_type(kind).ok_or_else(|| {
+            RunError::Config(format!(
+                "stale resource kind {kind:?} for {} is not supported",
+                app.name
+            ))
+        })?;
+        kube.delete(
+            ResourceKey::namespaced(resource_type, namespace, name),
+            DeleteOptions::default(),
+        )
+        .await?;
+    }
+
+    for selector in &stale.pod_label_selectors {
+        let pods = kube
+            .list(POD, Some(namespace.to_owned()), Some(selector.clone()))
+            .await?;
+        for pod in pods {
+            let Some(name) = pod.metadata.name.clone() else {
+                continue;
+            };
+            kube.delete(
+                ResourceKey::namespaced(POD, namespace, name),
+                DeleteOptions {
+                    grace_period: Some(0),
+                    ..DeleteOptions::default()
+                },
+            )
+            .await?;
+        }
+        let deadline = Instant::now() + Duration::from_secs(60);
+        loop {
+            let remaining = kube
+                .list(POD, Some(namespace.to_owned()), Some(selector.clone()))
+                .await?;
+            if remaining.is_empty() {
+                break;
+            }
+            if Instant::now() >= deadline {
+                return Err(RunError::Config(format!(
+                    "stale probe pods for {} did not terminate: {}",
+                    app.name,
+                    remaining
+                        .iter()
+                        .filter_map(|pod| pod.metadata.name.as_deref())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )));
+            }
+            tokio::time::sleep(Duration::from_secs(1)).await;
+        }
+    }
+    Ok(())
+}
+
+fn stale_resource_type(kind: &str) -> Option<ResourceType> {
+    match kind.to_ascii_lowercase().as_str() {
+        "daemonset" => Some(DAEMON_SET),
+        "deployment" => Some(DEPLOYMENT),
+        "job" => Some(JOB),
+        "pod" => Some(POD),
+        "statefulset" => Some(STATEFUL_SET),
+        _ => None,
+    }
 }
 
 async fn render_apps(

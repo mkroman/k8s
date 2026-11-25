@@ -13,6 +13,7 @@ categories.workspace = true
 
 [dependencies]
 axum.workspace = true
+bollard.workspace = true
 futures.workspace = true
 gix.workspace = true
 http.workspace = true

@@ -9,12 +9,18 @@
 mod kind_config;
 mod registry;
 
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
+use bollard::Docker;
+use bollard::container::LogOutput;
+use bollard::exec::{CreateExecOptions, StartExecOptions, StartExecResults};
+use bollard::query_parameters::ListContainersOptions;
+use futures::StreamExt as _;
 use thiserror::Error;
-use tracing::warn;
+use tracing::{info, warn};
 
 use crate::BoxFuture;
 use crate::command::{CommandOutput, CommandRunner, CommandSpec, Tool};
@@ -131,6 +137,17 @@ pub enum ClusterError {
         name: String,
         /// The validation rule that failed.
         reason: &'static str,
+    },
+    /// The Docker daemon could not be reached or a node exec failed.
+    #[error("Docker API error: {0}")]
+    Docker(String),
+    /// A node does not have the containerd configuration Astrarium requires.
+    #[error("containerd configuration check failed for {node}: {message}")]
+    Containerd {
+        /// The kind node container.
+        node: String,
+        /// The failed setting.
+        message: String,
     },
     /// The cluster is in an unexpected state.
     #[error("{0}")]
@@ -349,6 +366,121 @@ impl<R: CommandRunner> KindCluster<R> {
         Ok(clusters)
     }
 
+    /// Removes an image from every node in the cluster.
+    ///
+    /// This is used by cold-image probes such as Spegel. Docker is accessed
+    /// through its API (the Rust binary never invokes the `docker` CLI); the
+    /// node's `crictl` is tried first, with `ctr` as a fallback.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ClusterError::Docker`] when the daemon or an exec fails, and
+    /// [`ClusterError::State`] when an image cannot be removed.
+    pub async fn remove_image_from_nodes(
+        &self,
+        cluster: &str,
+        image: &str,
+    ) -> Result<(), ClusterError> {
+        let docker = docker_client()?;
+        let containers = node_containers(&docker, cluster).await?;
+        if containers.is_empty() {
+            return Err(ClusterError::State(format!(
+                "kind cluster {cluster:?} has no node containers"
+            )));
+        }
+        for container in containers {
+            let script = r#"
+image="$1"
+if out=$(crictl rmi "$image" 2>&1); then exit 0; fi
+case "$out" in
+  *"no such image"*|*"not found"*|*"does not exist"*) exit 0 ;;
+esac
+if out=$(ctr -n k8s.io images rm --sync "$image" 2>&1); then exit 0; fi
+case "$out" in
+  *"no such image"*|*"not found"*|*"does not exist"*) exit 0 ;;
+esac
+printf '%s
+' "$out" >&2
+exit 1
+"#;
+            let (code, stdout, stderr) = docker_exec(
+                &docker,
+                &container,
+                vec![
+                    "sh".to_owned(),
+                    "-c".to_owned(),
+                    script.to_owned(),
+                    "sh".to_owned(),
+                    image.to_owned(),
+                ],
+            )
+            .await?;
+            if code != 0 {
+                return Err(ClusterError::State(format!(
+                    "could not remove image {image} from kind node {container}: {}",
+                    if stderr.trim().is_empty() {
+                        stdout.trim()
+                    } else {
+                        stderr.trim()
+                    }
+                )));
+            }
+            info!(node = %container, image, "cold-start image is absent");
+        }
+        Ok(())
+    }
+
+    /// Verifies the containerd settings the registry mirrors and Spegel rely on.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ClusterError::Containerd`] when a required setting is absent.
+    pub async fn verify_containerd_config(&self, cluster: &str) -> Result<(), ClusterError> {
+        let docker = docker_client()?;
+        let containers = node_containers(&docker, cluster).await?;
+        for container in containers {
+            let (code, stdout, stderr) = docker_exec(
+                &docker,
+                &container,
+                vec![
+                    "sh".to_owned(),
+                    "-c".to_owned(),
+                    "cat /etc/containerd/config.toml".to_owned(),
+                ],
+            )
+            .await?;
+            if code != 0 {
+                return Err(ClusterError::Containerd {
+                    node: container,
+                    message: format!("could not read config: {}", stderr.trim()),
+                });
+            }
+            for (needle, message) in [
+                (
+                    "config_path = \"/etc/containerd/certs.d\"",
+                    "config_path is not /etc/containerd/certs.d",
+                ),
+                (
+                    "discard_unpacked_layers = false",
+                    "discard_unpacked_layers is not false",
+                ),
+                (
+                    "content_sharing_policy = \"isolated\"",
+                    "content_sharing_policy is not isolated",
+                ),
+            ] {
+                if !stdout.lines().any(|line| line.trim() == needle) {
+                    return Err(ClusterError::Containerd {
+                        node: container,
+                        message: message.to_owned(),
+                    });
+                }
+            }
+            info!(node = %container, "containerd configuration verified");
+        }
+        Ok(())
+    }
+
     /// Deletes a cluster that this run created, unless `keep` is set.
     ///
     /// A reused cluster is never deleted: it belongs to the caller.
@@ -432,6 +564,79 @@ fn validate_cluster_name(name: &str) -> Result<(), ClusterError> {
         }),
         None => Ok(()),
     }
+}
+
+fn docker_client() -> Result<Docker, ClusterError> {
+    Docker::connect_with_local_defaults().map_err(|error| ClusterError::Docker(error.to_string()))
+}
+
+async fn node_containers(docker: &Docker, cluster: &str) -> Result<Vec<String>, ClusterError> {
+    let mut filters = HashMap::new();
+    filters.insert(
+        "label".to_owned(),
+        vec![format!("io.x-k8s.kind.cluster={cluster}")],
+    );
+    let options = ListContainersOptions {
+        all: true,
+        filters: Some(filters),
+        ..ListContainersOptions::default()
+    };
+    let containers = docker
+        .list_containers(Some(options))
+        .await
+        .map_err(|error| ClusterError::Docker(error.to_string()))?;
+    Ok(containers
+        .into_iter()
+        .filter_map(|container| container.id)
+        .collect())
+}
+
+async fn docker_exec(
+    docker: &Docker,
+    container: &str,
+    command: Vec<String>,
+) -> Result<(i64, String, String), ClusterError> {
+    let exec = docker
+        .create_exec(
+            container,
+            CreateExecOptions {
+                cmd: Some(command),
+                attach_stdout: Some(true),
+                attach_stderr: Some(true),
+                ..CreateExecOptions::default()
+            },
+        )
+        .await
+        .map_err(|error| ClusterError::Docker(error.to_string()))?;
+    let results = docker
+        .start_exec(&exec.id, None::<StartExecOptions>)
+        .await
+        .map_err(|error| ClusterError::Docker(error.to_string()))?;
+    let mut stdout = String::new();
+    let mut stderr = String::new();
+    if let StartExecResults::Attached { mut output, .. } = results {
+        while let Some(item) = output.next().await {
+            let item = item.map_err(|error| ClusterError::Docker(error.to_string()))?;
+            match item {
+                LogOutput::StdOut { message } | LogOutput::Console { message } => {
+                    stdout.push_str(&String::from_utf8_lossy(&message));
+                }
+                LogOutput::StdErr { message } => {
+                    stderr.push_str(&String::from_utf8_lossy(&message));
+                }
+                LogOutput::StdIn { .. } => {}
+            }
+        }
+    } else {
+        return Err(ClusterError::Docker(
+            "Docker returned a detached exec".to_owned(),
+        ));
+    }
+    let inspect = docker
+        .inspect_exec(&exec.id)
+        .await
+        .map_err(|error| ClusterError::Docker(error.to_string()))?;
+    Ok((inspect.exit_code.unwrap_or(-1), stdout, stderr))
 }
 
 #[cfg(test)]

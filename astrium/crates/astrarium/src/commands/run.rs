@@ -79,6 +79,7 @@ fn error_type(error: &astrarium_core::run::RunError) -> ErrorType {
         RunError::Diagnostics(_) => ErrorType::Diagnostics,
         RunError::Manifest(_)
         | RunError::ValueError(_)
+        | RunError::Config(_)
         | RunError::MissingApp(_)
         | RunError::MissingNamespace(_)
         | RunError::MissingProject(_)
