@@ -207,6 +207,8 @@ pub struct OperationState {
     pub started_at: Option<String>,
     /// The finish time as an RFC 3339 string.
     pub finished_at: Option<String>,
+    /// The number of retries already attempted.
+    pub retry_count: i64,
 }
 
 /// Argo CD Application summary.

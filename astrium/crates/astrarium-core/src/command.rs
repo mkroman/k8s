@@ -233,6 +233,12 @@ pub trait CommandRunner: Send + Sync {
     fn run(&self, spec: CommandSpec) -> BoxFuture<'_, Result<CommandOutput, CommandError>>;
 }
 
+impl<T: CommandRunner + ?Sized> CommandRunner for std::sync::Arc<T> {
+    fn run(&self, spec: CommandSpec) -> BoxFuture<'_, Result<CommandOutput, CommandError>> {
+        (**self).run(spec)
+    }
+}
+
 /// The production command runner.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct RealCommandRunner;

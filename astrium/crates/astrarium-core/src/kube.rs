@@ -345,6 +345,25 @@ pub trait KubeApi: Send + Sync {
         options: ApplyOptions,
     ) -> BoxFuture<'_, Result<DynamicObject, KubeError>>;
 
+    /// Applies an object whose API resource must be discovered from its
+    /// `apiVersion` and `kind`.
+    ///
+    /// This is used for the Argo CD installation manifests, which contain many
+    /// kinds that are not part of the typed resource catalogue. The default
+    /// implementation reports that dynamic apply is unsupported so existing
+    /// test fakes do not need to implement it.
+    fn apply_dynamic(
+        &self,
+        _object: DynamicObject,
+        _options: ApplyOptions,
+    ) -> BoxFuture<'_, Result<DynamicObject, KubeError>> {
+        Box::pin(async {
+            Err(KubeError::Request {
+                message: "dynamic apply is not implemented by this KubeApi".to_owned(),
+            })
+        })
+    }
+
     /// Fetches an object, returning `None` for HTTP 404.
     fn get(&self, key: ResourceKey) -> BoxFuture<'_, Result<Option<DynamicObject>, KubeError>>;
 
@@ -396,6 +415,29 @@ impl KubeClient {
         let client = Client::try_default()
             .await
             .map_err(|source| KubeError::Client { source })?;
+        Ok(Self { client })
+    }
+
+    /// Creates a client from an explicit kubeconfig path.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`KubeError::Client`] when the kubeconfig cannot be read or the
+    /// client cannot be constructed.
+    pub async fn from_kubeconfig(path: impl AsRef<std::path::Path>) -> Result<Self, KubeError> {
+        let kubeconfig =
+            kube::config::Kubeconfig::read_from(path).map_err(|source| KubeError::Client {
+                source: kube::Error::InferKubeconfig(source),
+            })?;
+        let config = kube::Config::from_custom_kubeconfig(
+            kubeconfig,
+            &kube::config::KubeConfigOptions::default(),
+        )
+        .await
+        .map_err(|source| KubeError::Client {
+            source: kube::Error::InferKubeconfig(source),
+        })?;
+        let client = Client::try_from(config).map_err(|source| KubeError::Client { source })?;
         Ok(Self { client })
     }
 
@@ -453,6 +495,71 @@ impl KubeApi for KubeClient {
             api.patch(&key.name, &params, &Patch::Apply(&object))
                 .await
                 .map_err(|source| KubeError::api(key.resource.kind, key.name, source))
+        })
+    }
+
+    fn apply_dynamic(
+        &self,
+        object: DynamicObject,
+        options: ApplyOptions,
+    ) -> BoxFuture<'_, Result<DynamicObject, KubeError>> {
+        Box::pin(async move {
+            let (api_version, kind) = object
+                .types
+                .as_ref()
+                .map(|types| (types.api_version.clone(), types.kind.clone()))
+                .ok_or_else(|| KubeError::Request {
+                    message: "dynamic apply object has no apiVersion/kind".to_owned(),
+                })?;
+            let name = object
+                .metadata
+                .name
+                .clone()
+                .ok_or_else(|| KubeError::Request {
+                    message: format!("{api_version} {kind} has no metadata.name"),
+                })?;
+            let namespace = object.metadata.namespace.clone();
+            let (group, version) = split_api_version(&api_version)?;
+            let gvk = GroupVersionKind::gvk(group, version, &kind);
+            let (api_resource, capabilities) =
+                pinned_kind(&self.client, &gvk)
+                    .await
+                    .map_err(|source| KubeError::Discovery {
+                        api_version: api_version.clone(),
+                        kind: kind.clone(),
+                        source: Box::new(source),
+                    })?;
+            let api: Api<DynamicObject> = match capabilities.scope {
+                Scope::Namespaced => {
+                    let namespace =
+                        namespace
+                            .as_deref()
+                            .ok_or_else(|| KubeError::MissingObjectNamespace {
+                                api_version: api_version.clone(),
+                                kind: kind.clone(),
+                            })?;
+                    Api::namespaced_with(self.client.clone(), namespace, &api_resource)
+                }
+                Scope::Cluster => Api::all_with(self.client.clone(), &api_resource),
+            };
+            let mut params = PatchParams::apply(&options.field_manager);
+            if options.strict {
+                params = params.validation_strict();
+            }
+            if options.force {
+                params = params.force();
+            }
+            if options.dry_run {
+                params = params.dry_run();
+            }
+            api.patch(&name, &params, &Patch::Apply(&object))
+                .await
+                .map_err(|source| KubeError::ApiObject {
+                    api_version,
+                    kind,
+                    name,
+                    source: Box::new(source),
+                })
         })
     }
 

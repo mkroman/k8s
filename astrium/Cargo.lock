@@ -164,6 +164,7 @@ dependencies = [
  "insta",
  "miette",
  "predicates",
+ "rustls",
  "schemars",
  "serde",
  "serde_json",

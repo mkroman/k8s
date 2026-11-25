@@ -25,6 +25,7 @@ pub mod manifest;
 pub mod plan;
 pub mod probe;
 pub mod render;
+pub mod run;
 pub mod telemetry;
 pub mod types;
 

@@ -11,6 +11,7 @@
 //! tests.
 
 mod build;
+mod install;
 mod resources;
 
 use thiserror::Error;
@@ -20,6 +21,7 @@ pub use build::{
     application_for_manifest, apply_app_project, apply_application, apply_namespace, namespace,
     sync_wave, sync_wave_for_depth,
 };
+pub use install::{InstallError, install_argo_cd};
 pub use resources::{
     ARGOCD_GROUP, ARGOCD_VERSION, AppProject, AppProjectSpec, Application, ApplicationDestination,
     ApplicationSource, ApplicationSourceHelm, ApplicationSpec, ApplicationStatus,

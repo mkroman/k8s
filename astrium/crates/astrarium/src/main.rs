@@ -17,6 +17,11 @@ use crate::cli::{Cli, Command, LogFormat, ManifestCommand};
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    // Both kube and reqwest use rustls. Installing the ring provider once at
+    // process start avoids rustls' "multiple providers" panic when the
+    // dependency graph enables more than one provider feature.
+    let _ = rustls::crypto::ring::default_provider().install_default();
+
     let cli = Cli::parse();
 
     let needs_manifest = match &cli.command {
