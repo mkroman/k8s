@@ -684,9 +684,9 @@ impl DiagnosticsReport {
     /// Writes `diagnostics.json` and `summary.md` into `directory`.
     ///
     /// The JSON report is redacted as well as the Markdown summary, so an
-    /// artifact upload cannot leak Secrets. The summary is also appended to
-    /// `$GITHUB_STEP_SUMMARY` and failed apps are annotated when running in
-    /// GitHub Actions; those CI side effects are best effort.
+    /// artifact upload cannot leak Secrets. CI publication is deliberately a
+    /// separate step ([`Self::emit_ci`]) so tests and library callers do not
+    /// write fixture data into a real `$GITHUB_STEP_SUMMARY`.
     ///
     /// # Errors
     ///
@@ -712,10 +712,6 @@ impl DiagnosticsReport {
                 source,
             }
         })?;
-
-        if let Err(error) = self.emit_ci() {
-            warn!(%error, "failed to publish diagnostics to the CI summary");
-        }
 
         Ok(json_path)
     }

@@ -243,6 +243,8 @@ source = "demo"
     binary()
         .args(["plan", "--all", "--json", "--config"])
         .arg(&manifest)
+        .env_remove("GITHUB_OUTPUT")
+        .env_remove("GITHUB_STEP_SUMMARY")
         .assert()
         .success()
         .stdout(predicate::str::contains(r#""app": "demo""#));

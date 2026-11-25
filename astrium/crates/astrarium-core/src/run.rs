@@ -825,9 +825,8 @@ async fn collect_diagnostics(
     let report = collector.collect(request).await;
     match report.write(&directory) {
         Ok(path) => {
-            let _ = report.append_github_step_summary();
-            for annotation in report.github_annotations() {
-                eprintln!("{annotation}");
+            if let Err(error) = report.emit_ci() {
+                warn!(%error, "failed to publish diagnostics to the CI summary");
             }
             Some(path)
         }
