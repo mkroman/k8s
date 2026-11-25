@@ -29,6 +29,9 @@ pub mod run;
 pub mod telemetry;
 pub mod types;
 
+#[cfg(any(test, feature = "testing"))]
+pub mod testing;
+
 pub use argocd::{AppProject, AppProjectSpec, Application, ApplicationSpec};
 pub use clock::{Clock, SystemClock};
 pub use cluster::{ClusterError, ClusterHandle, ClusterOptions, ClusterProvider};

@@ -11,6 +11,11 @@ homepage.workspace = true
 keywords.workspace = true
 categories.workspace = true
 
+[features]
+# Compiles the reusable fakes in `testing` for external test crates.
+# `astrarium-test-support` enables this feature.
+testing = []
+
 [dependencies]
 axum.workspace = true
 bollard.workspace = true

@@ -12,6 +12,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use futures::{StreamExt as _, TryStreamExt as _};
+use jiff::Timestamp;
 use thiserror::Error;
 use tracing::{Instrument as _, info, warn};
 
@@ -622,11 +623,11 @@ async fn wait_for_application(
     fast_fail: bool,
     clock: &dyn Clock,
 ) -> Result<(), String> {
-    let deadline = Instant::now() + timeout;
-    let mut revision_deadline: Option<Instant> = None;
+    let deadline = deadline_after(clock, timeout);
+    let mut revision_deadline: Option<Timestamp> = None;
 
     loop {
-        if Instant::now() >= deadline {
+        if clock.now() >= deadline {
             return Err(format!(
                 "Application {} did not become Synced and Healthy within {timeout:?}",
                 app.name
@@ -699,8 +700,8 @@ async fn wait_for_application(
                             return Ok(());
                         }
                         let revision_deadline = *revision_deadline
-                            .get_or_insert_with(|| Instant::now() + Duration::from_secs(30));
-                        if Instant::now() >= revision_deadline {
+                            .get_or_insert_with(|| deadline_after(clock, Duration::from_secs(30)));
+                        if clock.now() >= revision_deadline {
                             return Err(format!(
                                 "Application {} synced revision {revision:?}, expected {expected_revision:?}",
                                 app.name
@@ -757,12 +758,12 @@ async fn wait_for_probe(
     app: &AppSpec,
     clock: &dyn Clock,
 ) -> Result<ProbeOutcome, String> {
-    let deadline = Instant::now() + Duration::from_secs(120);
+    let deadline = deadline_after(clock, Duration::from_secs(120));
     loop {
         match check_app(kube, app).await {
             Ok(outcome) => return Ok(outcome),
             Err(error) => {
-                if Instant::now() >= deadline {
+                if clock.now() >= deadline {
                     return Err(format!(
                         "post-sync checks for {} did not pass: {error}",
                         app.name
@@ -772,6 +773,15 @@ async fn wait_for_probe(
         }
         clock.sleep(Duration::from_secs(2)).await;
     }
+}
+
+/// Computes a deadline from the injected clock, saturating at the timestamp
+/// maximum instead of panicking on an absurd timeout.
+fn deadline_after(clock: &dyn Clock, timeout: Duration) -> Timestamp {
+    clock
+        .now()
+        .saturating_add(timeout)
+        .unwrap_or(Timestamp::MAX)
 }
 
 async fn collect_diagnostics(
@@ -833,7 +843,15 @@ pub type ClockFuture<'a, T> = BoxFuture<'a, T>;
 
 #[cfg(test)]
 mod tests {
+    use std::collections::{HashSet, VecDeque};
+    use std::path::Path;
+    use std::sync::{Mutex, MutexGuard, PoisonError};
+
+    use crate::testing::FakeClock;
+    use kube::core::DynamicObject;
+
     use super::*;
+    use crate::kube::{LogRequest, ObjectReference, ProxyRequest};
 
     #[test]
     fn run_error_keeps_app_name() {
@@ -842,5 +860,506 @@ mod tests {
             message: "boom".to_owned(),
         };
         assert!(error.to_string().contains("demo"));
+    }
+
+    /// Builds a one-app manifest. `extra` is appended to the `[[apps]]` table,
+    /// so tests can set resources, sync policies and stale probe settings.
+    fn test_manifest(extra: &str) -> Manifest {
+        let source = format!(
+            r#"
+[project]
+name = "test"
+root = "."
+
+[telemetry]
+enabled = false
+
+[registry]
+enabled = false
+mirrors = []
+
+[[projects]]
+name = "demo"
+destinations = [{{ namespace = "demo" }}]
+
+[[namespaces]]
+name = "demo"
+
+[[apps]]
+name = "demo"
+namespace = "demo"
+project = "demo"
+source = "demo"
+renderer = "kustomize"
+{extra}
+"#
+        );
+        Manifest::from_toml_str(&source, Path::new(".")).expect("test manifest")
+    }
+
+    fn healthy(revision: &str) -> serde_json::Value {
+        serde_json::json!({
+            "health": {"status": "Healthy"},
+            "sync": {"status": "Synced", "revision": revision},
+        })
+    }
+
+    fn failed(retry_count: i64, message: &str) -> serde_json::Value {
+        serde_json::json!({
+            "health": {"status": "Degraded"},
+            "sync": {"status": "OutOfSync"},
+            "operationState": {
+                "phase": "Failed",
+                "retryCount": retry_count,
+                "message": message,
+            },
+        })
+    }
+
+    #[tokio::test]
+    async fn application_wait_succeeds_on_healthy_synced_revision() {
+        let manifest = test_manifest("");
+        let app = manifest.app("demo").expect("app");
+        let kube = FakeKube::new().with_application_status(healthy("1.2.3"));
+        let clock = FakeClock::default();
+
+        let result = wait_for_application(
+            &kube,
+            "argocd",
+            app,
+            "1.2.3",
+            Duration::from_secs(10),
+            false,
+            &clock,
+        )
+        .await;
+
+        assert!(result.is_ok(), "{result:?}");
+        assert_eq!(clock.sleep_count(), 0);
+        assert_eq!(kube.application_gets(), 1);
+    }
+
+    #[tokio::test]
+    async fn application_wait_retries_while_the_budget_lasts() {
+        let manifest = test_manifest("sync_policy = { retry_limit = 2 }");
+        let app = manifest.app("demo").expect("app");
+        let kube = FakeKube::new()
+            .with_application_status(failed(0, "first attempt"))
+            .with_application_status(failed(1, "second attempt"))
+            .with_application_status(healthy("1.2.3"));
+        let clock = FakeClock::default();
+
+        let result = wait_for_application(
+            &kube,
+            "argocd",
+            app,
+            "1.2.3",
+            Duration::from_secs(10),
+            false,
+            &clock,
+        )
+        .await;
+
+        assert!(result.is_ok(), "{result:?}");
+        assert_eq!(
+            clock.sleeps(),
+            vec![Duration::from_secs(1), Duration::from_secs(1)]
+        );
+        assert_eq!(kube.application_gets(), 3);
+    }
+
+    #[tokio::test]
+    async fn application_wait_reports_the_final_failed_sync() {
+        let manifest = test_manifest("sync_policy = { retry_limit = 0 }");
+        let app = manifest.app("demo").expect("app");
+        let kube = FakeKube::new().with_application_status(failed(0, "boom"));
+        let clock = FakeClock::default();
+
+        let error = wait_for_application(
+            &kube,
+            "argocd",
+            app,
+            "1.2.3",
+            Duration::from_secs(10),
+            false,
+            &clock,
+        )
+        .await
+        .expect_err("failed sync");
+
+        assert!(error.contains("sync operation Failed: boom"), "{error}");
+        assert_eq!(clock.sleeps().len(), 0);
+    }
+
+    #[tokio::test]
+    async fn application_wait_times_out_on_a_revision_mismatch() {
+        let manifest = test_manifest("");
+        let app = manifest.app("demo").expect("app");
+        let kube = FakeKube::new().with_application_status(healthy("old-revision"));
+        let clock = FakeClock::default();
+
+        let error = wait_for_application(
+            &kube,
+            "argocd",
+            app,
+            "new-revision",
+            Duration::from_secs(120),
+            false,
+            &clock,
+        )
+        .await
+        .expect_err("revision mismatch");
+
+        assert!(error.contains("old-revision"), "{error}");
+        assert!(error.contains("new-revision"), "{error}");
+        assert_eq!(clock.sleep_count(), 30);
+        assert_eq!(clock.total_slept(), Duration::from_secs(30));
+    }
+
+    #[tokio::test]
+    async fn application_wait_fails_fast_on_crash_loop_back_off() {
+        let manifest = test_manifest("");
+        let app = manifest.app("demo").expect("app");
+        let kube = FakeKube::new().with_pod("demo-abc", 3, Some("CrashLoopBackOff"));
+        let clock = FakeClock::default();
+
+        let error = wait_for_application(
+            &kube,
+            "argocd",
+            app,
+            "1.2.3",
+            Duration::from_secs(10),
+            true,
+            &clock,
+        )
+        .await
+        .expect_err("fatal pod");
+
+        assert!(
+            error.contains("CrashLoopBackOff after 3 restarts"),
+            "{error}"
+        );
+        assert_eq!(kube.application_gets(), 0);
+    }
+
+    #[tokio::test]
+    async fn fatal_pod_requires_three_restarts_and_crash_loop_back_off() {
+        let manifest = test_manifest("");
+        let app = manifest.app("demo").expect("app");
+        let kube = FakeKube::new()
+            .with_pod("two-restarts", 2, Some("CrashLoopBackOff"))
+            .with_pod("other-reason", 3, Some("ImagePullBackOff"));
+
+        assert_eq!(fatal_pod(&kube, app).await.expect("fatal pod"), None);
+    }
+
+    #[tokio::test]
+    async fn probe_retries_until_the_resource_exists() {
+        let manifest = test_manifest(
+            r#"resources = [{ api_version = "v1", kind = "ConfigMap", namespace = "demo", name = "demo-config" }]"#,
+        );
+        let app = manifest.app("demo").expect("app");
+        let kube = FakeKube::new()
+            .with_resource_exists(false)
+            .with_resource_exists(false)
+            .with_resource_exists(true);
+        let clock = FakeClock::default();
+
+        let outcome = wait_for_probe(&kube, app, &clock).await.expect("probe");
+
+        assert_eq!(
+            outcome,
+            ProbeOutcome {
+                resources_checked: 1,
+                jobs_checked: 0,
+            }
+        );
+        assert_eq!(
+            clock.sleeps(),
+            vec![Duration::from_secs(2), Duration::from_secs(2)]
+        );
+        assert_eq!(kube.object_gets(), 3);
+    }
+
+    #[tokio::test]
+    async fn probe_fails_after_the_two_minute_window() {
+        let manifest = test_manifest(
+            r#"resources = [{ api_version = "v1", kind = "ConfigMap", namespace = "demo", name = "demo-config" }]"#,
+        );
+        let app = manifest.app("demo").expect("app");
+        let kube = FakeKube::new().with_resource_exists(false);
+        let clock = FakeClock::default();
+
+        let error = wait_for_probe(&kube, app, &clock)
+            .await
+            .expect_err("probe timeout");
+
+        assert!(error.contains("did not pass"), "{error}");
+        assert!(error.contains("ConfigMap demo/demo-config"), "{error}");
+        assert_eq!(clock.sleep_count(), 60);
+        assert_eq!(clock.total_slept(), Duration::from_secs(120));
+    }
+
+    #[tokio::test]
+    async fn stale_probe_resources_are_deleted_before_a_cold_start() {
+        let manifest = test_manifest(
+            r#"stale_probe_resources = { namespace = "demo", resource_names = ["deployment/demo"], pod_label_selectors = ["app=demo"] }"#,
+        );
+        let app = manifest.app("demo").expect("app");
+        let kube = FakeKube::new()
+            .with_namespace("demo")
+            .with_pod("probe-pod", 0, None);
+
+        clear_stale_probe_resources(&kube, app)
+            .await
+            .expect("clean stale resources");
+
+        let deletes = kube.deletes();
+        assert_eq!(deletes.len(), 2, "{deletes:?}");
+        assert!(
+            deletes
+                .iter()
+                .any(|(key, _)| key.resource == DEPLOYMENT && key.name == "demo")
+        );
+        let (_, pod_options) = deletes
+            .iter()
+            .find(|(key, _)| key.resource == POD && key.name == "probe-pod")
+            .expect("pod delete");
+        assert_eq!(pod_options.grace_period, Some(0));
+        assert_eq!(kube.pods().len(), 0);
+    }
+
+    #[tokio::test]
+    async fn stale_probe_cleanup_is_a_noop_without_the_namespace() {
+        let manifest = test_manifest(
+            r#"stale_probe_resources = { namespace = "demo", resource_names = ["deployment/demo"] }"#,
+        );
+        let app = manifest.app("demo").expect("app");
+        let kube = FakeKube::new();
+
+        clear_stale_probe_resources(&kube, app)
+            .await
+            .expect("missing namespace is ignored");
+
+        assert!(kube.deletes().is_empty());
+    }
+
+    #[tokio::test]
+    async fn stale_probe_cleanup_rejects_unknown_kinds() {
+        let manifest = test_manifest(
+            r#"stale_probe_resources = { namespace = "demo", resource_names = ["cronjob/demo"] }"#,
+        );
+        let app = manifest.app("demo").expect("app");
+        let kube = FakeKube::new().with_namespace("demo");
+
+        let error = clear_stale_probe_resources(&kube, app)
+            .await
+            .expect_err("unsupported kind");
+
+        assert!(error.to_string().contains("not supported"), "{error}");
+        assert!(kube.deletes().is_empty());
+    }
+
+    /// A scriptable in-memory [`KubeApi`].
+    ///
+    /// Application statuses and resource existence are consumed in order; the
+    /// final queued value repeats, so a test can model a steady state without
+    /// enqueueing dozens of identical responses.
+    #[derive(Debug, Default)]
+    struct FakeKube {
+        state: Mutex<FakeState>,
+    }
+
+    #[derive(Debug, Default)]
+    struct FakeState {
+        application_statuses: VecDeque<serde_json::Value>,
+        resource_exists: VecDeque<bool>,
+        namespaces: HashSet<String>,
+        pods: Vec<DynamicObject>,
+        deletes: Vec<(ResourceKey, DeleteOptions)>,
+        application_gets: usize,
+        object_gets: usize,
+    }
+
+    impl FakeKube {
+        fn new() -> Self {
+            Self::default()
+        }
+
+        fn with_application_status(self, status: serde_json::Value) -> Self {
+            self.lock().application_statuses.push_back(status);
+            self
+        }
+
+        fn with_resource_exists(self, exists: bool) -> Self {
+            self.lock().resource_exists.push_back(exists);
+            self
+        }
+
+        fn with_namespace(self, name: &str) -> Self {
+            self.lock().namespaces.insert(name.to_owned());
+            self
+        }
+
+        fn with_pod(self, name: &str, restarts: i64, reason: Option<&str>) -> Self {
+            let mut pod = crate::kube::object(POD, Some("demo"), name);
+            pod.data = serde_json::json!({
+                "status": {
+                    "containerStatuses": [{
+                        "name": "app",
+                        "restartCount": restarts,
+                        "state": {"waiting": {"reason": reason.unwrap_or("")}},
+                    }],
+                },
+            });
+            self.lock().pods.push(pod);
+            self
+        }
+
+        fn application_gets(&self) -> usize {
+            self.lock().application_gets
+        }
+
+        fn object_gets(&self) -> usize {
+            self.lock().object_gets
+        }
+
+        fn deletes(&self) -> Vec<(ResourceKey, DeleteOptions)> {
+            self.lock().deletes.clone()
+        }
+
+        fn pods(&self) -> Vec<DynamicObject> {
+            self.lock().pods.clone()
+        }
+
+        fn next_application_status(state: &mut FakeState) -> Option<serde_json::Value> {
+            match state.application_statuses.len() {
+                0 => None,
+                1 => state.application_statuses.front().cloned(),
+                _ => state.application_statuses.pop_front(),
+            }
+        }
+
+        fn next_resource_exists(state: &mut FakeState) -> Option<bool> {
+            match state.resource_exists.len() {
+                0 => None,
+                1 => state.resource_exists.front().copied(),
+                _ => state.resource_exists.pop_front(),
+            }
+        }
+
+        fn lock(&self) -> MutexGuard<'_, FakeState> {
+            self.state.lock().unwrap_or_else(PoisonError::into_inner)
+        }
+    }
+
+    impl KubeApi for FakeKube {
+        fn apply(
+            &self,
+            _key: ResourceKey,
+            object: DynamicObject,
+            _options: ApplyOptions,
+        ) -> BoxFuture<'_, Result<DynamicObject, crate::kube::KubeError>> {
+            Box::pin(async move { Ok(object) })
+        }
+
+        fn get(
+            &self,
+            key: ResourceKey,
+        ) -> BoxFuture<'_, Result<Option<DynamicObject>, crate::kube::KubeError>> {
+            Box::pin(async move {
+                let mut state = self.lock();
+                if key.resource == APPLICATION_RESOURCE {
+                    state.application_gets += 1;
+                    if let Some(status) = Self::next_application_status(&mut state) {
+                        let mut object =
+                            DynamicObject::new(&key.name, &APPLICATION_RESOURCE.api_resource());
+                        object.metadata.namespace = key.namespace;
+                        object.data = serde_json::json!({"status": status});
+                        return Ok(Some(object));
+                    }
+                } else if key.resource == NAMESPACE && state.namespaces.contains(&key.name) {
+                    return Ok(Some(crate::kube::object(
+                        NAMESPACE,
+                        key.namespace.as_deref(),
+                        &key.name,
+                    )));
+                }
+                Ok(None)
+            })
+        }
+
+        fn get_object(
+            &self,
+            reference: ObjectReference,
+        ) -> BoxFuture<'_, Result<Option<DynamicObject>, crate::kube::KubeError>> {
+            Box::pin(async move {
+                let mut state = self.lock();
+                state.object_gets += 1;
+                if Self::next_resource_exists(&mut state).unwrap_or(false) {
+                    let mut object = DynamicObject::new(&reference.name, &POD.api_resource());
+                    object.metadata.namespace = reference.namespace;
+                    Ok(Some(object))
+                } else {
+                    Ok(None)
+                }
+            })
+        }
+
+        fn service_proxy(
+            &self,
+            _request: ProxyRequest,
+        ) -> BoxFuture<'_, Result<String, crate::kube::KubeError>> {
+            Box::pin(async { Ok("{}".to_owned()) })
+        }
+
+        fn list(
+            &self,
+            resource: ResourceType,
+            namespace: Option<String>,
+            _label_selector: Option<String>,
+        ) -> BoxFuture<'_, Result<Vec<DynamicObject>, crate::kube::KubeError>> {
+            Box::pin(async move {
+                if resource != POD {
+                    return Ok(Vec::new());
+                }
+                let state = self.lock();
+                Ok(state
+                    .pods
+                    .iter()
+                    .filter(|pod| {
+                        namespace.as_deref().is_none_or(|namespace| {
+                            pod.metadata.namespace.as_deref() == Some(namespace)
+                        })
+                    })
+                    .cloned()
+                    .collect())
+            })
+        }
+
+        fn delete(
+            &self,
+            key: ResourceKey,
+            options: DeleteOptions,
+        ) -> BoxFuture<'_, Result<(), crate::kube::KubeError>> {
+            Box::pin(async move {
+                let mut state = self.lock();
+                state.deletes.push((key.clone(), options));
+                state
+                    .pods
+                    .retain(|pod| pod.metadata.name.as_deref() != Some(key.name.as_str()));
+                if key.resource == NAMESPACE {
+                    state.namespaces.remove(&key.name);
+                }
+                Ok(())
+            })
+        }
+
+        fn logs(
+            &self,
+            _request: LogRequest,
+        ) -> BoxFuture<'_, Result<String, crate::kube::KubeError>> {
+            Box::pin(async { Ok(String::new()) })
+        }
     }
 }

@@ -20,6 +20,7 @@ categories = ["development-tools::testing"]
 
 [workspace.dependencies]
 astrarium-core = { version = "0.1.0", path = "crates/astrarium-core" }
+astrarium-test-support = { version = "0.1.0", path = "crates/astrarium-test-support" }
 
 axum = "0.8.9"
 bollard = "0.21.1"

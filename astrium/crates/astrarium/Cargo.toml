@@ -30,6 +30,7 @@ which.workspace = true
 
 [dev-dependencies]
 assert_cmd.workspace = true
+astrarium-test-support.workspace = true
 gix.workspace = true
 insta.workspace = true
 predicates.workspace = true
