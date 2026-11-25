@@ -176,7 +176,18 @@ jobs:
       timeout-minutes: 20
       env:
         APP: ${{ matrix.app }}
-      run: astrarium run --app "${APP}" --fast-fail
+      run: |
+        set -euo pipefail
+        astrarium run --app "${APP}" --fast-fail \
+          --trace-file "diagnostics/astrarium-trace.json"
+    - name: Upload trace file
+      if: always()
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: astrarium-${{ matrix.app }}-trace
+        path: diagnostics/astrarium-trace.json
+        if-no-files-found: warn
+        retention-days: 7
     - name: Collect kind logs
       if: failure()
       timeout-minutes: 5

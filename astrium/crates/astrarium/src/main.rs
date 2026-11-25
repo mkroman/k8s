@@ -63,6 +63,7 @@ async fn main() -> Result<()> {
         run_id: telemetry::new_run_id(),
         repository: runtime.repository,
         revision: runtime.revision,
+        trace_file: cli.trace_file.clone(),
     };
     let guard = telemetry::init(&telemetry_config, &options).into_diagnostic()?;
     info!(

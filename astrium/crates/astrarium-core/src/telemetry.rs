@@ -23,7 +23,10 @@ use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::{EnvFilter, fmt};
 
+mod trace_file;
+
 use crate::manifest::TelemetryConfig;
+use trace_file::TraceFileExporter;
 
 /// Options that are not part of the manifest.
 #[derive(Clone, Debug)]
@@ -36,6 +39,8 @@ pub struct TelemetryOptions {
     pub repository: Option<String>,
     /// The current Git revision, when known.
     pub revision: Option<String>,
+    /// Write an OTLP JSON trace file that Jaeger UI can open.
+    pub trace_file: Option<std::path::PathBuf>,
 }
 
 /// An error while initialising or shutting down telemetry.
@@ -287,16 +292,26 @@ pub fn init(
         EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("astrarium=info,info"));
     let ansi = std::env::var_os("NO_COLOR").is_none() && std::env::var_os("CI").is_none();
 
-    let (provider, tracer) = if config.enabled {
-        let exporter = opentelemetry_otlp::SpanExporter::builder()
-            .with_tonic()
-            .with_endpoint(&config.otlp_endpoint)
-            .build()?;
+    let resource = build_resource(config, options);
+    let file_exporter = options
+        .trace_file
+        .as_ref()
+        .map(|path| TraceFileExporter::new(path.clone(), resource.clone()));
+    let needs_provider = config.enabled || file_exporter.is_some();
 
-        let provider = SdkTracerProvider::builder()
-            .with_batch_exporter(exporter)
-            .with_resource(build_resource(config, options))
-            .build();
+    let (provider, tracer) = if needs_provider {
+        let mut builder = SdkTracerProvider::builder().with_resource(resource);
+        if config.enabled {
+            let exporter = opentelemetry_otlp::SpanExporter::builder()
+                .with_tonic()
+                .with_endpoint(&config.otlp_endpoint)
+                .build()?;
+            builder = builder.with_batch_exporter(exporter);
+        }
+        if let Some(file_exporter) = file_exporter {
+            builder = builder.with_batch_exporter(file_exporter);
+        }
+        let provider = builder.build();
         let tracer = provider.tracer(config.service_name.clone());
         (Some(provider), Some(tracer))
     } else {
@@ -401,6 +416,7 @@ mod tests {
             run_id: "run-42".to_owned(),
             repository: Some("https://github.com/mkroman/k8s".to_owned()),
             revision: Some("300f59d".to_owned()),
+            trace_file: None,
         };
         let resource = build_resource(&config, &options);
         assert_eq!(
@@ -441,6 +457,7 @@ mod tests {
             run_id: "run-1".to_owned(),
             repository: None,
             revision: None,
+            trace_file: None,
         };
         let resource = build_resource(&config, &options);
         assert_eq!(

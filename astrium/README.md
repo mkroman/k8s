@@ -38,6 +38,20 @@ astrium/target/release/astrarium run --app mosquitto
 `plan` selects apps from a Git diff (M3) or explicitly with `--all`/`--app`.
 `run` creates a kind cluster, installs Argo CD, and deploys the selected apps.
 
+### Trace files
+
+`run` can also write an OTLP JSON trace file:
+
+```bash
+astrarium run --app mosquitto --trace-file diagnostics/astrarium-trace.json
+```
+
+The file is valid OTLP JSON (`resourceSpans`/`scopeSpans`/`spans`) and can be
+loaded into Jaeger UI with **Search → Upload** (the file upload control is
+enabled by default). Jaeger 2.23 accepts OTLP JSON directly; no collector or
+storage backend is needed to inspect an uploaded file. The e2e workflow uploads
+the file as an `astrarium-<app>-trace` artifact on every run.
+
 ## Design
 
 - **Manifest first.** `astrarium.toml` is the source of truth for the test

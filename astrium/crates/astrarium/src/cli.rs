@@ -40,6 +40,10 @@ pub struct Cli {
     #[arg(long, global = true, env = "ASTRARIUM_NO_TELEMETRY")]
     pub no_telemetry: bool,
 
+    /// Write the run's spans to an OTLP JSON file that Jaeger UI can open.
+    #[arg(long, global = true, env = "ASTRARIUM_TRACE_FILE", value_name = "PATH")]
+    pub trace_file: Option<PathBuf>,
+
     /// The command to run.
     #[command(subcommand)]
     pub command: Command,

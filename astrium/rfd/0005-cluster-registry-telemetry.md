@@ -219,6 +219,25 @@ Astrarium logs a warning and continues; a missing collector must not fail e2e.
 Sampling is parent-based and always-on for e2e. There is no head sampler that
 could drop a failed run.
 
+#### Trace files
+
+`--trace-file <path>` (or `ASTRARIUM_TRACE_FILE`) installs a second
+`BatchSpanProcessor` whose exporter writes the same spans as OTLP JSON. The
+file contains `resourceSpans`, `scopeSpans`, and `spans`; trace/span IDs are
+lowercase hex, nanosecond timestamps and `intValue` attributes are decimal
+strings, and the resource carries the same service and VCS attributes as the
+network exporter. It is written atomically at shutdown, so a failed run still
+leaves a file (the provider shutdown is best effort and does not change the
+exit status).
+
+The format is the OpenTelemetry OTLP JSON encoding. Jaeger 2.23's Search page
+accepts OTLP JSON directly through its file upload control (enabled by default),
+so the file can be inspected without a collector, storage backend, or network
+access. The e2e workflow uploads `diagnostics/astrarium-trace.json` as an
+artifact for every app job. A legacy Jaeger JSON file is not used because OTLP
+JSON is already the native export of the SDK and remains useful to other OTLP
+viewers (Grafana, otel-tui, and the OTLP JSON viewers).
+
 Resource attributes:
 
 | Attribute | Value |

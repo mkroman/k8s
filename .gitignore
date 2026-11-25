@@ -1,3 +1,4 @@
 **/charts/*.tgz
 astrium/target/
 .astrium/
+diagnostics/
