@@ -32,11 +32,65 @@ Deeper docs: `hack/ci/README.md` (CI scripts, tool manifest),
   restored, declare the matching `pre-delete-finalizer.*` or
   `post-delete-finalizer.*` entries in `apps/values.yaml` instead.
 
+## Astrarium test orchestrator
+
+- The generic e2e/test orchestrator is Astrarium. It lives in `astrium/`;
+  the binary is `astrarium`, the suite manifest is `astrarium.toml` at the
+  repository root, and RFDs live in `astrium/rfd/`.
+- Rust 2024, Rust 1.100, workspace with `astrarium-core` and
+  `astrarium-test-support`. Run `cargo fmt --check`,
+  `cargo clippy --locked --all-targets --all-features -- -D warnings`, and
+  `cargo test --locked --all-features` before committing.
+- The Rust binary may invoke only `helm`, `kustomize`, and `kind`. Do git
+  operations with `gix`, Kubernetes with `kube`, HTTP with `reqwest`, and dates
+  and times with `jiff`. CI workflow scripts may use `gh`, `docker compose`,
+  `tar`, `sha256sum`, etc.
+- `astrarium.toml` is the source of truth for the e2e suite. Do not add a
+  runtime adapter that reads `apps/values.yaml` or `hack/e2e/apps.yaml`.
+  Create Namespaces, AppProjects, and Applications directly from Rust.
+- Keep the production `apps` chart as the app-of-apps source of truth for
+  deployment. Do not use it as an e2e bootstrap.
+- Registry mirrors and Jaeger are defined in `astrium/compose.yaml`. The kind
+  cluster must mount containerd `hosts.toml` mirrors. Prefer the host LAN IP,
+  with a Docker bridge-gateway fallback.
+- Use the Astrarium RFD process for architectural changes: `astrium/rfd/`,
+  states prediscussion/ideation/discussion/published/committed/abandoned,
+  branch + PR discussion, `rfd/README.md` index, no direct pushes to main.
+- Rust style: domain modules; use `foo.rs` + `foo/` for module roots and
+  submodules, and never add `foo/mod.rs`; enforce with
+  `clippy::mod_module_files` (the lint that bans `mod.rs`; do not confuse it
+  with `self_named_module_files`, which does the opposite); no
+  `utils`/`helpers`/`common`; newtypes for semantic strings; `thiserror` per
+  module and `miette` at the CLI boundary; no `unwrap`/`expect` in production;
+  `gix` in `spawn_blocking`; `tokio::JoinSet`/`CancellationToken` for
+  concurrency.
+- CI/release: project CI builds/tests/checks the workspace. Release tags are
+  `astrarium-vX.Y.Z`; release binaries are uploaded to GitHub Releases and
+  cached via a local composite action. No new third-party Actions; pin runner
+  images and action SHAs.
+- Migration: keep `hack/e2e` as a reference until Astrarium passes the smoke
+  set twice. Do not add new shell e2e scripts; extend Astrarium instead.
+- Agent workflow: define shared interfaces first, then parallelize by module
+  in separate worktrees. The manager reviews each change for API consistency,
+  idiom, security, and tests before merging.
+
 ## Checks
 
 Install the pinned CI tools with
 `./hack/ci/install-tools.sh ~/.local/bin [tool ...]`. Helm, kubectl and
 yamllint must be installed separately.
+
+Astrarium workspace checks (from `astrium/`):
+
+```bash
+cargo fmt --check
+cargo clippy --locked --all-targets --all-features -- -D warnings
+cargo test --locked --all-features
+cargo build --locked --release
+./target/release/astrarium doctor
+```
+
+Repository checks:
 
 ```bash
 ./hack/ci/lint-yaml.sh                      # plain YAML; skips templates/, charts/, workflows
@@ -63,6 +117,10 @@ git diff --check
   depends on that order.
 
 ## E2E (kind + Argo CD)
+
+The shell harness below is the legacy reference implementation. New e2e work
+goes into Astrarium (`astrium/`, `astrarium.toml`) until the shell harness is
+removed after Astrarium passes the smoke set twice.
 
 `hack/e2e/run-app.sh APP` runs one entry from `hack/e2e/apps.yaml`. It needs
 docker, kind, kubectl, argocd, yq and jq.

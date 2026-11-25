@@ -1,0 +1,48 @@
+# A minimal Astrarium suite.
+#
+# The paths are relative to this file's directory. A real suite usually sets
+# `root = "../.."` when the manifest lives next to the repository root.
+#
+# Run `astrarium manifest validate --config examples/minimal/astrarium.toml`
+# after creating the referenced chart directory.
+
+[project]
+name = "minimal"
+root = "."
+base_branch = "main"
+
+[cluster]
+provider = "kind"
+name = "astrarium-minimal"
+
+[argocd]
+install = "argocd"
+
+[telemetry]
+enabled = false
+
+[registry]
+enabled = false
+mirrors = []
+
+[[projects]]
+name = "demo"
+source_repositories = ["*"]
+destinations = [{ namespace = "demo" }]
+cluster_resource_whitelist = []
+namespace_resource_whitelist = [
+  { group = "apps", kind = "Deployment" },
+  { group = "", kind = "Service" },
+]
+
+[[namespaces]]
+name = "demo"
+labels = { "pod-security.kubernetes.io/enforce" = "restricted" }
+
+[[apps]]
+name = "demo"
+namespace = "demo"
+project = "demo"
+source = "demo"
+renderer = "helm"
+probe = true

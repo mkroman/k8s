@@ -1,0 +1,86 @@
+# Local services for Astrarium.
+#
+#   docker compose -f astrium/compose.yaml up -d
+#
+# Jaeger receives OTLP/gRPC on 4317 and OTLP/HTTP on 4318. The UI is on
+# http://localhost:16686.
+#
+# The registry services are pull-through caches. Astrarium writes containerd
+# `hosts.toml` files into each kind node that point at these ports, so node
+# image pulls are served by the local cache. The caches bind to 0.0.0.0 because
+# kind nodes reach the host through the Docker bridge gateway in some setups.
+name: astrarium
+
+services:
+  jaeger:
+    image: jaegertracing/jaeger:2.23.0
+    restart: unless-stopped
+    ports:
+    - "16686:16686"
+    - "4317:4317"
+    - "4318:4318"
+    environment:
+      # Jaeger v2 is an OTel Collector distribution. Keep the all-in-one
+      # defaults (OTLP receivers and in-memory storage) and disable its own
+      # self-telemetry exporter so a loop cannot form.
+      OTEL_TRACES_EXPORTER: none
+      OTEL_METRICS_EXPORTER: none
+      OTEL_LOGS_EXPORTER: none
+
+  mirror-docker:
+    image: registry:3.1.2
+    restart: unless-stopped
+    ports:
+    - "5000:5000"
+    environment:
+      REGISTRY_HTTP_ADDR: 0.0.0.0:5000
+      REGISTRY_PROXY_REMOTEURL: https://registry-1.docker.io
+      REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY: /var/lib/registry
+      REGISTRY_LOG_LEVEL: warn
+    volumes:
+    - mirror-docker:/var/lib/registry
+
+  mirror-quay:
+    image: registry:3.1.2
+    restart: unless-stopped
+    ports:
+    - "5001:5000"
+    environment:
+      REGISTRY_HTTP_ADDR: 0.0.0.0:5000
+      REGISTRY_PROXY_REMOTEURL: https://quay.io
+      REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY: /var/lib/registry
+      REGISTRY_LOG_LEVEL: warn
+    volumes:
+    - mirror-quay:/var/lib/registry
+
+  mirror-ghcr:
+    image: registry:3.1.2
+    restart: unless-stopped
+    ports:
+    - "5002:5000"
+    environment:
+      REGISTRY_HTTP_ADDR: 0.0.0.0:5000
+      REGISTRY_PROXY_REMOTEURL: https://ghcr.io
+      REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY: /var/lib/registry
+      REGISTRY_LOG_LEVEL: warn
+    volumes:
+    - mirror-ghcr:/var/lib/registry
+
+  mirror-k8s:
+    image: registry:3.1.2
+    restart: unless-stopped
+    ports:
+    - "5003:5000"
+    environment:
+      REGISTRY_HTTP_ADDR: 0.0.0.0:5000
+      REGISTRY_PROXY_REMOTEURL: https://registry.k8s.io
+      REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY: /var/lib/registry
+      REGISTRY_LOG_LEVEL: warn
+    volumes:
+    - mirror-k8s:/var/lib/registry
+
+volumes:
+  mirror-docker:
+  mirror-quay:
+  mirror-ghcr:
+  mirror-k8s:

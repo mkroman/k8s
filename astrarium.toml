@@ -1,0 +1,99 @@
+# Astrarium suite for this repository.
+#
+# This is the native source of truth for the e2e suite. It is not an adapter for
+# `apps/values.yaml` or `hack/e2e/apps.yaml`; the test-relevant projects,
+# namespaces and applications are declared here on purpose. The production
+# `apps` chart remains the deployment source of truth.
+#
+# RFDs: astrium/rfd/
+# Usage: astrarium plan --all
+#        astrarium run --app mosquitto
+
+[project]
+name = "k8s-home-lab"
+root = "."
+base_branch = "main"
+
+[cluster]
+provider = "kind"
+name = "astrarium"
+kind_config = "hack/e2e/kind.yaml"
+kubeconfig = ".astrium/kubeconfig"
+
+[argocd]
+install = "hack/e2e/argocd"
+namespace = "argocd"
+project = "astrarium"
+repo_name = "astrarium"
+server = "https://kubernetes.default.svc"
+
+[render]
+helm = "helm"
+kustomize = "kustomize"
+kind = "kind"
+namespace = "default"
+timeout = "10m"
+dry_run = true
+
+[telemetry]
+enabled = true
+otlp_endpoint = "http://localhost:4317"
+service_name = "astrarium"
+environment = "kind"
+
+[registry]
+enabled = true
+host = "auto"
+
+[[registry.mirrors]]
+upstream = "docker.io"
+endpoint = "http://{host}:5000"
+
+[[registry.mirrors]]
+upstream = "quay.io"
+endpoint = "http://{host}:5001"
+
+[[registry.mirrors]]
+upstream = "ghcr.io"
+endpoint = "http://{host}:5002"
+
+[[registry.mirrors]]
+upstream = "registry.k8s.io"
+endpoint = "http://{host}:5003"
+
+# Mosquitto is the first native e2e app: its kind overlay is a Kustomize
+# directory with a PostSync probe and no Helm dependency. Further apps are
+# added as the Astrarium milestones convert them.
+[[projects]]
+name = "mosquitto"
+description = "Eclipse Mosquitto MQTT broker"
+source_repositories = ["*"]
+destinations = [{ server = "https://kubernetes.default.svc", namespace = "mosquitto" }]
+cluster_resource_whitelist = []
+namespace_resource_whitelist = [
+  { group = "", kind = "ConfigMap" },
+  { group = "", kind = "PersistentVolumeClaim" },
+  { group = "", kind = "Service" },
+  { group = "apps", kind = "Deployment" },
+  { group = "apps", kind = "ReplicaSet" },
+  { group = "", kind = "Pod" },
+  { group = "batch", kind = "Job" },
+  { group = "networking.k8s.io", kind = "NetworkPolicy" },
+  { group = "bitnami.com", kind = "SealedSecret" },
+]
+
+[[namespaces]]
+name = "mosquitto"
+labels = { "pod-security.kubernetes.io/enforce" = "restricted", "pod-security.kubernetes.io/enforce-version" = "latest" }
+
+[[apps]]
+name = "mosquitto"
+namespace = "mosquitto"
+project = "mosquitto"
+source = "mosquitto/overlays/kind"
+renderer = "kustomize"
+probe = true
+resources = [
+  { api_version = "apps/v1", kind = "Deployment", namespace = "mosquitto", name = "mosquitto" },
+  { api_version = "v1", kind = "ConfigMap", namespace = "mosquitto", name = "mosquitto-config" },
+]
