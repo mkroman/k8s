@@ -55,9 +55,12 @@ the file as an `astrarium-<app>-trace` artifact on every run.
 ## Design
 
 - **Manifest first.** `astrarium.toml` is the source of truth for the test
-  suite. Astrarium creates `Namespace`, `AppProject` and `Application` objects
-  directly; it does not bootstrap the production `apps` chart and does not read
-  `apps/values.yaml` or `hack/e2e/apps.yaml` at runtime.
+  suite. Native `[[projects]]`, `[[namespaces]]`, `[[apps]]` and
+  `[[helm_repositories]]` tables remain supported. This repository opts into
+  the read-only `[catalog]` adapter, which imports its existing
+  `apps/values.yaml` and `hack/e2e/apps.yaml` before validation. Astrarium
+  creates `Namespace`, `AppProject` and `Application` objects directly; it does
+  not bootstrap the production `apps` chart.
 - **Only three external CLI programs.** The Rust binary invokes `helm`,
   `kustomize` and `kind`. Git access uses `gix`, Kubernetes access uses `kube`,
   HTTP uses `reqwest`, and dates/times use `jiff`. Cold-image removal and node

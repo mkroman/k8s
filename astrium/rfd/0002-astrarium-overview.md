@@ -207,20 +207,24 @@ layout, lint policy, and module rules are RFD 0007.
 ### Relationship to the production `apps` chart
 
 The production `apps` chart in `apps/` remains the app-of-apps source of truth
-for the real cluster. Astrarium does not read `apps/values.yaml` at runtime and
-does not render the `apps` chart. `astrarium.toml` is a native manifest that
-duplicates only the projects, namespaces, and applications needed by the test
-suite.
+for the real cluster. Astrarium does not render or deploy the `apps` chart.
+`astrarium.toml` is the suite definition: it can declare projects, namespaces
+and applications natively, or opt into a read-only catalog adapter that reads
+`apps/values.yaml` and `hack/e2e/apps.yaml`. This repository uses the catalog
+adapter, limited to the applications listed in the e2e catalogue.
 
-That duplication is accepted, not hidden:
+Native mode accepts duplication as a trade-off, not as a hidden mechanism:
 
 - The manifest is the source of truth for tests, including values that are
   kind-specific.
-- A change to a production Application does not automatically change the test
-  manifest. A human converts the test-relevant part.
-- An optional CI-only consistency check may compare names, projects, and
-  namespaces between `apps/values.yaml` and `astrarium.toml` to catch drift. It
-  is a repository check, not a runtime adapter, and it does not feed the run.
+- A change to a production Application does not automatically change a native
+  test manifest. A human converts the test-relevant part.
+- In catalog mode the adapter imports the same definitions at load time, so
+  production renames and namespace label changes flow into the suite without a
+  second copy. The trade-off is coupling to those YAML shapes.
+- An optional CI-only consistency check can still compare a native manifest
+  with `apps/values.yaml` to catch drift. It is a repository check, not a
+  runtime adapter, and it does not feed the run.
 - The `apps` chart is never used as an e2e bootstrap. There is no root `apps`
   Application in the test cluster (RFD 0004).
 
@@ -262,9 +266,9 @@ The rewrite is accepted when:
 1. A developer can run `astrarium run --app <name>` with only `helm`,
    `kustomize`, `kind`, and Docker or Podman installed; the binary invokes no
    other host executables.
-2. `astrarium.toml` is the native source of truth; no runtime adapter reads the
-   production YAML catalogues; Namespaces, AppProjects, and Applications are
-   created directly from Rust.
+2. `astrarium.toml` is the source of truth; suites use either the native
+   tables or the read-only catalog adapter, never both. Namespaces,
+   AppProjects, and Applications are created directly from Rust.
 3. `astrarium plan` selects the same applications as `hack/e2e/list-changed.sh`
    for existing pull requests, plus the previous-run incremental behaviour.
 4. A one-app fix after a completed run runs only the affected applications and

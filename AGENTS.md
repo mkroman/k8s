@@ -46,9 +46,13 @@ Deeper docs: `hack/ci/README.md` (CI scripts, tool manifest),
   and times with `jiff`. Cold-image removal and node config checks use the
   Docker API through `bollard`, never the `docker` CLI. CI workflow scripts may
   use `gh`, `docker compose`, `tar`, `sha256sum`, etc.
-- `astrarium.toml` is the source of truth for the e2e suite. Do not add a
-  runtime adapter that reads `apps/values.yaml` or `hack/e2e/apps.yaml`.
-  Create Namespaces, AppProjects, and Applications directly from Rust.
+- Native `astrarium.toml` mode remains supported. This repository opts into
+  the typed, read-only `[catalog]` adapter for its existing app-of-apps
+  catalogues (`apps/values.yaml` and `hack/e2e/apps.yaml`). The adapter imports
+  projects, namespaces, applications and Helm repositories before normal
+  validation; it does not use the production `apps` chart for deployment.
+  A manifest must use either native tables or `[catalog]`, never both. Create
+  Namespaces, AppProjects, and Applications directly from Rust.
 - Keep the production `apps` chart as the app-of-apps source of truth for
   deployment. Do not use it as an e2e bootstrap.
 - Registry mirrors and Jaeger are defined in `astrium/compose.yaml`. The kind
