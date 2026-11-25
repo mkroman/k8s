@@ -1,8 +1,10 @@
 name: Astrarium e2e
 
-# M4 skeleton. `astrarium run` is not implemented yet, so this workflow is
-# workflow_dispatch-only: pull requests must not fail on a command that is still
-# being built. Enable the pull_request/push triggers below once `run` lands.
+# Astrarium e2e. `astrarium run` is implemented; this workflow stays
+# workflow_dispatch-only until the first `astrarium-v0.1.0` release exists,
+# because the setup action downloads a pinned release binary. Enable the
+# pull_request/push triggers below once `.github/astrarium-version` points at a
+# published release.
 #
 # Intended triggers:
 #   pull_request:
@@ -20,7 +22,8 @@ name: Astrarium e2e
 # dispatch runs the whole suite, or one app when the optional `app` input is
 # set.
 #
-# M4 follow-ups once `run` lands:
+# Follow-ups before enabling pull-request runs:
+# - cut `astrarium-v0.1.0` and update `.github/astrarium-version`;
 # - build Astrarium from source when `astrium/**` changes and reuse the release
 #   binary otherwise;
 # - pass the PR base to `astrarium plan --base` and the previous-run results to

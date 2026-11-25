@@ -98,10 +98,10 @@ cargo build --locked --release
 ./target/release/astrarium doctor
 ```
 
-The e2e smoke set is added in milestones M2–M4. The Astrarium CI and release
-workflows are in place; the e2e workflow is a manual M4 skeleton until
-`astrarium run` lands. The legacy shell harness remains available until
-Astrarium has passed the smoke set twice.
+The Astrarium CI and release workflows are in place. The e2e workflow is
+manual until the first release is published, because it downloads a pinned
+release binary. The legacy shell harness remains available until Astrarium has
+passed the smoke set twice.
 
 ## CI and releases
 
@@ -113,9 +113,9 @@ Astrarium has passed the smoke set twice.
   `astrarium-<version>-<target>.tar.gz` for `x86_64-unknown-linux-gnu` and
   `aarch64-unknown-linux-gnu`, with bash/zsh/fish completions and
   `SHA256SUMS`.
-- `.github/workflows/astrarium-e2e.yaml` is the M4 e2e entry point. It is
-  `workflow_dispatch`-only until `astrarium run` lands, then the plan job
-  selects apps from the diff and fans out one job per selected app.
+- `.github/workflows/astrarium-e2e.yaml` is the e2e entry point. It is
+  `workflow_dispatch`-only until the first release is published; it then runs
+  the plan job and fans out one job per selected app.
 - `.github/actions/setup-astrarium/action.yml` downloads and verifies a
   released binary, and caches `~/.local/bin/astrarium` by version, OS and
   architecture. `.github/astrarium-version` pins the e2e version; bump it after
