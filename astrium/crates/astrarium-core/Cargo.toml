@@ -16,6 +16,7 @@ futures.workspace = true
 jiff.workspace = true
 k8s-openapi.workspace = true
 kube.workspace = true
+local-ip-address.workspace = true
 opentelemetry.workspace = true
 opentelemetry-otlp.workspace = true
 opentelemetry_sdk.workspace = true

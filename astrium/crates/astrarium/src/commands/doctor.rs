@@ -4,9 +4,11 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use astrarium_core::Manifest;
+use astrarium_core::cluster::resolve_registry_host;
 use astrarium_core::command::{CommandRunner, CommandSpec, RealCommandRunner, Tool};
 use miette::{IntoDiagnostic, Result};
 use serde::Serialize;
+use tokio::net::TcpStream;
 
 use crate::cli::DoctorArgs;
 
@@ -15,6 +17,7 @@ struct DoctorReport {
     ok: bool,
     tools: Vec<ToolStatus>,
     manifest: Option<ManifestStatus>,
+    services: Vec<ServiceStatus>,
     config_path: PathBuf,
     warnings: Vec<String>,
     errors: Vec<String>,
@@ -38,6 +41,14 @@ struct ManifestStatus {
     projects: usize,
     namespaces: usize,
     valid: bool,
+    error: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct ServiceStatus {
+    name: String,
+    endpoint: String,
+    reachable: bool,
     error: Option<String>,
 }
 
@@ -104,10 +115,19 @@ pub async fn run(manifest: Option<&Manifest>, args: &DoctorArgs) -> Result<()> {
         );
     }
 
+    let services = if args.skip_services {
+        Vec::new()
+    } else if let Some(manifest) = manifest {
+        check_services(manifest, &mut warnings).await
+    } else {
+        Vec::new()
+    };
+
     let report = DoctorReport {
         ok: errors.is_empty(),
         tools,
         manifest: manifest_status,
+        services,
         config_path: manifest
             .and_then(|manifest| manifest.path.clone())
             .unwrap_or_else(|| PathBuf::from("astrarium.toml")),
@@ -180,6 +200,108 @@ async fn check_tool<R: CommandRunner>(runner: &R, tool: Tool, program: String) -
     }
 }
 
+async fn check_services(manifest: &Manifest, warnings: &mut Vec<String>) -> Vec<ServiceStatus> {
+    let mut services = Vec::new();
+
+    if manifest.telemetry.enabled {
+        services.push(check_service("jaeger-otlp", &manifest.telemetry.otlp_endpoint).await);
+    }
+
+    if manifest.registry.enabled && !manifest.registry.mirrors.is_empty() {
+        match resolve_registry_host(&manifest.registry.host) {
+            Ok(host) => {
+                for mirror in &manifest.registry.mirrors {
+                    let endpoint = mirror.endpoint.replace("{host}", &host);
+                    services.push(
+                        check_service(&format!("registry-{}", mirror.upstream), &endpoint).await,
+                    );
+                }
+            }
+            Err(error) => warnings.push(format!(
+                "could not resolve the registry mirror host; skipping registry checks: {error}"
+            )),
+        }
+    }
+
+    for service in &services {
+        if !service.reachable {
+            warnings.push(format!(
+                "{} at {} is not reachable ({}); start the local services with `docker compose -f astrium/compose.yaml up -d`",
+                service.name,
+                service.endpoint,
+                service.error.as_deref().unwrap_or("unknown error")
+            ));
+        }
+    }
+
+    services
+}
+
+async fn check_service(name: &str, endpoint: &str) -> ServiceStatus {
+    let Some((host, port)) = parse_endpoint(endpoint) else {
+        return ServiceStatus {
+            name: name.to_owned(),
+            endpoint: endpoint.to_owned(),
+            reachable: false,
+            error: Some("not an http(s) URL with a host and port".to_owned()),
+        };
+    };
+
+    match tokio::time::timeout(
+        Duration::from_millis(750),
+        TcpStream::connect((host.as_str(), port)),
+    )
+    .await
+    {
+        Ok(Ok(_stream)) => ServiceStatus {
+            name: name.to_owned(),
+            endpoint: endpoint.to_owned(),
+            reachable: true,
+            error: None,
+        },
+        Ok(Err(error)) => ServiceStatus {
+            name: name.to_owned(),
+            endpoint: endpoint.to_owned(),
+            reachable: false,
+            error: Some(error.to_string()),
+        },
+        Err(_) => ServiceStatus {
+            name: name.to_owned(),
+            endpoint: endpoint.to_owned(),
+            reachable: false,
+            error: Some("connection timed out".to_owned()),
+        },
+    }
+}
+
+fn parse_endpoint(endpoint: &str) -> Option<(String, u16)> {
+    let (scheme, rest) = endpoint.split_once("://")?;
+    let default_port = match scheme.to_ascii_lowercase().as_str() {
+        "http" => 80,
+        "https" => 443,
+        _ => return None,
+    };
+
+    let authority = rest.split('/').next()?;
+    let authority = authority.rsplit('@').next()?;
+    if let Some(rest) = authority.strip_prefix('[') {
+        let (host, rest) = rest.split_once(']')?;
+        let port = rest
+            .strip_prefix(':')
+            .and_then(|port| port.parse::<u16>().ok())
+            .unwrap_or(default_port);
+        return Some((host.to_owned(), port));
+    }
+
+    match authority.rsplit_once(':') {
+        Some((host, port)) if !host.contains(':') => {
+            Some((host.to_owned(), port.parse::<u16>().ok()?))
+        }
+        Some(_) => None,
+        None => Some((authority.to_owned(), default_port)),
+    }
+}
+
 fn print_human(report: &DoctorReport) {
     println!("Astrarium doctor");
     println!("  config: {}", report.config_path.display());
@@ -207,6 +329,20 @@ fn print_human(report: &DoctorReport) {
     } else {
         println!("  manifest: not loaded");
     }
+    if !report.services.is_empty() {
+        println!("  services:");
+        for service in &report.services {
+            let marker = if service.reachable {
+                "ok"
+            } else {
+                "unreachable"
+            };
+            println!("    {:<24} {marker:<12} {}", service.name, service.endpoint);
+            if let Some(error) = &service.error {
+                println!("      {error}");
+            }
+        }
+    }
     for warning in &report.warnings {
         println!("  warning: {warning}");
     }
@@ -217,4 +353,31 @@ fn print_human(report: &DoctorReport) {
         "  result: {}",
         if report.ok { "ready" } else { "not ready" }
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_service_endpoints() {
+        assert_eq!(
+            parse_endpoint("http://localhost:4317"),
+            Some(("localhost".to_owned(), 4317))
+        );
+        assert_eq!(
+            parse_endpoint("https://example.test/path"),
+            Some(("example.test".to_owned(), 443))
+        );
+        assert_eq!(
+            parse_endpoint("http://[2001:db8::1]:5000"),
+            Some(("2001:db8::1".to_owned(), 5000))
+        );
+        assert_eq!(
+            parse_endpoint("http://user:pass@127.0.0.1:5000"),
+            Some(("127.0.0.1".to_owned(), 5000))
+        );
+        assert_eq!(parse_endpoint("unix:///var/run/socket"), None);
+        assert_eq!(parse_endpoint("http://localhost:not-a-port"), None);
+    }
 }

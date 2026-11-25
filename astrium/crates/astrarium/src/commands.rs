@@ -1,5 +1,6 @@
 //! Command implementations.
 
+pub mod cluster;
 pub mod doctor;
 pub mod manifest;
 
@@ -36,9 +37,7 @@ pub async fn dispatch(cli: Cli, manifest: Option<&Manifest>) -> Result<()> {
             "`astrarium upgrade` is not implemented yet"
         )),
         Command::Render(_) => Err(miette::miette!("`astrarium render` is not implemented yet")),
-        Command::Cluster(_) => Err(miette::miette!(
-            "`astrarium cluster` is not implemented yet"
-        )),
+        Command::Cluster(args) => cluster::run(manifest, &args).await,
     }
 }
 
