@@ -19,6 +19,16 @@ Applications are defined here.
 
 Helm chart for Applications sourced from external Git repositories.
 
+### [`astrium/`](astrium/)
+
+Astrarium, the Rust end-to-end test orchestrator for this GitOps repository.
+It creates namespaces, AppProjects and Applications directly, renders Helm and
+Kustomize sources into a local chart repository, and emits OpenTelemetry traces
+to Jaeger. The suite is declared in [`astrarium.toml`](astrarium.toml); see
+[`astrium/README.md`](astrium/README.md) and [`astrium/rfd/`](astrium/rfd/).
+The legacy shell harness in `hack/e2e/` remains as a reference until Astrarium
+passes the smoke set twice.
+
 [cluster-bootstrapping]: https://argo-cd.readthedocs.io/en/stable/operator-manual/cluster-bootstrapping/
 
 ## Applications
