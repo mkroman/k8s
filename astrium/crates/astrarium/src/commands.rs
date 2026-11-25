@@ -3,6 +3,7 @@
 pub mod cluster;
 pub mod doctor;
 pub mod manifest;
+pub mod render;
 
 use std::path::PathBuf;
 
@@ -39,7 +40,7 @@ pub async fn dispatch(cli: Cli, manifest: Option<&Manifest>) -> Result<()> {
         Command::Upgrade(_) => Err(miette::miette!(
             "`astrarium upgrade` is not implemented yet"
         )),
-        Command::Render(_) => Err(miette::miette!("`astrarium render` is not implemented yet")),
+        Command::Render(args) => render::run(manifest, &args).await,
         Command::Cluster(args) => cluster::run(manifest, &args).await,
     }
 }

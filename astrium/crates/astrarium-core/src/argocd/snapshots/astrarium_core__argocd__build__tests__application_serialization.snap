@@ -1,0 +1,52 @@
+---
+source: crates/astrarium-core/src/argocd/build.rs
+expression: value
+---
+{
+  "apiVersion": "argoproj.io/v1alpha1",
+  "kind": "Application",
+  "metadata": {
+    "annotations": {
+      "argocd.argoproj.io/sync-wave": "0",
+      "example.test/owner": "suite"
+    },
+    "name": "demo",
+    "namespace": "argocd"
+  },
+  "spec": {
+    "destination": {
+      "namespace": "demo",
+      "server": "https://kubernetes.default.svc"
+    },
+    "project": "demo",
+    "source": {
+      "chart": "demo",
+      "helm": {
+        "releaseName": "demo",
+        "valuesObject": {
+          "enabled": true,
+          "image": {
+            "tag": "v1.2.3"
+          },
+          "replicaCount": 1
+        }
+      },
+      "repoURL": "http://127.0.0.1:1234",
+      "targetRevision": "0.1.0"
+    },
+    "syncPolicy": {
+      "automated": {
+        "prune": true,
+        "selfHeal": true
+      },
+      "retry": {
+        "backoff": {
+          "duration": "5s",
+          "factor": 2,
+          "maxDuration": "5m"
+        },
+        "limit": 20
+      }
+    }
+  }
+}

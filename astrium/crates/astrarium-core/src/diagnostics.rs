@@ -1171,6 +1171,20 @@ mod tests {
             })
         }
 
+        fn get_object(
+            &self,
+            _reference: crate::kube::ObjectReference,
+        ) -> crate::BoxFuture<'_, Result<Option<DynamicObject>, KubeError>> {
+            Box::pin(async { Ok(None) })
+        }
+
+        fn service_proxy(
+            &self,
+            _request: crate::kube::ProxyRequest,
+        ) -> crate::BoxFuture<'_, Result<String, KubeError>> {
+            Box::pin(async { Ok(String::new()) })
+        }
+
         fn list(
             &self,
             resource: ResourceType,
