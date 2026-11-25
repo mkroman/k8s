@@ -2,7 +2,7 @@
 //!
 //! A plan is the set of apps a run should deploy. Apps can be selected
 //! explicitly, as the whole suite, or from the current Git change set. Change
-//! selection is implemented in [`selection`] with `gix`; it never shells out to
+//! selection is implemented in the private `selection` module with `gix`; it never shells out to
 //! `git`.
 
 mod selection;
