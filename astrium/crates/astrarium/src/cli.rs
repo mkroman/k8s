@@ -84,10 +84,12 @@ pub enum Command {
 /// Arguments for `astrarium plan`.
 #[derive(Debug, Args)]
 pub struct PlanArgs {
-    /// The diff base revision.
+    /// The diff base revision. Defaults to the previous-run head when it is an
+    /// ancestor, then `project.base_branch`, then `HEAD^`.
     #[arg(long, value_name = "REV")]
     pub base: Option<String>,
-    /// A previous-run JSON file from CI.
+    /// A previous-run JSON file from CI. Apps that failed, were cancelled or
+    /// were skipped are selected again.
     #[arg(long, value_name = "JSON")]
     pub previous_results: Option<PathBuf>,
     /// Select a specific app. Repeat for several apps.
@@ -96,9 +98,17 @@ pub struct PlanArgs {
     /// Select every app.
     #[arg(long)]
     pub all: bool,
-    /// Emit the GitHub Actions matrix JSON instead of the human summary.
+    /// Emit the machine-readable plan and matrix instead of the human summary.
     #[arg(long)]
     pub json: bool,
+    /// Write `matrix` and `has_apps` to this file. Defaults to `$GITHUB_OUTPUT`
+    /// when that environment variable is set.
+    #[arg(long, value_name = "PATH")]
+    pub github_output: Option<PathBuf>,
+    /// Append a Markdown summary to this file. Defaults to
+    /// `$GITHUB_STEP_SUMMARY` when that environment variable is set.
+    #[arg(long, value_name = "PATH")]
+    pub step_summary: Option<PathBuf>,
 }
 
 /// Arguments for `astrarium run`.

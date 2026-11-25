@@ -147,6 +147,13 @@ pub struct ProjectConfig {
     /// The branch that change selection compares against.
     #[serde(default = "default_main")]
     pub base_branch: String,
+    /// Repository-relative paths that select every app when they change.
+    ///
+    /// The manifest itself, the kind configuration and the Argo CD install
+    /// directory are always treated as shared. Use this list for anything else,
+    /// such as a shared values file or the orchestrator's own source tree.
+    #[serde(default)]
+    pub shared_paths: Vec<PathBuf>,
 }
 
 /// The cluster provider.
@@ -297,9 +304,9 @@ pub struct ProjectSpec {
     pub name: ProjectName,
     /// A human-readable description.
     pub description: Option<String>,
-    /// Allowed source repositories. Astrarium always adds its local chart
-    /// repository.
-    #[serde(default)]
+    /// Allowed source repositories. Defaults to every repository. Astrarium
+    /// appends its local chart repository unless the list contains `"*"`.
+    #[serde(default = "default_source_repositories")]
     pub source_repositories: Vec<String>,
     /// Allowed destinations.
     #[serde(default)]
@@ -307,6 +314,9 @@ pub struct ProjectSpec {
     /// Cluster-scoped resources the project may manage. Empty denies all.
     #[serde(default)]
     pub cluster_resource_whitelist: Vec<ResourceKind>,
+    /// Cluster-scoped resources the project may not manage.
+    #[serde(default)]
+    pub cluster_resource_blacklist: Vec<ResourceKind>,
     /// Namespaced resources the project may manage. When omitted, Argo CD's
     /// default (allow all namespaced resources) applies.
     pub namespace_resource_whitelist: Option<Vec<ResourceKind>>,
@@ -363,10 +373,17 @@ pub struct AppSpec {
     pub project: Option<ProjectName>,
     /// The chart or Kustomize directory, relative to the repository root.
     pub source: PathBuf,
+    /// Extra repository-relative paths that select this app when they change.
+    ///
+    /// Use this when `source` is a narrower directory than the files it
+    /// consumes, for example a Kustomize overlay below a larger base tree.
+    #[serde(default)]
+    pub watch: Vec<PathBuf>,
     /// How the source is rendered.
     #[serde(default)]
     pub renderer: RendererKind,
-    /// Helm values files, merged in listed order after `common_values`.
+    /// Helm values files, relative to `source` and merged in listed order
+    /// after `common_values`.
     #[serde(default)]
     pub values: Vec<PathBuf>,
     /// A values file shared by several apps, merged before `values`.
@@ -385,6 +402,10 @@ pub struct AppSpec {
     /// The app's probe needs an image that is absent from every node.
     #[serde(default)]
     pub requires_fresh_image: bool,
+    /// The app's probe requires the kind containerd configuration, including
+    /// the mirror `config_path` and isolated content sharing.
+    #[serde(default)]
+    pub requires_containerd_config: bool,
     /// Resources that must be removed before a cold-image redeploy.
     pub stale_probe_resources: Option<StaleProbeResources>,
     /// Objects that must exist after the app is healthy.
@@ -423,8 +444,8 @@ pub enum RendererKind {
 #[derive(Clone, Debug, Deserialize, Serialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct UpgradeSpec {
-    /// Values used for the initial deployment, before the current values are
-    /// applied.
+    /// Values used for the initial deployment, relative to the app's `source`
+    /// and applied before the current values.
     #[serde(default)]
     pub from_values: Vec<PathBuf>,
     /// A Git revision to deploy before the current working tree.
@@ -662,6 +683,14 @@ impl Manifest {
                 "project.base_branch must not be empty",
             ));
         }
+        for shared in &self.project.shared_paths {
+            if shared.as_os_str().is_empty() {
+                return Err(ManifestError::invalid(
+                    "project.shared_paths entries must not be empty",
+                ));
+            }
+            self.resolve_path(shared)?;
+        }
 
         let mut project_names = HashSet::new();
         for project in &self.projects {
@@ -701,11 +730,25 @@ impl Manifest {
             }
 
             self.resolve_path(&app.source)?;
+            for watch in &app.watch {
+                if watch.as_os_str().is_empty() {
+                    return Err(ManifestError::invalid(format!(
+                        "app {} watch entries must not be empty",
+                        app.name
+                    )));
+                }
+                self.resolve_path(watch)?;
+            }
             for values in &app.values {
-                self.resolve_path(values)?;
+                self.resolve_path(&app.source.join(values))?;
             }
             if let Some(common) = &app.common_values {
                 self.resolve_path(common)?;
+            }
+            if let Some(upgrade) = &app.upgrade {
+                for values in &upgrade.from_values {
+                    self.resolve_path(&app.source.join(values))?;
+                }
             }
             for requirement in &app.requires {
                 if !app_names.contains(requirement.as_str())
@@ -815,14 +858,20 @@ impl Manifest {
                 }
             }
             for values in &app.values {
-                self.require_path(values, &format!("app {} values", app.name))?;
+                self.require_path(
+                    &app.source.join(values),
+                    &format!("app {} values", app.name),
+                )?;
             }
             if let Some(common) = &app.common_values {
                 self.require_path(common, &format!("app {} common_values", app.name))?;
             }
             if let Some(upgrade) = &app.upgrade {
                 for values in &upgrade.from_values {
-                    self.require_path(values, &format!("app {} upgrade values", app.name))?;
+                    self.require_path(
+                        &app.source.join(values),
+                        &format!("app {} upgrade values", app.name),
+                    )?;
                 }
             }
         }
@@ -999,6 +1048,10 @@ fn default_root() -> PathBuf {
 
 fn default_main() -> String {
     "main".to_owned()
+}
+
+fn default_source_repositories() -> Vec<String> {
+    vec!["*".to_owned()]
 }
 
 fn default_cluster_name() -> String {
@@ -1307,5 +1360,40 @@ requires = ["beta"]
         let manifest = Manifest::from_toml_str(&base_manifest(""), dir.path()).unwrap();
         assert_eq!(manifest.registry.mirrors.len(), 4);
         assert_eq!(manifest.registry.mirrors[0].endpoint, "http://{host}:5000");
+    }
+
+    #[test]
+    fn projects_default_to_every_source_and_no_cluster_blacklist() {
+        let dir = tempfile::tempdir().unwrap();
+        let source = base_manifest("").replace("source_repositories = [\"*\"]\n", "");
+        let manifest = Manifest::from_toml_str(&source, dir.path()).unwrap();
+        assert_eq!(manifest.projects[0].source_repositories, vec!["*"]);
+        assert!(manifest.projects[0].cluster_resource_blacklist.is_empty());
+    }
+
+    #[test]
+    fn project_cluster_blacklist_round_trips() {
+        let dir = tempfile::tempdir().unwrap();
+        let source = base_manifest("").replace(
+            "source_repositories = [\"*\"]\n",
+            "cluster_resource_blacklist = [{ group = \"\", kind = \"Namespace\" }]\n",
+        );
+        let manifest = Manifest::from_toml_str(&source, dir.path()).unwrap();
+        assert_eq!(manifest.projects[0].cluster_resource_blacklist.len(), 1);
+        let serialized = toml::to_string(&manifest.projects[0]).unwrap();
+        assert!(serialized.contains("cluster_resource_blacklist"));
+        assert!(serialized.contains("Namespace"));
+    }
+
+    #[test]
+    fn parses_containerd_requirement_and_watch_paths() {
+        let dir = tempfile::tempdir().unwrap();
+        let source = base_manifest("").replace(
+            "source = \"alpha\"",
+            "source = \"alpha\"\nwatch = [\"shared\"]\nrequires_containerd_config = true",
+        );
+        let manifest = Manifest::from_toml_str(&source, dir.path()).unwrap();
+        assert_eq!(manifest.apps[0].watch, vec![PathBuf::from("shared")]);
+        assert!(manifest.apps[0].requires_containerd_config);
     }
 }
