@@ -41,7 +41,11 @@ shared_paths = [
   "hack/e2e/apps.yaml",
   "hack/e2e/kind.yaml",
   "hack/e2e/argocd",
-  "astrium",
+  # Astrarium source and build inputs change the harness itself. Documentation
+  # and RFD-only changes live outside these paths and do not trigger every app.
+  "astrium/crates",
+  "astrium/Cargo.toml",
+  "astrium/Cargo.lock",
   "astrium/compose.yaml",
 ]
 
