@@ -1,37 +1,26 @@
 name: Astrarium e2e
 
-# Astrarium e2e. `astrarium run` is implemented; this workflow stays
-# workflow_dispatch-only until the first `astrarium-v0.1.0` release exists,
-# because the setup action downloads a pinned release binary. Enable the
-# pull_request/push triggers below once `.github/astrarium-version` points at a
-# published release.
+# Astrarium e2e. Pull requests and pushes select apps from the diff; a manual
+# dispatch runs the whole suite or one app. The workflow downloads the pinned
+# release from `.github/astrarium-version`.
 #
-# Intended triggers:
-#   pull_request:
-#     paths-ignore:
-#     - "**.md"
-#     - ".github/ISSUE_TEMPLATE/**"
-#   push:
-#     branches: [main]
-#     paths-ignore:
-#     - "**.md"
-#     - ".github/ISSUE_TEMPLATE/**"
-#
-# The plan job selects apps from the diff (`astrarium plan --json`) and emits a
-# GitHub Actions matrix of the form {"include":[{"app":"..."}]}. A manual
-# dispatch runs the whole suite, or one app when the optional `app` input is
-# set.
-#
-# Follow-ups before enabling pull-request runs:
-# - cut `astrarium-v0.1.0` and update `.github/astrarium-version`;
+# Follow-ups:
 # - build Astrarium from source when `astrium/**` changes and reuse the release
 #   binary otherwise;
-# - pass the PR base to `astrarium plan --base` and the previous-run results to
-#   `astrarium plan --previous-results`, and grant `actions: read` for that
-#   lookup;
+# - pass previous-run results with `--previous-results` and grant `actions:
+#   read` for that lookup;
 # - gate the full suite on an `e2e/full` label, with the smoke set as default.
 
 on:
+  pull_request:
+    paths-ignore:
+    - "**.md"
+    - ".github/ISSUE_TEMPLATE/**"
+  push:
+    branches: [main]
+    paths-ignore:
+    - "**.md"
+    - ".github/ISSUE_TEMPLATE/**"
   workflow_dispatch:
     inputs:
       app:
@@ -78,13 +67,17 @@ jobs:
       id: plan
       env:
         INPUT_APP: ${{ inputs.app }}
+        EVENT_NAME: ${{ github.event_name }}
+        BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
       run: |
         set -euo pipefail
         args=(--json)
         if [[ -n "${INPUT_APP}" ]]; then
           args+=(--app "${INPUT_APP}")
-        else
+        elif [[ "${EVENT_NAME}" == "workflow_dispatch" ]]; then
           args+=(--all)
+        elif [[ -n "${BASE_SHA}" && ! "${BASE_SHA}" =~ ^0+$ ]]; then
+          args+=(--base "${BASE_SHA}")
         fi
         plan_json="$(astrarium plan "${args[@]}")"
         matrix="$(jq -c '.matrix' <<<"${plan_json}")"
