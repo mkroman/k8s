@@ -1,0 +1,42 @@
+{{- if .Values.metrics.serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "stalwart.fullname" . }}
+  labels:
+    {{- include "stalwart.labels" . | nindent 4 }}
+    app.kubernetes.io/component: admin
+    metrics.uplink.io/monitor: prometheus
+    {{- with .Values.metrics.serviceMonitor.additionalLabels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  jobLabel: {{ .Values.metrics.serviceMonitor.jobLabel }}
+  selector:
+    matchLabels:
+      {{- include "stalwart.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: admin
+  endpoints:
+    - port: mgmt
+      path: /metrics/prometheus
+      scheme: http
+      interval: {{ .Values.metrics.serviceMonitor.interval }}
+      scrapeTimeout: {{ .Values.metrics.serviceMonitor.scrapeTimeout }}
+      {{- if .Values.metrics.auth.existingSecret }}
+      basicAuth:
+        username:
+          name: {{ .Values.metrics.auth.existingSecret }}
+          key: {{ .Values.metrics.auth.usernameKey }}
+        password:
+          name: {{ .Values.metrics.auth.existingSecret }}
+          key: {{ .Values.metrics.auth.passwordKey }}
+      {{- end }}
+      {{- with .Values.metrics.serviceMonitor.relabelings }}
+      relabelings:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.metrics.serviceMonitor.metricRelabelings }}
+      metricRelabelings:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

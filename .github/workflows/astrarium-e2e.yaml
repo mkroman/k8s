@@ -186,11 +186,18 @@ jobs:
   run:
     name: App ${{ matrix.app }}
     needs: [changes, build, plan]
-    if: needs.plan.outputs.has_apps == 'true'
+    # Repository secrets are not available to fork pull requests. Run this
+    # authenticated job only for branches in this repository.
+    if: >-
+      needs.plan.outputs.has_apps == 'true' &&
+      (github.event_name != 'pull_request' ||
+       github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 60
     permissions:
       contents: read
+    env:
+      REGISTRY: registry.rwx.im
     strategy:
       fail-fast: false
       max-parallel: 4
@@ -240,8 +247,20 @@ jobs:
         tar -xzf "${tmp}/${archive}" -C "${tmp}"
         install -m 0755 "${tmp}/linux-amd64/helm" "${HOME}/.local/bin/helm"
         helm version --short
-    - name: Install kind and kustomize
-      run: ./hack/ci/install-tools.sh "${HOME}/.local/bin" kind kustomize
+    - name: Install kind, kustomize and yq
+      run: ./hack/ci/install-tools.sh "${HOME}/.local/bin" kind kustomize yq
+    - name: Log in to the registry
+      uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ secrets.REGISTRY_USER }}
+        password: ${{ secrets.REGISTRY_PASSWORD }}
+    - name: Validate CI images
+      env:
+        APP: ${{ matrix.app }}
+      run: ./hack/ci/validate-ci-images.sh "${APP}"
+    - name: Prepare CI images
+      run: ./hack/ci/prepare-ci-images.sh
     - name: Start local services
       # Each matrix job has its own runner, so the fixed compose ports do not
       # collide across apps.
@@ -271,16 +290,34 @@ jobs:
       timeout-minutes: 20
       env:
         APP: ${{ matrix.app }}
+        ASTRARIUM_REGISTRY_USER: ${{ secrets.REGISTRY_USER }}
+        ASTRARIUM_REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
       run: |
         set -euo pipefail
-        astrarium run --app "${APP}" --fast-fail \
+        astrarium run --app "${APP}" --fast-fail --keep-cluster \
           --trace-file "diagnostics/astrarium-trace.json"
+    - name: Run the upgrade test
+      timeout-minutes: 30
+      env:
+        APP: ${{ matrix.app }}
+      run: |
+        set -euo pipefail
+        astrarium upgrade --app "${APP}" --reuse-cluster --no-deploy \
+          --trace-file "diagnostics/astrarium-upgrade-trace.json"
     - name: Upload trace file
       if: always()
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: astrarium-${{ matrix.app }}-trace
         path: diagnostics/astrarium-trace.json
+        if-no-files-found: warn
+        retention-days: 7
+    - name: Upload upgrade trace file
+      if: always()
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: astrarium-${{ matrix.app }}-upgrade-trace
+        path: diagnostics/astrarium-upgrade-trace.json
         if-no-files-found: warn
         retention-days: 7
     - name: Collect kind logs
@@ -291,7 +328,7 @@ jobs:
         mkdir -p diagnostics
         while IFS= read -r cluster; do
           kind export logs "diagnostics/${cluster}" --name "${cluster}" || true
-        done < <(kind get clusters | grep '^astrarium-' || true)
+        done < <(kind get clusters | grep -E '^astrarium(-|$)' || true)
     - name: Upload diagnostics
       if: failure()
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

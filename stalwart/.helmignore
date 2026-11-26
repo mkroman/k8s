@@ -1,0 +1,6 @@
+.DS_Store
+.git/
+.gitignore
+values-prod.yaml
+values-kind.yaml
+README.md

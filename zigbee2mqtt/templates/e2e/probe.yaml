@@ -1,9 +1,10 @@
 {{- if .Values.e2e.enabled }}
-{{- $probeImage := required "e2e.probeImage is required when e2e.enabled is true" .Values.e2e.probeImage }}
+{{- $globalE2E := (.Values.global | default dict).e2e | default dict }}
+{{- $probeImage := required "e2e.probeImage or global.e2e.probeImage is required when e2e.enabled is true" (default $globalE2E.probeImage .Values.e2e.probeImage) }}
 {{- $mqttHost := required "e2e.mqtt.host is required when e2e.enabled is true" .Values.e2e.mqtt.host }}
 {{- $mqttPort := int (required "e2e.mqtt.port is required when e2e.enabled is true" .Values.e2e.mqtt.port) }}
 {{- $topic := required "e2e.topic is required when e2e.enabled is true" .Values.e2e.topic }}
-{{- $timeout := int (required "e2e.timeoutSeconds is required when e2e.enabled is true" .Values.e2e.timeoutSeconds) }}
+{{- $timeout := int (default 180 (default $globalE2E.timeoutSeconds .Values.e2e.timeoutSeconds)) }}
 {{- /* No RBAC: the probe only talks MQTT, never the Kubernetes API. */}}
 {{- /* PostSync hook: the sync fails when the bridge state stays offline. */}}
 apiVersion: batch/v1
@@ -11,6 +12,9 @@ kind: Job
 metadata:
   name: e2e-zigbee2mqtt-bridge-state
   namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/component: e2e-probe
+    e2e.uplink.io/app: {{ .Release.Name | quote }}
   annotations:
     helm.sh/hook: post-install,post-upgrade
     helm.sh/hook-weight: "10"
@@ -24,6 +28,7 @@ spec:
       labels:
         app.kubernetes.io/name: zigbee2mqtt
         app.kubernetes.io/component: e2e-probe
+        e2e.uplink.io/app: {{ .Release.Name | quote }}
     spec:
       automountServiceAccountToken: false
       restartPolicy: Never

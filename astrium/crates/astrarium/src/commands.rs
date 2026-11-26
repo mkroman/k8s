@@ -5,6 +5,7 @@ pub mod doctor;
 pub mod manifest;
 pub mod render;
 pub mod run;
+pub mod upgrade;
 
 use std::path::PathBuf;
 
@@ -36,9 +37,7 @@ pub async fn dispatch(cli: Cli, manifest: Option<&Manifest>) -> Result<()> {
         },
         Command::Plan(args) => plan(manifest, &args).await,
         Command::Run(args) => run::run(manifest, &args).await,
-        Command::Upgrade(_) => Err(miette::miette!(
-            "`astrarium upgrade` is not implemented yet"
-        )),
+        Command::Upgrade(args) => upgrade::run(manifest, &args).await,
         Command::Render(args) => render::run(manifest, &args).await,
         Command::Cluster(args) => cluster::run(manifest, &args).await,
     }

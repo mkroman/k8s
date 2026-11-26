@@ -1,0 +1,33 @@
+chart: stalwart
+commonValues: true
+render:
+  - values-kind.yaml
+  - values-prod.yaml
+mustFail:
+  - name: rocksdb-without-persistence
+    args: ["--set", "persistence.enabled=false"]
+    match: "persistence.enabled must be true"
+  - name: multiple-replicas
+    args: ["--set", "replicaCount=2"]
+  - name: recovery-admin-without-secret
+    args: ["--set", "recoveryAdmin.enabled=true"]
+    match: "recoveryAdmin.enabled requires"
+  - name: certificate-without-dns-names
+    args: ["--set", "certificate.enabled=true"]
+    match: "certificate.dnsNames must contain at least one name"
+  - name: metrics-without-admin-service
+    args:
+      - "--set"
+      - "metrics.serviceMonitor.enabled=true"
+      - "--set"
+      - "service.admin.enabled=false"
+    match: "service.admin.enabled must be true"
+  - name: reload-without-credentials
+    args:
+      - "--set"
+      - "certificate.enabled=true"
+      - "--set"
+      - "certificate.dnsNames[0]=mail.example.test"
+      - "--set"
+      - "certificate.reload.enabled=true"
+    match: "certificate.reload.credentialsSecret is required"

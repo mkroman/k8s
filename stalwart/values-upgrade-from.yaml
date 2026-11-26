@@ -1,0 +1,6 @@
+# Previous release for the Astrarium upgrade test.
+#
+# The chart defaults to the current appVersion. This overlay is merged last for
+# the initial deployment; the upgrade then switches back to the current values.
+image:
+  tag: v1.1.0

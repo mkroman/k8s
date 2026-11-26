@@ -1,0 +1,104 @@
+{{- $managementPort := include "stalwart.managementPort" . | int }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "stalwart.headlessServiceName" . }}
+  labels:
+    {{- include "stalwart.labels" . | nindent 4 }}
+    app.kubernetes.io/component: headless
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: false
+  selector:
+    {{- include "stalwart.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: mail
+  ports:
+    - name: mgmt
+      port: {{ $managementPort }}
+      targetPort: mgmt
+      protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "stalwart.fullname" . }}
+  labels:
+    {{- include "stalwart.labels" . | nindent 4 }}
+    app.kubernetes.io/component: mail
+  {{- with .Values.service.mail.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.service.mail.type }}
+  {{- if or (eq .Values.service.mail.type "NodePort") (eq .Values.service.mail.type "LoadBalancer") }}
+  externalTrafficPolicy: {{ .Values.service.mail.externalTrafficPolicy }}
+  {{- end }}
+  {{- with .Values.service.mail.loadBalancerIP }}
+  loadBalancerIP: {{ . | quote }}
+  {{- end }}
+  {{- with .Values.service.mail.loadBalancerClass }}
+  loadBalancerClass: {{ . | quote }}
+  {{- end }}
+  {{- with .Values.service.mail.loadBalancerSourceRanges }}
+  loadBalancerSourceRanges:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.service.mail.ipFamilyPolicy }}
+  ipFamilyPolicy: {{ . | quote }}
+  {{- end }}
+  {{- with .Values.service.mail.ipFamilies }}
+  ipFamilies:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  selector:
+    {{- include "stalwart.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: mail
+  ports:
+    {{- $portDefs := list
+      (dict "name" "smtp" "value" .Values.service.mail.ports.smtp)
+      (dict "name" "smtps" "value" .Values.service.mail.ports.smtps)
+      (dict "name" "imaps" "value" .Values.service.mail.ports.imaps)
+      (dict "name" "https" "value" .Values.service.mail.ports.https)
+      (dict "name" "pop3s" "value" .Values.service.mail.ports.pop3s)
+      (dict "name" "sieve" "value" .Values.service.mail.ports.sieve)
+      (dict "name" "submission" "value" .Values.service.mail.ports.submission)
+      (dict "name" "imap" "value" .Values.service.mail.ports.imap)
+      (dict "name" "pop3" "value" .Values.service.mail.ports.pop3)
+      (dict "name" "http" "value" .Values.service.mail.ports.http)
+    }}
+    {{- range $portDefs }}
+    {{- if gt (int .value) 0 }}
+    - name: {{ .name }}
+      port: {{ .value }}
+      targetPort: {{ .name }}
+      protocol: TCP
+    {{- end }}
+    {{- end }}
+    {{- with .Values.service.mail.extraPorts }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+---
+{{- if .Values.service.admin.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "stalwart.adminServiceName" . }}
+  labels:
+    {{- include "stalwart.labels" . | nindent 4 }}
+    app.kubernetes.io/component: admin
+  {{- with .Values.service.admin.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "stalwart.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: mail
+  ports:
+    - name: mgmt
+      port: {{ .Values.service.admin.port }}
+      targetPort: mgmt
+      protocol: TCP
+{{- end }}

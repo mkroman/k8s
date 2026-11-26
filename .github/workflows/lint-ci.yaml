@@ -50,23 +50,47 @@ jobs:
 
   renovate:
     name: renovate config
+    # The registry login uses repository secrets, which are unavailable to
+    # fork pull requests. Do not check out or run fork code with those secrets.
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    container:
+    env:
+      REGISTRY: registry.rwx.im
       # Pinned to a full version and digest; the github-actions manager updates
       # both when a new Renovate release is available.
-      image: ghcr.io/renovatebot/renovate:44.257.9@sha256:d6b65ff3562dd499240b23d34ef806ec7e5fd2675e4236a027dfb36774f2aa75
-      # GitHub-hosted runners mount the workspace as 1001:127; the Renovate
-      # image runs as 12021. Match the permissions used by the official
-      # renovatebot/github-action CI.
-      options: -u 1001:0 --group-add 1000 --group-add 12021 --group-add 127
+      RENOVATE_IMAGE: ghcr.io/renovatebot/renovate:44.257.9
+      RENOVATE_DIGEST: sha256:d6b65ff3562dd499240b23d34ef806ec7e5fd2675e4236a027dfb36774f2aa75
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Log in to the registry
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.REGISTRY_USER }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+      - name: Pull the Renovate image through the registry proxy
+        run: |
+          set -euo pipefail
+          docker pull "${REGISTRY}/${RENOVATE_IMAGE}@${RENOVATE_DIGEST}"
+          docker tag "${REGISTRY}/${RENOVATE_IMAGE}@${RENOVATE_DIGEST}" "${RENOVATE_IMAGE}"
       - name: Validate configuration
-        run: renovate-config-validator --no-global --strict renovate.json
+        run: |
+          set -euo pipefail
+          # GitHub-hosted runners mount the workspace as 1001:127; the Renovate
+          # image runs as 12021. Match the permissions used by the official
+          # renovatebot/github-action CI.
+          docker run --rm \
+            --entrypoint renovate-config-validator \
+            -v "${PWD}:/workspace" -w /workspace \
+            -u 1001:0 --group-add 1000 --group-add 12021 --group-add 127 \
+            "${RENOVATE_IMAGE}" \
+            --no-global --strict renovate.json
 
   zizmor:
     name: zizmor

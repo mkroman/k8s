@@ -13,18 +13,30 @@ spec:
         # pods can never become Service endpoints.
         app.kubernetes.io/component: broker
     spec:
+      containers:
+      - name: mosquitto
+        volumeMounts:
+        # The anonymous-listener config has no password_file, and this overlay
+        # deletes the SealedSecret. Remove the production password mount so the
+        # Deployment does not reference a Secret that cannot exist in kind.
+        - mountPath: /etc/mosquitto/passwords.db
+          $patch: delete
       securityContext:
-        # Defensive: guarantees the local-path PVC is writable by UID 1883.
+        # Defensive: guarantees the emptyDir data mount is writable by UID
+        # 1883, matching production's PVC permissions.
         fsGroup: 1883
       volumes:
-      # E2E only: the projected volume (configMap + mosquitto-passwd secret)
-      # becomes a plain ConfigMap volume with the anonymous-listener config.
-      # Keep the volume and mount names identical to base so the
-      # volumeMounts stay valid.
+      # E2E only: replace the base ConfigMap with the anonymous-listener
+      # config. The mount path (subPath) is inherited from the base.
       - name: mosquitto-config
-        projected: null
         configMap:
-          name: mosquitto-config
+          name: mosquitto-e2e-config
+          defaultMode: 0644
+      - name: mosquitto-passwd
+        $patch: delete
+      # The e2e test proves MQTT connectivity, not local-path storage. Keep
+      # production on its PVC, but use pod-local storage here so a slow or
+      # permission-sensitive local-path volume cannot crash-loop the broker.
       - name: mosquitto-data
-        persistentVolumeClaim:
-          claimName: mosquitto-data
+        persistentVolumeClaim: null
+        emptyDir: {}

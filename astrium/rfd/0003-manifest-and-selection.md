@@ -70,12 +70,16 @@ base_branch = "main"
 [catalog]
 apps = "apps/values.yaml"
 e2e = "hack/e2e/apps.yaml"
+common_values = "hack/e2e/values-common.yaml"
 ```
 
 Both paths are repository-relative and resolved through the manifest root. The
 adapter imports only the applications listed in the e2e catalogue, reduces the
 projects to those referenced by those applications, derives namespaces from
 application and project destinations, and imports the e2e Helm repositories.
+The optional `common_values` file is merged into every imported Helm app before
+its own value files; this repository uses it for shared `global.e2e` probe
+defaults.
 Applications, projects and namespaces from native tables must be absent in this
 mode; mixing the two modes is a validation error. This repository uses the
 catalog form above and keeps the cluster, Argo CD, render, telemetry and
@@ -187,7 +191,7 @@ matrix: {"include":[{"app":"mosquitto"},{"app":"zigbee2mqtt"}]}
 | `[render]` | no | Executable names, render namespace, dry-run toggle, and command timeout. Defaults: `helm`, `kustomize`, `kind`, `default`, `true`, `10m`. |
 | `[telemetry]` | no | OTLP endpoint, service name, environment, and enabled toggle (RFD 0005). |
 | `[registry]` | no | Pull-through mirror settings (RFD 0005). Enabled by default; `enabled = false` pulls directly. |
-| `[catalog]` | no | Read-only adapter for `apps/values.yaml` and `hack/e2e/apps.yaml`. Mutually exclusive with the native project, namespace, application and Helm repository tables. |
+| `[catalog]` | no | Read-only adapter for `apps/values.yaml` and `hack/e2e/apps.yaml`, with an optional shared `common_values` file. Mutually exclusive with the native project, namespace, application and Helm repository tables. |
 | `[[helm_repositories]]` | no | Named Helm chart repositories registered before dependency builds. |
 
 `[project]` fields are `name` (required; used as `cicd.pipeline.name`), `root`
@@ -239,7 +243,7 @@ namespace (`spegel`, `longhorn`) is an explicit manifest decision.
 | `timeout_seconds` | integer | from `[render].timeout` | Wait budget in seconds; overrides the render timeout. |
 | `resources` | array of tables | `[]` | Objects that must exist after the app is healthy. |
 | `prometheus_targets` | table | unset | Prometheus jobs whose targets must all be `up`. |
-| `upgrade` | table | unset | Optional upgrade test: `from_values` or `from_revision` (RFD 0004). |
+| `upgrade` | table | unset | Optional in-cluster upgrade test: `enabled`, `container`, `data_path`, `timeout_seconds`, `security_profile` and `verify_pvc_retention` (RFD 0004). |
 | `requires_fresh_image` | boolean | `false` | The probe needs an image absent from every node. |
 | `requires_containerd_config` | boolean | `false` | The probe depends on the node's registry and content-store settings. |
 | `stale_probe_resources` | table | unset | Resources and pods to delete before a cold-image run. |

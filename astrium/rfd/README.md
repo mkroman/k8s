@@ -64,12 +64,12 @@ the current examples of that threshold.
 ## Adding an RFD
 
 ```bash
-git switch -c rfd/0008-probe-timeouts
-cp astrium/rfd/template.md astrium/rfd/0008-probe-timeouts.md
-$EDITOR astrium/rfd/0008-probe-timeouts.md   # set state: prediscussion
+git switch -c rfd/0009-probe-timeouts
+cp astrium/rfd/template.md astrium/rfd/0009-probe-timeouts.md
+$EDITOR astrium/rfd/0009-probe-timeouts.md   # set state: prediscussion
 $EDITOR astrium/rfd/README.md                # add the index row
 git add astrium/rfd
-git commit -m "rfd: add 0008 probe timeouts"
+git commit -m "rfd: add 0009 probe timeouts"
 gh pr create --fill
 ```
 
@@ -135,9 +135,10 @@ the decision rather than the document.
 | [0002](0002-astrarium-overview.md) | Astrarium overview | published | Names the project, states its goals and non-goals, and fixes the crate, command, and milestone shape. |
 | [0003](0003-manifest-and-selection.md) | Manifest and selection | published | Defines `astrarium.toml`, the dependency DAG, and diff-based application selection. |
 | [0004](0004-rendering-and-argocd.md) | Rendering and Argo CD | published | Packages Helm and Kustomize applications into an HTTP chart repository and creates Argo CD resources directly. |
-| [0005](0005-cluster-registry-telemetry.md) | Cluster, registry, and telemetry | published | Bootstraps kind, pull-through registry mirrors, Argo CD, and OTLP traces with bounded diagnostics. |
+| [0005](0005-cluster-registry-telemetry.md) | Cluster, registry, and telemetry | published | Bootstraps kind, the path-prefixed registry proxy, Argo CD, and OTLP traces with bounded diagnostics. |
 | [0006](0006-ci-release-and-caching.md) | CI, release, and caching | published | Defines GitHub Actions, release tags and binaries, and how e2e jobs obtain Astrarium. |
 | [0007](0007-testing-and-structure.md) | Testing and structure | published | Fixes the workspace, module, error, async, and testing rules and the migration away from `hack/e2e`. |
+| [0008](0008-chaos-testing.md) | Chaos testing for stateful upgrades | ideation | Plans a repeatable outage, failure-recovery, and Secret-rotation suite for stateful upgrade paths. |
 
 ## Conventions
 

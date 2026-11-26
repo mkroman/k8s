@@ -145,6 +145,12 @@ pub struct UpgradeArgs {
     /// Keep the cluster after a successful run.
     #[arg(long)]
     pub keep_cluster: bool,
+    /// Reuse an existing cluster instead of creating one.
+    #[arg(long)]
+    pub reuse_cluster: bool,
+    /// Skip the normal suite run and test an already deployed app.
+    #[arg(long)]
+    pub no_deploy: bool,
 }
 
 /// Arguments for `astrarium render`.

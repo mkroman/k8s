@@ -1,0 +1,46 @@
+apiVersion: v2
+name: stalwart
+description: >-
+  Hardened Stalwart mail and collaboration server (SMTP, IMAP, POP3, JMAP,
+  CalDAV, CardDAV, WebDAV) for Kubernetes. Based on the official Stalwart
+  Kubernetes reference while adding restricted Pod Security, NetworkPolicy,
+  cert-manager, Prometheus resources, and e2e rollout checks.
+type: application
+version: 0.1.0
+# renovate: datasource=github-releases depName=stalwartlabs/stalwart
+appVersion: "1.1.1"
+kubeVersion: ">=1.31.0-0"
+
+home: https://stalw.art/
+icon: https://stalw.art/img/logo-red.svg
+sources:
+  - https://github.com/stalwartlabs/stalwart
+  - https://stalw.art/docs/cluster/orchestration/kubernetes/
+  - https://stalw.art/docs/cluster/orchestration/kubernetes-chart/
+  - https://stalw.art/docs/install/security/
+  - https://stalw.art/docs/management/backup/
+keywords:
+  - stalwart
+  - mail
+  - smtp
+  - imap
+  - jmap
+  - caldav
+  - carddav
+maintainers:
+  - name: mkroman
+annotations:
+  artifacthub.io/license: AGPL-3.0-only
+  artifacthub.io/category: email
+  artifacthub.io/images: |
+    - name: stalwart
+      image: stalwartlabs/stalwart:v1.1.1
+  artifacthub.io/links: |
+    - name: Kubernetes deployment guide
+      url: https://stalw.art/docs/cluster/orchestration/kubernetes/
+    - name: Security guide
+      url: https://stalw.art/docs/install/security/
+    - name: Backup and restore
+      url: https://stalw.art/docs/management/backup/
+    - name: Source code
+      url: https://github.com/stalwartlabs/stalwart

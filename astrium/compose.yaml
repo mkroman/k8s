@@ -5,13 +5,10 @@
 # Jaeger receives OTLP/gRPC on 4317 and OTLP/HTTP on 4318. The UI is on
 # http://localhost:16686.
 #
-# The registry services are pull-through caches. Astrarium writes containerd
-# `hosts.toml` files into each kind node that point workload image pulls at
-# these ports. `kindest/node` itself is pulled by the host Docker daemon before
-# the nodes exist, so it bypasses these caches; configure the host daemon's
-# registry-mirrors or pre-pull the node image if that pull is a bottleneck. The
-# caches bind to 0.0.0.0 because kind nodes reach the host through the Docker
-# bridge gateway in some setups.
+# Astrarium configures containerd to pull through registry.rwx.im directly.
+# The host-side images (`kindest/node` and Jaeger) are pulled through the same
+# registry and retagged by hack/ci/prepare-ci-images.sh before kind and compose
+# run.
 name: astrarium
 
 services:
@@ -29,61 +26,3 @@ services:
       OTEL_TRACES_EXPORTER: none
       OTEL_METRICS_EXPORTER: none
       OTEL_LOGS_EXPORTER: none
-
-  mirror-docker:
-    image: registry:3.1.2
-    restart: unless-stopped
-    ports:
-    - "5000:5000"
-    environment:
-      REGISTRY_HTTP_ADDR: 0.0.0.0:5000
-      REGISTRY_PROXY_REMOTEURL: https://registry-1.docker.io
-      REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY: /var/lib/registry
-      REGISTRY_LOG_LEVEL: warn
-    volumes:
-    - mirror-docker:/var/lib/registry
-
-  mirror-quay:
-    image: registry:3.1.2
-    restart: unless-stopped
-    ports:
-    - "5001:5000"
-    environment:
-      REGISTRY_HTTP_ADDR: 0.0.0.0:5000
-      REGISTRY_PROXY_REMOTEURL: https://quay.io
-      REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY: /var/lib/registry
-      REGISTRY_LOG_LEVEL: warn
-    volumes:
-    - mirror-quay:/var/lib/registry
-
-  mirror-ghcr:
-    image: registry:3.1.2
-    restart: unless-stopped
-    ports:
-    - "5002:5000"
-    environment:
-      REGISTRY_HTTP_ADDR: 0.0.0.0:5000
-      REGISTRY_PROXY_REMOTEURL: https://ghcr.io
-      REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY: /var/lib/registry
-      REGISTRY_LOG_LEVEL: warn
-    volumes:
-    - mirror-ghcr:/var/lib/registry
-
-  mirror-k8s:
-    image: registry:3.1.2
-    restart: unless-stopped
-    ports:
-    - "5003:5000"
-    environment:
-      REGISTRY_HTTP_ADDR: 0.0.0.0:5000
-      REGISTRY_PROXY_REMOTEURL: https://registry.k8s.io
-      REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY: /var/lib/registry
-      REGISTRY_LOG_LEVEL: warn
-    volumes:
-    - mirror-k8s:/var/lib/registry
-
-volumes:
-  mirror-docker:
-  mirror-quay:
-  mirror-ghcr:
-  mirror-k8s:

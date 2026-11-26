@@ -1,0 +1,353 @@
+{{- $configType := index .Values.config "@type" | default "" }}
+{{- if gt (int .Values.replicaCount) 1 }}
+{{- fail "replicaCount must be 1: a second Stalwart pod without shared stores and a coordinator would have independent data" }}
+{{- end }}
+{{- if and (eq $configType "RocksDb") (not .Values.persistence.enabled) }}
+{{- fail "persistence.enabled must be true when config.@type is RocksDb" }}
+{{- end }}
+{{- if and (eq $configType "RocksDb") (not (index .Values.config "path")) }}
+{{- fail "config.path is required when config.@type is RocksDb" }}
+{{- end }}
+{{- if and .Values.recoveryAdmin.enabled (not .Values.recoveryAdmin.existingSecret) (not .Values.recoveryAdmin.password) }}
+{{- fail "recoveryAdmin.enabled requires recoveryAdmin.existingSecret or recoveryAdmin.password" }}
+{{- end }}
+{{- if and .Values.certificate.enabled .Values.certificate.create (not .Values.certificate.dnsNames) }}
+{{- fail "certificate.dnsNames must contain at least one name when certificate.enabled and certificate.create are true" }}
+{{- end }}
+{{- if and .Values.certificate.enabled (not .Values.certificate.create) (not .Values.certificate.existingSecret) }}
+{{- fail "certificate.existingSecret is required when certificate.enabled is true and certificate.create is false" }}
+{{- end }}
+{{- if and .Values.metrics.serviceMonitor.enabled (not .Values.service.admin.enabled) }}
+{{- fail "service.admin.enabled must be true when metrics.serviceMonitor.enabled is true" }}
+{{- end }}
+{{- if and .Values.certificate.reload.enabled (not .Values.service.admin.enabled) }}
+{{- fail "service.admin.enabled must be true when certificate.reload.enabled is true" }}
+{{- end }}
+{{- if and .Values.certificate.reload.enabled (not .Values.certificate.reload.credentialsSecret) }}
+{{- fail "certificate.reload.credentialsSecret is required when certificate.reload.enabled is true" }}
+{{- end }}
+{{- $managementPort := include "stalwart.managementPort" . | int }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "stalwart.fullname" . }}
+  labels:
+    {{- include "stalwart.labels" . | nindent 4 }}
+    app.kubernetes.io/component: mail
+spec:
+  serviceName: {{ include "stalwart.headlessServiceName" . }}
+  replicas: {{ .Values.replicaCount }}
+  podManagementPolicy: OrderedReady
+  updateStrategy:
+    {{- toYaml .Values.updateStrategy | nindent 4 }}
+  revisionHistoryLimit: {{ .Values.revisionHistoryLimit }}
+  minReadySeconds: {{ .Values.minReadySeconds }}
+  {{- if and .Values.persistence.enabled (not .Values.persistence.existingClaim) }}
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: {{ .Values.persistence.retentionPolicy.whenDeleted }}
+    whenScaled: {{ .Values.persistence.retentionPolicy.whenScaled }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "stalwart.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "stalwart.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: mail
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- if and .Values.recoveryAdmin.enabled (not .Values.recoveryAdmin.existingSecret) .Values.recoveryAdmin.password }}
+        checksum/recovery-admin: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+        {{- end }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      serviceAccountName: {{ include "stalwart.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.priorityClassName }}
+      priorityClassName: {{ . | quote }}
+      {{- end }}
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.extraInitContainers }}
+      initContainers:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: stalwart
+          image: {{ include "stalwart.image" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - --config
+            - /etc/stalwart/config.json
+          env:
+            - name: TMPDIR
+              value: /tmp
+            - name: HOME
+              value: /tmp
+            {{- with .Values.role }}
+            - name: STALWART_ROLE
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.pushShard }}
+            - name: STALWART_PUSH_SHARD
+              value: {{ . | quote }}
+            {{- end }}
+            {{- if .Values.recoveryMode.enabled }}
+            - name: STALWART_RECOVERY_MODE
+              value: "true"
+            - name: STALWART_RECOVERY_MODE_PORT
+              value: {{ .Values.recoveryMode.port | quote }}
+            - name: STALWART_RECOVERY_MODE_LOG_LEVEL
+              value: {{ .Values.recoveryMode.logLevel | quote }}
+            {{- with .Values.recoveryMode.bind }}
+            - name: STALWART_RECOVERY_MODE_BIND
+              value: {{ . | quote }}
+            {{- end }}
+            {{- end }}
+            {{- if .Values.recoveryAdmin.enabled }}
+            - name: STALWART_RECOVERY_ADMIN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ default (printf "%s-recovery-admin" (include "stalwart.fullname" .)) .Values.recoveryAdmin.existingSecret }}
+                  key: {{ .Values.recoveryAdmin.existingSecretKey }}
+            {{- end }}
+            {{- with .Values.publicUrl }}
+            - name: STALWART_PUBLIC_URL
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.httpsPort }}
+            - name: STALWART_HTTPS_PORT
+              value: {{ . | quote }}
+            {{- end }}
+            {{- if .Values.updateRolePermissions }}
+            - name: STALWART_UPDATE_ROLE_PERMISSIONS
+              value: "true"
+            {{- end }}
+            {{- with .Values.tokioWorkerThreads }}
+            - name: TOKIO_WORKER_THREADS
+              value: {{ . | quote }}
+            {{- end }}
+            {{- range $key, $value := .Values.extraEnv }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+          {{- with .Values.extraEnvFrom }}
+          envFrom:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          ports:
+            - name: smtp
+              containerPort: 25
+              protocol: TCP
+            - name: smtps
+              containerPort: 465
+              protocol: TCP
+            - name: imaps
+              containerPort: 993
+              protocol: TCP
+            - name: https
+              containerPort: 443
+              protocol: TCP
+            - name: pop3s
+              containerPort: 995
+              protocol: TCP
+            - name: sieve
+              containerPort: 4190
+              protocol: TCP
+            - name: submission
+              containerPort: 587
+              protocol: TCP
+            - name: imap
+              containerPort: 143
+              protocol: TCP
+            - name: pop3
+              containerPort: 110
+              protocol: TCP
+            - name: http
+              containerPort: 80
+              protocol: TCP
+            - name: mgmt
+              containerPort: {{ $managementPort }}
+              protocol: TCP
+          {{- if .Values.probes.liveness.enabled }}
+          livenessProbe:
+            {{- if eq .Values.probes.mode "httpGet" }}
+            httpGet:
+              path: {{ .Values.probes.liveness.path }}
+              port: mgmt
+            {{- else }}
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - curl -fsS --max-time {{ .Values.probes.liveness.timeoutSeconds }} http://127.0.0.1:{{ $managementPort }}{{ .Values.probes.liveness.path }}
+            {{- end }}
+            initialDelaySeconds: {{ .Values.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.probes.liveness.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.liveness.timeoutSeconds }}
+            failureThreshold: {{ .Values.probes.liveness.failureThreshold }}
+          {{- end }}
+          {{- if .Values.probes.readiness.enabled }}
+          readinessProbe:
+            {{- if eq .Values.probes.mode "httpGet" }}
+            httpGet:
+              path: {{ .Values.probes.readiness.path }}
+              port: mgmt
+            {{- else }}
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - curl -fsS --max-time {{ .Values.probes.readiness.timeoutSeconds }} http://127.0.0.1:{{ $managementPort }}{{ .Values.probes.readiness.path }}
+            {{- end }}
+            initialDelaySeconds: {{ .Values.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.probes.readiness.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.readiness.timeoutSeconds }}
+            failureThreshold: {{ .Values.probes.readiness.failureThreshold }}
+          {{- end }}
+          {{- if .Values.probes.startup.enabled }}
+          startupProbe:
+            {{- if eq .Values.probes.mode "httpGet" }}
+            httpGet:
+              path: {{ .Values.probes.startup.path }}
+              port: mgmt
+            {{- else }}
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - curl -fsS --max-time {{ .Values.probes.startup.timeoutSeconds }} http://127.0.0.1:{{ $managementPort }}{{ .Values.probes.startup.path }}
+            {{- end }}
+            periodSeconds: {{ .Values.probes.startup.periodSeconds }}
+            timeoutSeconds: {{ .Values.probes.startup.timeoutSeconds }}
+            failureThreshold: {{ .Values.probes.startup.failureThreshold }}
+          {{- end }}
+          {{- if gt (int .Values.lifecycle.preStopSleepSeconds) 0 }}
+          lifecycle:
+            preStop:
+              exec:
+                command:
+                  - /bin/sh
+                  - -c
+                  - sleep {{ .Values.lifecycle.preStopSleepSeconds }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/stalwart/config.json
+              subPath: config.json
+              readOnly: true
+            - name: data
+              mountPath: /var/lib/stalwart
+            - name: logs
+              mountPath: /var/log/stalwart
+            - name: tmp
+              mountPath: /tmp
+            {{- if .Values.certificate.enabled }}
+            - name: tls
+              mountPath: /etc/stalwart/tls
+              readOnly: true
+            {{- end }}
+            {{- if .Values.metrics.auth.existingSecret }}
+            - name: metrics-auth
+              mountPath: /etc/stalwart/metrics
+              readOnly: true
+            {{- end }}
+            {{- with .Values.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "stalwart.configMapName" . }}
+        - name: logs
+          emptyDir:
+            {{- with .Values.logs.sizeLimit }}
+            sizeLimit: {{ . }}
+            {{- end }}
+        - name: tmp
+          emptyDir:
+            {{- with .Values.tmp.sizeLimit }}
+            sizeLimit: {{ . }}
+            {{- end }}
+        {{- if or .Values.persistence.existingClaim (not .Values.persistence.enabled) }}
+        - name: data
+          {{- if .Values.persistence.existingClaim }}
+          persistentVolumeClaim:
+            claimName: {{ .Values.persistence.existingClaim }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        {{- end }}
+        {{- if .Values.certificate.enabled }}
+        - name: tls
+          secret:
+            secretName: {{ include "stalwart.certificateSecretName" . }}
+        {{- end }}
+        {{- if .Values.metrics.auth.existingSecret }}
+        - name: metrics-auth
+          secret:
+            secretName: {{ .Values.metrics.auth.existingSecret }}
+        {{- end }}
+        {{- with .Values.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+  {{- if and .Values.persistence.enabled (not .Values.persistence.existingClaim) }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+        labels:
+          {{- include "stalwart.selectorLabels" . | nindent 10 }}
+          app.kubernetes.io/component: data
+        {{- with .Values.persistence.annotations }}
+        annotations:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+      spec:
+        accessModes:
+          - {{ .Values.persistence.accessMode | quote }}
+        {{- with .Values.persistence.storageClass }}
+        storageClassName: {{ . | quote }}
+        {{- end }}
+        {{- with .Values.persistence.volumeName }}
+        volumeName: {{ . | quote }}
+        {{- end }}
+        {{- with .Values.persistence.selector }}
+        selector:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.persistence.size | quote }}
+  {{- end }}

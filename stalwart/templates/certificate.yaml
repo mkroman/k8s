@@ -1,0 +1,36 @@
+{{- if and .Values.certificate.enabled .Values.certificate.create }}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "stalwart.fullname" . }}
+  labels:
+    {{- include "stalwart.labels" . | nindent 4 }}
+    app.kubernetes.io/component: tls
+  {{- with .Values.certificate.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  secretName: {{ include "stalwart.certificateSecretName" . | quote }}
+  {{- with .Values.certificate.commonName }}
+  commonName: {{ . | quote }}
+  {{- end }}
+  dnsNames:
+    {{- range .Values.certificate.dnsNames }}
+    - {{ . | quote }}
+    {{- end }}
+  issuerRef:
+    kind: {{ .Values.certificate.issuerRef.kind | quote }}
+    name: {{ .Values.certificate.issuerRef.name | quote }}
+    {{- with .Values.certificate.issuerRef.group }}
+    group: {{ . | quote }}
+    {{- end }}
+  privateKey:
+    rotationPolicy: {{ .Values.certificate.privateKey.rotationPolicy | quote }}
+  {{- with .Values.certificate.duration }}
+  duration: {{ . | quote }}
+  {{- end }}
+  {{- with .Values.certificate.renewBefore }}
+  renewBefore: {{ . | quote }}
+  {{- end }}
+{{- end }}

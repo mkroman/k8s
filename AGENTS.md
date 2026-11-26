@@ -13,9 +13,8 @@ inputs), `spegel/README.md` (containerd).
   - `projects`: AppProjects
   - `namespaces`: every Namespace, with Pod Security labels. Applications do
     not use `CreateNamespace`, so a new namespace must be added here.
-  - `newApplications`: local apps
-  - `applications`: external repos via `apps-of-apps/<name>.yaml`
-- A chart directory with no `newApplications` entry is not deployed (for
+  - `applications`: local apps; external repositories live in `apps-of-apps/`
+- A chart directory with no `applications` entry is not deployed (for
   example `immich`, `kanidm`, `flaresolverr`).
 - AppProject defaults in `apps/templates/appproject.yaml`: if
   `clusterResourceWhitelist` is omitted it renders `[]`, so no cluster-scoped
@@ -56,9 +55,10 @@ inputs), `spegel/README.md` (containerd).
   Namespaces, AppProjects, and Applications directly from Rust.
 - Keep the production `apps` chart as the app-of-apps source of truth for
   deployment. Do not use it as an e2e bootstrap.
-- Registry mirrors and Jaeger are defined in `astrium/compose.yaml`. The kind
-  cluster must mount containerd `hosts.toml` mirrors. Prefer the host LAN IP,
-  with a Docker bridge-gateway fallback.
+- Jaeger is defined in `astrium/compose.yaml`. Registry mirrors are the
+  path-prefixed proxy entries in `astrarium.toml`; kind nodes authenticate via
+  Astrarium's generated Docker config. Only endpoints that contain `{host}`
+  need the host-address resolution.
 - `astrarium run --trace-file <path>` writes OTLP JSON that Jaeger UI can load
   through Search -> Upload. The e2e workflow uploads it as an
   `astrarium-<app>-trace` artifact; keep that path in failure diagnostics too.
@@ -76,7 +76,8 @@ inputs), `spegel/README.md` (containerd).
 - CI/release: project CI builds/tests/checks the workspace. Release tags are
   `astrarium-vX.Y.Z`; release binaries are uploaded to GitHub Releases and
   cached via a local composite action. No new third-party Actions; pin runner
-  images and action SHAs.
+  images and action SHAs. E2E and the Renovate container job need repository
+  secrets, so workflows skip them for fork pull requests.
 - Do not add new shell e2e scripts; extend Astrarium instead. `hack/e2e`
   contains only shared inputs (catalogue, kind config and Argo CD overlay).
 - Agent workflow: define shared interfaces first, then parallelize by module
@@ -105,6 +106,10 @@ Repository checks:
 ./hack/ci/lint-yaml.sh                      # plain YAML; skips templates/, charts/, workflows
 ./hack/ci/validate-helm.sh spegel           # one chart: dep build, lint, render, kubeconform
 ./hack/ci/validate-helm.sh                  # every chart (CI)
+./hack/ci/validate-chart-cases.sh           # data-driven render/negative chart cases
+./hack/ci/validate-e2e-contract.sh          # shared Argo CD e2e probe contract
+./hack/ci/validate-ci-images.sh stalwart    # registry image preflight (needs registry login)
+./hack/ci/prepare-ci-images.sh              # pre-pull host images through the registry
 ./hack/ci/validate-kustomize.sh             # every kustomization.yaml
 ./hack/ci/validate-app-of-apps.sh           # root app keeps SSA + server-side diff
 ./hack/ci/validate-dashboards.py            # grafana/dashboards/*.json; datasources must use $datasource
@@ -141,6 +146,19 @@ astrarium run --app spegel --reuse-cluster --fast-fail
 - Iterate locally with `--keep-cluster` on the first run, then
   `--reuse-cluster`. The cluster name comes from `[cluster].name`; Astrarium
   only deletes clusters named `astrarium` or prefixed with `astrarium-`.
+- Container pulls use `registry.rwx.im` through path-prefixed containerd
+  mirrors. `astrarium.toml` sets `override_path = true` and
+  Astrarium generates the node Docker `config.json` from
+  `ASTRARIUM_REGISTRY_USER` and `ASTRARIUM_REGISTRY_PASSWORD` and mounts it at
+  `/var/lib/kubelet/config.json` on every node. Its `auths` entries are keyed by
+  the upstream image hosts (docker.io, ghcr.io, ...), because kubelet chooses
+  credentials before containerd applies the mirror. An explicit
+  `ASTRARIUM_REGISTRY_AUTH_FILE` overrides generation. CI supplies the
+  `REGISTRY_USER` and `REGISTRY_PASSWORD` secrets. Mirrors set
+  `fallback = false`, so a failed mirror never pulls directly from the upstream
+  or leaks the credentials to it. Host-side images are pre-pulled and retagged
+  by `hack/ci/prepare-ci-images.sh`; do not prefix image names in charts or
+  manifests.
 - `--trace-file diagnostics/astrarium-trace.json` writes OTLP JSON that Jaeger
   UI can open through Search → Upload.
 - Kind overrides are picked up automatically: `<chart>/values-kind.yaml` for
@@ -154,6 +172,17 @@ astrarium run --app spegel --reuse-cluster --fast-fail
   `zigbee2mqtt` `coordinator.devicePath`).
 - Astrarium relies on Argo CD sync plus diagnostics. Static chart validation
   still happens in `hack/ci/validate-helm.sh`.
+- E2E probes carry `app.kubernetes.io/component: e2e-probe` and
+  `e2e.uplink.io/app: <release>` labels. `hack/ci/validate-e2e-contract.sh`
+  enforces the shared probe contract. Shared probe image/timeout defaults live
+  in `hack/e2e/values-common.yaml` and are injected as `global.e2e`.
+- Apps can opt into the generic in-cluster upgrade test with an `upgrade`
+  block in `hack/e2e/apps.yaml`. `astrarium upgrade` installs into
+  `<namespace>-rollout-<run>` with `upgrade.from_values` (a pinned previous
+  image/config), upgrades to the current values, then checks pod replacement,
+  marker persistence and PVC retention. `from_revision` is unsupported. The e2e workflow runs it with
+  `--reuse-cluster --no-deploy` after `run --keep-cluster`. Do not add a
+  per-app shell script.
 
 ## Probe conventions
 
@@ -194,11 +223,16 @@ astrarium run --app spegel --reuse-cluster --fast-fail
 - Never commit plaintext Secrets. SealedSecrets come from per-app
   `make secrets` (`op2secret | kubeseal`), which needs 1Password and cluster
   access. Ask the user to regenerate them.
-- To register a new app: add a project, namespace and `newApplications`
+- To register a new app: add a project, namespace and `applications`
   entry in `apps/values.yaml`, and add a row to the `README.md` table.
 
 ## Cluster / containerd
 
+- Image pulls go through `registry.rwx.im`. The mirrors in `astrarium.toml`
+  store repositories as `registry.rwx.im/<upstream>/<repo>` and require
+  `override_path = true`; containerd otherwise appends `/v2` to the mirror
+  path. Node authentication is the plain Docker config mounted at
+  `/var/lib/kubelet/config.json`, not an imagePullSecret.
 - This repo has no Ansible or Kubespray playbooks. Document the node
   settings an app needs in that chart's README.
 - The production cluster runs containerd 2.3. `discard_unpacked_layers` must

@@ -1,0 +1,146 @@
+{{- if .Values.networkPolicy.enabled }}
+{{- $managementPort := include "stalwart.managementPort" . | int }}
+{{- $configType := index .Values.config "@type" | default "" }}
+{{- $mailEnabled := or
+  (gt (int .Values.service.mail.ports.smtp) 0)
+  (gt (int .Values.service.mail.ports.smtps) 0)
+  (gt (int .Values.service.mail.ports.imaps) 0)
+  (gt (int .Values.service.mail.ports.https) 0)
+  (gt (int .Values.service.mail.ports.pop3s) 0)
+  (gt (int .Values.service.mail.ports.sieve) 0)
+  (gt (int .Values.service.mail.ports.submission) 0)
+  (gt (int .Values.service.mail.ports.imap) 0)
+  (gt (int .Values.service.mail.ports.pop3) 0)
+  (gt (int .Values.service.mail.ports.http) 0)
+}}
+{{- $dbPort := 0 }}
+{{- if eq $configType "PostgreSql" }}
+{{- $dbPort = index .Values.config "port" | default 5432 | int }}
+{{- else if eq $configType "MySql" }}
+{{- $dbPort = index .Values.config "port" | default 3306 | int }}
+{{- end }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "stalwart.fullname" . }}
+  labels:
+    {{- include "stalwart.labels" . | nindent 4 }}
+    app.kubernetes.io/component: mail
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "stalwart.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: mail
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Mail and HTTP listeners are public by design. Each rule is present only
+    # when the corresponding Service port is enabled.
+    {{- if $mailEnabled }}
+    - ports:
+        {{- if gt (int .Values.service.mail.ports.smtp) 0 }}
+        - protocol: TCP
+          port: 25
+        {{- end }}
+        {{- if gt (int .Values.service.mail.ports.smtps) 0 }}
+        - protocol: TCP
+          port: 465
+        {{- end }}
+        {{- if gt (int .Values.service.mail.ports.imaps) 0 }}
+        - protocol: TCP
+          port: 993
+        {{- end }}
+        {{- if gt (int .Values.service.mail.ports.https) 0 }}
+        - protocol: TCP
+          port: 443
+        {{- end }}
+        {{- if gt (int .Values.service.mail.ports.pop3s) 0 }}
+        - protocol: TCP
+          port: 995
+        {{- end }}
+        {{- if gt (int .Values.service.mail.ports.sieve) 0 }}
+        - protocol: TCP
+          port: 4190
+        {{- end }}
+        {{- if gt (int .Values.service.mail.ports.submission) 0 }}
+        - protocol: TCP
+          port: 587
+        {{- end }}
+        {{- if gt (int .Values.service.mail.ports.imap) 0 }}
+        - protocol: TCP
+          port: 143
+        {{- end }}
+        {{- if gt (int .Values.service.mail.ports.pop3) 0 }}
+        - protocol: TCP
+          port: 110
+        {{- end }}
+        {{- if gt (int .Values.service.mail.ports.http) 0 }}
+        - protocol: TCP
+          port: 80
+        {{- end }}
+    {{- end }}
+    # Management listener: same namespace plus explicit namespaces/CIDRs.
+    - from:
+        - podSelector: {}
+        {{- range .Values.networkPolicy.managementIngress.namespaces }}
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ . | quote }}
+        {{- end }}
+        {{- with .Values.ingress.controllerNamespace }}
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ . | quote }}
+        {{- end }}
+        {{- range .Values.networkPolicy.managementIngress.cidrs }}
+        - ipBlock:
+            cidr: {{ . | quote }}
+        {{- end }}
+      ports:
+        - protocol: TCP
+          port: {{ $managementPort }}
+    {{- with .Values.networkPolicy.extraIngress }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+  egress:
+    {{- if .Values.networkPolicy.egress.allowAll }}
+    - {}
+    {{- else }}
+    # DNS resolution, including NodeLocal DNS and resolvers outside kube-system.
+    - ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    {{- if .Values.networkPolicy.egress.allowSmtp }}
+    # Outbound SMTP delivery and relay.
+    - ports:
+        - protocol: TCP
+          port: 25
+        - protocol: TCP
+          port: 465
+        - protocol: TCP
+          port: 587
+    {{- end }}
+    {{- if .Values.networkPolicy.egress.allowHttps }}
+    # WebUI bundle, spam rules, ASN data, ACME, DNS provider APIs, licensing.
+    - ports:
+        - protocol: TCP
+          port: 443
+    {{- end }}
+    {{- if .Values.networkPolicy.egress.allowHttp }}
+    - ports:
+        - protocol: TCP
+          port: 80
+    {{- end }}
+    {{- if and .Values.networkPolicy.egress.allowDatabase (gt $dbPort 0) }}
+    - ports:
+        - protocol: TCP
+          port: {{ $dbPort }}
+    {{- end }}
+    {{- with .Values.networkPolicy.egress.extraEgress }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- end }}
+{{- end }}

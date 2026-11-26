@@ -299,8 +299,19 @@ pub struct RegistryConfig {
 pub struct RegistryMirror {
     /// The upstream registry host, for example `docker.io`.
     pub upstream: String,
-    /// The mirror endpoint. `{host}` is replaced with the resolved host address.
+    /// The mirror endpoint. `{host}`, when present, is replaced with the
+    /// resolved host address.
     pub endpoint: String,
+    /// Treat the endpoint path as the registry API root instead of appending
+    /// `/v2`. Use this for a path-prefixed proxy such as
+    /// `https://registry.example.com/v2/docker.io`.
+    #[serde(default)]
+    pub override_path: bool,
+    /// Fall back to the upstream registry when every mirror fails. When false,
+    /// the generated `hosts.toml` omits `server` and the proxy is
+    /// authoritative.
+    #[serde(default = "default_true")]
+    pub fallback: bool,
 }
 
 /// A Helm chart repository that must be registered for dependency builds.
@@ -458,15 +469,59 @@ pub enum RendererKind {
 }
 
 /// An optional upgrade test.
+///
+/// The generic in-cluster test installs the chart into a separate
+/// `<namespace>-rollout` namespace with Helm, upgrades it, restarts its pods
+/// and checks that a marker written below [`UpgradeSpec::data_path`] and its
+/// PersistentVolumeClaims survive.
 #[derive(Clone, Debug, Deserialize, Serialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct UpgradeSpec {
-    /// Values used for the initial deployment, relative to the app's `source`
-    /// and applied before the current values.
+    /// Whether the upgrade test is enabled. An `upgrade` table opts in by
+    /// default.
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    /// Values merged after the app's current values for the initial
+    /// deployment, relative to the app's `source`. Use this to pin the
+    /// previous image or configuration; the upgrade then applies the current
+    /// values.
     #[serde(default)]
     pub from_values: Vec<PathBuf>,
     /// A Git revision to deploy before the current working tree.
     pub from_revision: Option<Revision>,
+    /// The container that owns `data_path`. Defaults to the first container.
+    pub container: Option<String>,
+    /// An absolute directory inside the container for the persistence marker.
+    /// When unset, the test does not write or read a marker.
+    pub data_path: Option<String>,
+    /// The Helm install, upgrade and rollout timeout in seconds.
+    #[serde(default = "default_upgrade_timeout")]
+    pub timeout_seconds: u64,
+    /// The pod security profile to assert.
+    #[serde(default)]
+    pub security_profile: UpgradeSecurityProfile,
+    /// Require the PersistentVolumeClaims to survive `helm uninstall`.
+    #[serde(default = "default_true")]
+    pub verify_pvc_retention: bool,
+}
+
+/// The pod security profile asserted by the upgrade test.
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, JsonSchema, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum UpgradeSecurityProfile {
+    /// The restricted profile: non-root, read-only root filesystem, no
+    /// privilege escalation, `RuntimeDefault` seccomp and all capabilities
+    /// dropped.
+    #[default]
+    Restricted,
+    /// Do not assert a pod security profile.
+    None,
+}
+
+/// The default upgrade-test timeout in seconds.
+#[must_use]
+pub const fn default_upgrade_timeout() -> u64 {
+    600
 }
 
 /// Resources that must be removed before a cold-image probe can run.
@@ -632,7 +687,12 @@ impl Manifest {
 
         let apps_path = self.resolve_path(&config.apps)?;
         let e2e_path = self.resolve_path(&config.e2e)?;
-        let suite = catalog::load(&self.project.root, &apps_path, &e2e_path)?;
+        let suite = catalog::load(
+            &self.project.root,
+            &apps_path,
+            &e2e_path,
+            config.common_values.as_deref(),
+        )?;
         self.projects = suite.projects;
         self.namespaces = suite.namespaces;
         self.apps = suite.apps;
@@ -848,12 +908,6 @@ impl Manifest {
                     return Err(ManifestError::invalid(
                         "registry mirror upstream must not be empty",
                     ));
-                }
-                if !mirror.endpoint.contains("{host}") {
-                    return Err(ManifestError::invalid(format!(
-                        "registry mirror for {} must contain {{host}} in its endpoint",
-                        mirror.upstream
-                    )));
                 }
             }
         }
@@ -1166,18 +1220,26 @@ fn default_registry_mirrors() -> Vec<RegistryMirror> {
         RegistryMirror {
             upstream: "docker.io".to_owned(),
             endpoint: "http://{host}:5000".to_owned(),
+            override_path: false,
+            fallback: true,
         },
         RegistryMirror {
             upstream: "quay.io".to_owned(),
             endpoint: "http://{host}:5001".to_owned(),
+            override_path: false,
+            fallback: true,
         },
         RegistryMirror {
             upstream: "ghcr.io".to_owned(),
             endpoint: "http://{host}:5002".to_owned(),
+            override_path: false,
+            fallback: true,
         },
         RegistryMirror {
             upstream: "registry.k8s.io".to_owned(),
             endpoint: "http://{host}:5003".to_owned(),
+            override_path: false,
+            fallback: true,
         },
     ]
 }

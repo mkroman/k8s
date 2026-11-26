@@ -63,6 +63,7 @@ the headless Argo CD overlay), not a separate shell harness.
 | sealed-secrets              | [`sealed-secrets`](sealed-secrets/)              | [![App Status](https://argo-cd.infra.rwx.im/api/badge?name=sealed-secrets)](https://argo-cd.infra.rwx.im/applications/sealed-secrets) |
 | ser2net                     | [`ser2net`](ser2net/)                           | [![App Status](https://argo-cd.infra.rwx.im/api/badge?name=ser2net)](https://argo-cd.infra.rwx.im/applications/ser2net) |
 | spegel                      | [`spegel`](spegel/)                              | [![App Status](https://argo-cd.infra.rwx.im/api/badge?name=spegel)](https://argo-cd.infra.rwx.im/applications/spegel) |
+| stalwart                    | [`stalwart`](stalwart/)                          | [![App Status](https://argo-cd.infra.rwx.im/api/badge?name=stalwart)](https://argo-cd.infra.rwx.im/applications/stalwart) |
 | traefik                     | [`traefik`](traefik/)                           | [![App Status](https://argo-cd.infra.rwx.im/api/badge?name=traefik)](https://argo-cd.infra.rwx.im/applications/traefik) |
 | vector-agent                | [`vector`](vector/)                             | [![App Status](https://argo-cd.infra.rwx.im/api/badge?name=vector-agent)](https://argo-cd.infra.rwx.im/applications/vector-agent) |
 | vector-aggregator           | [`vector`](vector/)                             | [![App Status](https://argo-cd.infra.rwx.im/api/badge?name=vector-aggregator)](https://argo-cd.infra.rwx.im/applications/vector-aggregator) |

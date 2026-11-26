@@ -1,0 +1,98 @@
+{{- if and .Values.metrics.serviceMonitor.enabled .Values.metrics.prometheusRule.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "stalwart.fullname" . }}
+  labels:
+    {{- include "stalwart.labels" . | nindent 4 }}
+    metrics.uplink.io/monitor: prometheus
+    {{- with .Values.metrics.prometheusRule.additionalLabels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  groups:
+    - name: stalwart
+      rules:
+        - alert: StalwartDown
+          expr: up{job="{{ .Release.Name }}"} == 0
+          for: 5m
+          labels:
+            severity: warning
+            context: stalwart
+          annotations:
+            summary: "A Stalwart target is down"
+            description: "Prometheus cannot scrape Stalwart. Check the pod, ServiceMonitor, NetworkPolicy, and Prometheus exporter configuration."
+        - alert: StalwartQueueBacklog
+          expr: stalwart_queue_messages > {{ .Values.metrics.prometheusRule.queueBacklogThreshold }}
+          for: 15m
+          labels:
+            severity: warning
+            context: stalwart
+          annotations:
+            summary: "Stalwart outbound queue backlog is above {{ .Values.metrics.prometheusRule.queueBacklogThreshold }}"
+            description: "Messages are accumulating in the Stalwart outbound queue. Check delivery errors, DNS, port 25, and relay configuration."
+        - alert: StalwartPodNotReady
+          expr: kube_pod_status_ready{namespace="{{ .Release.Namespace }}",pod=~"{{ include "stalwart.fullname" . }}-[0-9]+",condition="true"} == 0
+          for: 2m
+          labels:
+            severity: critical
+            context: stalwart
+          annotations:
+            summary: "Stalwart pod is not Ready"
+            description: "The Stalwart pod has been not Ready for two minutes. Check pod events, startup logs, PVC attachment, and resources."
+        - alert: StalwartPodRestarting
+          expr: increase(kube_pod_container_status_restarts_total{namespace="{{ .Release.Namespace }}",pod=~"{{ include "stalwart.fullname" . }}-[0-9]+"}[15m]) > 0
+          for: 1m
+          labels:
+            severity: warning
+            context: stalwart
+          annotations:
+            summary: "Stalwart container restarted"
+            description: "The Stalwart container restarted in the last 15 minutes. Check the previous logs, liveness failures, OOM kills, and the RocksDB LOCK state."
+        - alert: StalwartImagePullBackOff
+          expr: kube_pod_container_status_waiting_reason{namespace="{{ .Release.Namespace }}",pod=~"{{ include "stalwart.fullname" . }}-[0-9]+",reason=~"ImagePullBackOff|ErrImagePull"} > 0
+          for: 2m
+          labels:
+            severity: critical
+            context: stalwart
+          annotations:
+            summary: "Stalwart image cannot be pulled"
+            description: "The Stalwart pod cannot pull its image. Verify the tag exists, the image is present in the registry mirror, and imagePullSecrets are correct."
+        {{- if and .Values.persistence.enabled (not .Values.persistence.existingClaim) }}
+        - alert: StalwartPVCAlmostFull
+          expr: |
+            (kubelet_volume_stats_used_bytes{namespace="{{ .Release.Namespace }}",persistentvolumeclaim=~"data-{{ include "stalwart.fullname" . }}-[0-9]+"}
+              /
+             kubelet_volume_stats_capacity_bytes{namespace="{{ .Release.Namespace }}",persistentvolumeclaim=~"data-{{ include "stalwart.fullname" . }}-[0-9]+"})
+            > {{ .Values.metrics.prometheusRule.pvcUsageThreshold }}
+          for: 15m
+          labels:
+            severity: warning
+            context: stalwart
+          annotations:
+            summary: "Stalwart data volume is almost full"
+            description: "The Stalwart PVC is above the configured usage threshold. Expand it or remove old data before RocksDB runs out of space."
+        {{- end }}
+        {{- if and .Values.certificate.enabled .Values.certificate.create }}
+        - alert: StalwartCertificateExpiringSoon
+          expr: certmanager_certificate_expiration_timestamp_seconds{namespace="{{ .Release.Namespace }}",name="{{ include "stalwart.fullname" . }}"} - time() < {{ mul (int .Values.metrics.prometheusRule.certificateExpiryDays) 86400 }}
+          for: 1h
+          labels:
+            severity: warning
+            context: stalwart
+          annotations:
+            summary: "Stalwart TLS certificate expires soon"
+            description: "The cert-manager Certificate for Stalwart expires within the configured number of days. Check the issuer and renewal status."
+        {{- end }}
+        {{- if .Values.certificate.reload.enabled }}
+        - alert: StalwartCertificateReloadFailed
+          expr: kube_job_status_failed{namespace="{{ .Release.Namespace }}",job_name=~"{{ include "stalwart.fullname" . }}-reload-tls-.*"} > 0
+          for: 5m
+          labels:
+            severity: warning
+            context: stalwart
+          annotations:
+            summary: "Stalwart certificate reload Job failed"
+            description: "The TLS reload CronJob has a failed Job. Check the CronJob logs, the admin Service, and the reload credentials Secret."
+        {{- end }}
+{{- end }}

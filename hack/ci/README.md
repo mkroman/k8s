@@ -11,6 +11,10 @@ locally so failures can be reproduced without pushing.
 | `validate-kustomize.sh` | Every `kustomization.yaml` builds, then kubeconform validates the rendered manifests. |
 | `validate-app-of-apps.sh` | The root `apps` Application keeps `ServerSideApply=true` and `ServerSideDiff=true`, so Argo CD's controller-owned delete-hook finalizers stay out of the app-of-apps diff. |
 | `validate-helm.sh` | Every chart builds its dependencies, lints, and renders; kubeconform validates the result. |
+| `validate-chart-cases.sh` | Data-driven render and negative-render cases under `chart-cases/`. |
+| `validate-e2e-contract.sh` | Every Helm app that exposes `e2e` has the standard probe labels, hooks, image, and restricted security context. |
+| `validate-ci-images.sh` | The kind node image, compose images, and rendered upgrade-app images exist in the prefixed registry. Uses `docker buildx imagetools inspect`. |
+| `prepare-ci-images.sh` | Pulls host-side images through the prefixed registry and retags them with their original names for kind and compose. |
 | `validate-dashboards.py` | Grafana dashboard JSON: datasource references, variable convention, panel IDs, and removed panel types. |
 | `install-tools.sh` | Reads `tools.txt`, downloads each pinned release, verifies its SHA-256, and installs the binary. |
 
@@ -65,7 +69,7 @@ Install the tools from the manifest into a directory on `PATH`:
 export PATH="${HOME}/.local/bin:${PATH}"
 ```
 
-Also install `kubectl` (or `kustomize`), Helm 3.x, yamllint 1.38+, and `yq`.
+Also install `kubectl` (or `kustomize`), Helm 3.22+ or Helm 4.x, yamllint 1.38+, and `yq`.
 
 Run from anywhere in the repository:
 
@@ -76,7 +80,14 @@ Run from anywhere in the repository:
 ./hack/ci/validate-app-of-apps.sh
 ./hack/ci/validate-helm.sh           # every chart
 ./hack/ci/validate-helm.sh spegel    # one chart, useful while iterating
+./hack/ci/validate-chart-cases.sh    # declarative chart render/negative cases
+./hack/ci/validate-e2e-contract.sh   # shared Argo CD e2e probe contract
+./hack/ci/validate-ci-images.sh stalwart
+./hack/ci/prepare-ci-images.sh
 ```
+
+The image checks require `docker`, `yq`, and a prior login to the registry.
+Set `REGISTRY` to override the default registry host.
 
 ## Workflows
 
@@ -86,12 +97,16 @@ Run from anywhere in the repository:
 - `.github/workflows/lint-ci.yaml` runs actionlint, shellcheck, and zizmor.
 - `.github/workflows/astrarium-e2e.yaml` runs the changed-application e2e
   tests on kind through Astrarium; see [`astrium/README.md`](../../astrium/README.md)
-  and [`hack/e2e/README.md`](../e2e/README.md).
+  and [`hack/e2e/README.md`](../e2e/README.md). The authenticated `run` job and
+  the Renovate container job are skipped for fork pull requests because
+  repository secrets are not exposed there.
 
-The workflows use only official `actions/*` and `azure/*` actions, plus the
-official zizmor action. The CLI tools are installed from their upstream
-release archives by `install-tools.sh`; no third-party tool actions, Go
-builds, or container images are used.
+The workflows use official `actions/*` and `azure/*` actions, the official
+zizmor action, and the pinned `docker/login-action` used by the image build.
+The e2e job pulls its host images through the configured registry proxy;
+kind nodes pull workload images through the containerd mirror configuration.
+The CLI tools are installed from their upstream release archives by
+`install-tools.sh`.
 
 All actions are pinned to commit SHAs. Workflows use read-only `contents`
 permissions, `persist-credentials: false`, per-workflow concurrency, and

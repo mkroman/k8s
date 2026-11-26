@@ -1,0 +1,11 @@
+# Shared defaults for the Astrarium e2e suite.
+#
+# The catalog adapter merges this file into every imported app, so Helm charts
+# can read `global.e2e`. Charts use:
+#   .Values.e2e.probeImage | default .Values.global.e2e.probeImage
+# so an app-specific value in values-kind.yaml still wins.
+global:
+  e2e:
+    # renovate: datasource=docker depName=mirror.gcr.io/library/busybox
+    probeImage: mirror.gcr.io/library/busybox:1.37.0@sha256:66a6306db78bf2dbf3487f293aa8d6990d8e506fdffab9cc43fe422becf886e4
+    timeoutSeconds: 180

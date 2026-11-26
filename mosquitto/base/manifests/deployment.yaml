@@ -17,6 +17,15 @@ spec:
       containers:
       - name: mosquitto
         image: eclipse-mosquitto:2.0.22
+        # Ubuntu's AppArmor mosquitto profile allows config reads only below
+        # /etc/mosquitto. The image default is /mosquitto/config, so override
+        # both the command and the config path to stay readable on hosts that
+        # load that profile (GitHub Actions runners do).
+        command:
+        - /usr/sbin/mosquitto
+        args:
+        - -c
+        - /etc/mosquitto/mosquitto.conf
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
@@ -60,22 +69,28 @@ spec:
           timeoutSeconds: 5
         volumeMounts:
         - name: mosquitto-data
-          mountPath: /mosquitto/data
+          mountPath: /var/lib/mosquitto
+        # Mount the config and password files directly (subPath) so AppArmor
+        # sees regular files at the allowed /etc/mosquitto paths. A directory
+        # mount would expose the ConfigMap/Secret atomic-writer symlinks and
+        # bypass those path rules on the target side of the symlink.
         - name: mosquitto-config
-          mountPath: /mosquitto/config
+          mountPath: /etc/mosquitto/mosquitto.conf
+          subPath: mosquitto.conf
+          readOnly: true
+        - name: mosquitto-passwd
+          mountPath: /etc/mosquitto/passwords.db
+          subPath: passwords.db
+          readOnly: true
       volumes:
       - name: mosquitto-config
-        projected:
-          defaultMode: 0660
-          sources:
-          - configMap:
-              name: mosquitto-config
-          - secret:
-              name: mosquitto-passwd
-              items:
-              - key: passwords.db
-                mode: 0660
-                path: passwords.db
+        configMap:
+          name: mosquitto-config
+          defaultMode: 0644
+      - name: mosquitto-passwd
+        secret:
+          secretName: mosquitto-passwd
+          defaultMode: 0440
       - name: mosquitto-data
         persistentVolumeClaim:
           claimName: mosquitto-data

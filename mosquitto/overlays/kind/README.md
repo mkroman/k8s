@@ -20,10 +20,15 @@ throwaway kind cluster:
    unhealthy forever. The overlay deletes the SealedSecret (`$patch: delete`).
 3. **Credentials are unnecessary in e2e.** The overlay generates its own
    `mosquitto.conf` (derived from the base one: only `allow_anonymous true`
-   and the removal of `password_file` differ) and swaps the Deployment's
-   projected volume (configMap + secret) for a plain ConfigMap volume with
-   that config. Anonymous access is **e2e-only**; production keeps the
-   password-protected listener.
+   and the removal of `password_file` differ) and replaces the Deployment's
+   config ConfigMap. It also removes the production password-file volume and
+   mount, because the SealedSecret cannot be decrypted in kind. Anonymous
+   access is **e2e-only**; production keeps the password-protected listener.
+4. **The local-path PVC is unnecessary here.** This test proves MQTT
+   connectivity, not storage. The overlay switches `/var/lib/mosquitto` to
+   an `emptyDir` and deletes the base PVC, so a slow or permission-sensitive
+   local-path volume cannot crash-loop the broker or leave a Pending PVC in
+   the Application health.
 
 ## Layout note
 
@@ -36,12 +41,28 @@ overlay instead.
 ## Deterministic ConfigMap naming
 
 The base app generates its ConfigMap with `configMapGenerator`, which appends
-a content hash to the name. The e2e harness asserts a ConfigMap literally
-named `mosquitto-config` exists. The overlay therefore runs its own generator
-over the same name with `behavior: replace` and
-`disableNameSuffixHash: true`: the hash-suffixed base ConfigMap is replaced
-wholesale by one unhashed ConfigMap, and the Deployment volume reference
-resolves to exactly that name.
+a content hash to the name. The overlay adds a separate, deterministic
+`mosquitto-e2e-config` ConfigMap with `disableNameSuffixHash: true`, and the
+Deployment patch mounts it explicitly with `defaultMode: 0644`. This keeps the
+e2e resource assertion stable and avoids `behavior: replace`.
+
+## AppArmor-safe paths
+
+Ubuntu 26.04 ships an AppArmor profile for `/usr/sbin/mosquitto` that permits
+reading `/etc/mosquitto/**` and writing `/var/lib/mosquitto/mosquitto.db`.
+GitHub Actions runners load that profile. Kind pods run without an AppArmor
+profile, so the host profile applies to the mosquitto binary inside the
+container and it cannot read `/mosquitto/config/mosquitto.conf`; the broker
+then exits 3 with:
+
+```
+Error: Unable to open config file /mosquitto/config/mosquitto.conf.
+```
+
+The chart therefore mounts the config and password files at `/etc/mosquitto`
+and mounts the data volume at `/var/lib/mosquitto`. Both files use `subPath`
+so AppArmor sees regular files at those paths instead of ConfigMap/Secret
+atomic-writer symlink targets.
 
 ## NetworkPolicy
 
@@ -67,9 +88,10 @@ the copy from this overlay or the build will fail with a duplicate resource.
   `hook-delete-policy: BeforeHookCreation,HookSucceeded`. It publishes a
   retained message to `e2e/probe` (publish-before-subscribe is race-free
   because of the retain flag), subscribes and requires the exact message
-  back with `-C 1 -W 30`, and clears the retained message. A timeout, empty
-  payload, or wrong payload fails the Job. It has no Kubernetes API access
-  and needs no RBAC.
+  back, and clears the retained message. The publish/subscribe pair retries
+  for up to 90 seconds so a broker that is not ready yet cannot fail the
+  PostSync hook prematurely. A timeout, empty payload, or wrong payload
+  fails the Job. It has no Kubernetes API access and needs no RBAC.
 - The Job intentionally does **not** set `spec.selector`: the API server
   rejects a hand-written selector on a Job, and the generated
   `batch.kubernetes.io/controller-uid`/`job-name` labels can never match the
@@ -77,5 +99,5 @@ the copy from this overlay or the build will fail with a duplicate resource.
 - Broker pods are tagged `app.kubernetes.io/component: broker` and the
   Service selector requires that label. If the app labels were ever added to
   the probe pod, it still could not become a Service endpoint.
-- `deployment-patch.yaml` also sets `fsGroup: 1883` defensively so the
-  local-path PVC is writable by UID 1883.
+- `deployment-patch.yaml` keeps `fsGroup: 1883` so the data mount and any
+  future writable volume remain usable by the image's UID.

@@ -329,7 +329,7 @@ fn full_repository_manifest_validates() {
         .arg(repository_manifest())
         .assert()
         .success()
-        .stdout(predicate::str::contains("17 apps"));
+        .stdout(predicate::str::contains("18 apps"));
 }
 
 #[test]
@@ -368,6 +368,7 @@ fn full_repository_plan_contains_every_e2e_app() {
             "prometheus-operator",
             "sealed-secrets",
             "spegel",
+            "stalwart",
             "traefik",
             "vector-agent",
             "vector-aggregator",
@@ -376,7 +377,7 @@ fn full_repository_plan_contains_every_e2e_app() {
     );
     assert_eq!(
         plan["matrix"]["include"].as_array().expect("include").len(),
-        17
+        18
     );
 }
 
@@ -391,6 +392,60 @@ fn run_help_lists_selection_flags() {
         .stdout(predicate::str::contains("--keep-cluster"))
         .stdout(predicate::str::contains("--reuse-cluster"))
         .stdout(predicate::str::contains("--fast-fail"));
+}
+
+#[test]
+fn upgrade_help_lists_cluster_flags() {
+    binary()
+        .args(["upgrade", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("--app"))
+        .stdout(predicate::str::contains("--keep-cluster"))
+        .stdout(predicate::str::contains("--reuse-cluster"))
+        .stdout(predicate::str::contains("--no-deploy"));
+}
+
+#[test]
+fn upgrade_unknown_app_fails_before_creating_a_cluster() {
+    let directory = tempfile::tempdir().expect("tempdir");
+    let manifest = directory.path().join("astrarium.toml");
+    std::fs::write(&manifest, demo_manifest()).expect("manifest");
+
+    binary()
+        .args(["upgrade", "--app", "missing", "--config"])
+        .arg(&manifest)
+        .env_remove("GITHUB_OUTPUT")
+        .env_remove("GITHUB_STEP_SUMMARY")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("not declared in the manifest"));
+
+    assert!(
+        !directory.path().join(".astrium").exists(),
+        "an unknown app must not prepare a cluster"
+    );
+}
+
+#[test]
+fn upgrade_without_an_upgrade_block_is_a_noop() {
+    let directory = tempfile::tempdir().expect("tempdir");
+    let manifest = directory.path().join("astrarium.toml");
+    std::fs::write(&manifest, demo_manifest()).expect("manifest");
+
+    binary()
+        .args(["upgrade", "--app", "demo", "--config"])
+        .arg(&manifest)
+        .env_remove("GITHUB_OUTPUT")
+        .env_remove("GITHUB_STEP_SUMMARY")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("has no upgrade test"));
+
+    assert!(
+        !directory.path().join(".astrium").exists(),
+        "a no-op upgrade must not prepare a cluster"
+    );
 }
 
 #[test]

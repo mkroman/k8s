@@ -1,6 +1,7 @@
 {{- if .Values.e2e.enabled }}
+{{- $globalE2E := (.Values.global | default dict).e2e | default dict }}
 {{- $probeNamespace := required "e2e.probeNamespace is required when e2e.enabled is true" .Values.e2e.probeNamespace }}
-{{- $probeImage := required "e2e.probeImage is required when e2e.enabled is true" .Values.e2e.probeImage }}
+{{- $probeImage := required "e2e.probeImage or global.e2e.probeImage is required when e2e.enabled is true" (default $globalE2E.probeImage .Values.e2e.probeImage) }}
 {{- $rendererURL := printf "http://%s-image-renderer.%s.svc.cluster.local:8081/metrics" .Release.Name .Release.Namespace }}
 {{- $grafanaURL := printf "http://%s.%s.svc.cluster.local/api/health" .Release.Name .Release.Namespace }}
 apiVersion: batch/v1
@@ -8,6 +9,9 @@ kind: Job
 metadata:
   name: e2e-grafana-renderer-allow
   namespace: {{ $probeNamespace }}
+  labels:
+    app.kubernetes.io/component: e2e-probe
+    e2e.uplink.io/app: {{ .Release.Name | quote }}
   annotations:
     helm.sh/hook: post-install,post-upgrade
     helm.sh/hook-weight: "10"
@@ -59,6 +63,9 @@ kind: Job
 metadata:
   name: e2e-grafana-renderer-deny
   namespace: {{ $probeNamespace }}
+  labels:
+    app.kubernetes.io/component: e2e-probe
+    e2e.uplink.io/app: {{ .Release.Name | quote }}
   annotations:
     helm.sh/hook: post-install,post-upgrade
     helm.sh/hook-weight: "10"
@@ -108,6 +115,9 @@ kind: Job
 metadata:
   name: e2e-grafana-health-control
   namespace: {{ $probeNamespace }}
+  labels:
+    app.kubernetes.io/component: e2e-probe
+    e2e.uplink.io/app: {{ .Release.Name | quote }}
   annotations:
     helm.sh/hook: post-install,post-upgrade
     helm.sh/hook-weight: "10"

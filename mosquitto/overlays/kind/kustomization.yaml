@@ -15,7 +15,7 @@ namespace: mosquitto
 #   - switches the Service to ClusterIP (service-patch.yaml),
 #   - deletes the SealedSecret and swaps the Deployment's projected volume
 #     for an anonymous-listener ConfigMap, generated below with the
-#     deterministic unhashed name mosquitto-config,
+#     deterministic unhashed name mosquitto-e2e-config,
 #   - carries its own NetworkPolicy (networkpolicy.yaml) because the kind CNI
 #     enforces NetworkPolicy; it keeps broker egress in-cluster and leaves the
 #     probe Job unselected,
@@ -36,12 +36,11 @@ resources:
 - job.yaml
 
 configMapGenerator:
-- name: mosquitto-config
-  # Replace the base generator's hash-suffixed ConfigMap wholesale: the e2e
-  # harness asserts on the unhashed name mosquitto-config, the Deployment
-  # volume must reference exactly this name, and the anonymous-listener
-  # config supersedes the production one.
-  behavior: replace
+- name: mosquitto-e2e-config
+  # Use a unique name instead of replacing the base hash-suffixed ConfigMap.
+  # `behavior: replace` is fragile across Kustomize/Argo CD versions and can
+  # leave the Deployment mounting an empty ConfigMap. The base ConfigMap stays
+  # in the render but is unused by this overlay.
   options:
     disableNameSuffixHash: true
   files:
@@ -51,3 +50,11 @@ patches:
 - path: deployment-patch.yaml
 - path: service-patch.yaml
 - path: sealedsecret-delete.yaml
+# The broker uses an emptyDir in this overlay, so the base PVC would remain
+# Pending forever and keep the Application from becoming Healthy.
+- patch: |-
+    $patch: delete
+    apiVersion: v1
+    kind: PersistentVolumeClaim
+    metadata:
+      name: mosquitto-data

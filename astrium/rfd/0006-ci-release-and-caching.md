@@ -41,8 +41,16 @@ Three requirements shape the design:
 A pull request that touches the tool runs `astrarium-ci.yaml`: fmt, clippy,
 test, doc, and a release build on `ubuntu-24.04`. A pull request that touches an
 application also runs `astrarium-e2e.yaml`; its plan job emits a matrix, and
-each matrix entry runs `astrarium run --app <name>`. Source changes build the
-tool once in a build job and share the binary as an artifact.
+each matrix entry runs `astrarium run --app <name>`, followed by
+`astrarium upgrade --app <name> --reuse-cluster --no-deploy`. Source changes
+build the tool once in a build job and share the binary as an artifact.
+
+Each e2e entry logs in with `docker/login-action` using the `REGISTRY_USER` and
+`REGISTRY_PASSWORD` repository secrets, validates the kind node, Jaeger, and
+upgrade-app images with `docker buildx imagetools inspect`, and pre-pulls the
+host-side images through the registry proxy before kind and compose start. The
+same credentials are written as a plain Docker `config.json` and mounted at
+`/var/lib/kubelet/config.json` in every node for workload pulls.
 
 A release is cut by pushing a tag:
 

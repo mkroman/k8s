@@ -1,0 +1,78 @@
+# Production overrides for Stalwart.
+#
+# The mail domain, default hostname, listeners, TLS Certificate object, DKIM,
+# DNS management, accounts, and the Prometheus exporter are configured in
+# Stalwart's database. This file only covers Kubernetes-side settings.
+#
+# Prerequisites:
+#   - A SealedSecret named `stalwart-recovery-admin` containing:
+#       STALWART_RECOVERY_ADMIN: admin:<password>
+#       STALWART_USER: admin
+#       STALWART_PASSWORD: <same password>
+#   - A SealedSecret named `stalwart-metrics` containing:
+#       username: prometheus
+#       password: <metrics password>
+#   - The `letsencrypt-prod` ClusterIssuer (or adjust issuerRef below).
+#   - DNS A/AAAA records for mail.rwx.im and the autoconfiguration names, plus
+#     a PTR record and port 25 reachability.
+#
+# Create the SealedSecrets before the first sync; the pod waits for the
+# recovery administrator Secret.
+
+service:
+  mail:
+    type: LoadBalancer
+    externalTrafficPolicy: Local
+    # Pin a Cilium LB IPAM address once one is assigned, for example:
+    # annotations:
+    #   lbipam.cilium.io/ips: 10.0.3.10
+
+persistence:
+  storageClass: ssd-gp1x3
+  size: 50Gi
+
+resources:
+  requests:
+    cpu: 500m
+    memory: 1Gi
+  limits:
+    cpu: "4"
+    memory: 4Gi
+
+recoveryAdmin:
+  enabled: true
+  existingSecret: stalwart-recovery-admin
+  existingSecretKey: STALWART_RECOVERY_ADMIN
+
+publicUrl: https://mail.rwx.im
+
+certificate:
+  enabled: true
+  create: true
+  commonName: mail.rwx.im
+  dnsNames:
+    - mail.rwx.im
+    - autoconfig.rwx.im
+    - autodiscover.rwx.im
+    - mta-sts.rwx.im
+    - ua-auto-config.rwx.im
+  issuerRef:
+    kind: ClusterIssuer
+    name: letsencrypt-prod
+    group: cert-manager.io
+  reload:
+    enabled: true
+    credentialsSecret: stalwart-recovery-admin
+
+metrics:
+  serviceMonitor:
+    enabled: true
+  prometheusRule:
+    enabled: true
+  auth:
+    existingSecret: stalwart-metrics
+
+networkPolicy:
+  managementIngress:
+    namespaces:
+      - monitoring

@@ -238,7 +238,7 @@ Native mode accepts duplication as a trade-off, not as a hidden mechanism:
 | `astrarium run --app <name> --keep-cluster` | Leave the cluster for inspection. |
 | `astrarium run --app <name> --reuse-cluster` | Reuse an existing cluster named by the manifest. |
 | `astrarium run --app <name> --fast-fail` | Treat the first `Degraded` health as fatal, in addition to the default fatal conditions. |
-| `astrarium upgrade --app <name>` | Install, wait, trigger a second sync, and wait again to exercise upgrade hooks. |
+| `astrarium upgrade --app <name>` | Deploy the app, then install it in a rollout namespace, upgrade it, and verify pod replacement, data persistence and PVC retention. |
 | `astrarium render --app <name> [--output <dir>]` | Render and package without creating a cluster. |
 | `astrarium cluster create\|delete\|list` | Manage kind clusters outside a run. |
 | `astrarium doctor` | Check tools, Docker, Jaeger, and registry mirrors; print actionable fixes. |
@@ -255,7 +255,7 @@ manifest schema is generated with `schemars` (RFD 0003).
 | --- | --- | --- |
 | **M0 — RFDs and skeleton** | RFDs 0001–0007, workspace, CLI `version`/`doctor`, `compose.yaml`, telemetry init, `astrium/README.md`, `AGENTS.md` update. | `cargo test`, `cargo clippy`, and `cargo fmt --check` pass; `astrarium doctor` inspects the required tools; the RFD index exists and every RFD has a state. |
 | **M1 — One Kustomize app** | `astrarium.toml` for `mosquitto`; `plan`; kind; Argo CD; chart repository; direct Namespace/AppProject/Application creation; probe; diagnostics. | `astrarium run --app mosquitto` passes locally on a fresh cluster; the same application passes through the legacy harness for comparison. |
-| **M2 — Helm apps and prerequisites** | Helm packaging and `valuesObject` for `cert-manager`, `prometheus-operator`, `monitoring`, and `stalwart` once its chart merges; resource and Prometheus checks; fast-fail; upgrade. | The smoke set passes; `astrarium upgrade --app stalwart` exercises `post-upgrade` hooks. `stalwart` is planned work: its chart is on an unmerged PR (#430), not on this branch. |
+| **M2 — Helm apps and prerequisites** | Helm packaging and `valuesObject` for `cert-manager`, `prometheus-operator`, `monitoring`, and `stalwart` once its chart merges; resource and Prometheus checks; fast-fail; upgrade. | The smoke set passes; `astrarium upgrade --app stalwart` replaces the pod, keeps its data marker and retains its PVCs. `stalwart` is planned work: its chart is on an unmerged PR (#430), not on this branch. |
 | **M3 — Incremental selection and registry** | Previous-run JSON, `gix` diff, matrix output, registry `hosts.toml`, Jaeger traces with CI/CD semantic conventions, step summary and artifacts. | A one-app fix selects only affected applications and their prerequisites; a registry pull is served by the mirror; one trace per run is visible in Jaeger. |
 | **M4 — CI, release, and migration** | Project CI, release workflow, local setup action, e2e workflow uses Astrarium; legacy harness kept as reference. | `astrarium-v0.1.0` publishes binaries and `SHA256SUMS`; e2e downloads the cached binary; two consecutive green smoke runs; RFDs updated to `published`/`committed`; `hack/e2e` shell runners removed. |
 
