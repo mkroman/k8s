@@ -43,7 +43,7 @@ This means:
   (`autoconfig`, `autodiscover`, `mta-sts`, `ua-auto-config`).
 - Outbound HTTPS 443 (WebUI bundle, spam rules, ASN data, ACME, DNS providers)
   and DNS 53.
-- cert-manager and the `letsencrypt-production` ClusterIssuer.
+- The `letsencrypt-production-dns` ClusterIssuer from the cert-manager chart.
 - A PostgreSQL database and role. Production uses
   `postgres-rw.rwx.svc.cluster.local` and database `stalwart_prod`; the role
   needs `CREATE` on the schema (Stalwart creates its own tables).
@@ -128,11 +128,13 @@ or `STALWART_TOKEN`, from `certificate.reload.credentialsSecret`. Production
 uses the permanent administrator in `stalwart-cli`, not the recovery
 administrator, because the recovery Secret is removed after setup.
 
-`values-prod.yaml` references the repo's `letsencrypt-production`
-ClusterIssuer. It uses HTTP-01 through Traefik, so a dedicated mail
-LoadBalancer IP will not receive the challenge. Create a DNS-01 ClusterIssuer
-(the cert-manager chart ships a Cloudflare API token Secret) and override
-`certificate.issuerRef.name`, or use an existing wildcard certificate.
+`values-prod.yaml` references the repo's `letsencrypt-production-dns`
+ClusterIssuer. It uses Cloudflare DNS-01, so it works for the mail
+LoadBalancer IP where the HTTP-01 Traefik challenge cannot. The
+`cloudflare-api-access` SealedSecret in the cert-manager chart must contain a
+token with DNS edit access to the `rwx.im` zone. Alternatively, point
+`certificate.issuerRef` at an existing wildcard certificate issuer and keep the
+matching Secret name.
 
 ## Prometheus
 

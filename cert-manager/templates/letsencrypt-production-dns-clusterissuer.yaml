@@ -1,0 +1,23 @@
+{{- if .Values.clusterIssuer.letsEncryptProductionDns.enabled }}
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-production-dns
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: mk@maero.dk
+
+    privateKeySecretRef:
+      name: letsencrypt-production-dns
+
+    # DNS-01 through Cloudflare for certificates that cannot use an HTTP
+    # challenge, such as the mail LoadBalancer. The token Secret is sealed
+    # below and must have DNS edit access to the hosted zone.
+    solvers:
+      - dns01:
+          cloudflare:
+            apiTokenSecretRef:
+              name: cloudflare-api-access
+              key: api-token
+{{- end }}

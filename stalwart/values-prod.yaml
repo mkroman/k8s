@@ -17,9 +17,8 @@
 #   - A Secret named `stalwart-cli` with a permanent administrator's
 #     STALWART_USER and STALWART_PASSWORD (or STALWART_TOKEN) for the
 #     certificate reload CronJob.
-#   - The `letsencrypt-production` ClusterIssuer. It uses HTTP-01 through
-#     Traefik, so mail.rwx.im needs a DNS-01 issuer (create one and override
-#     certificate.issuerRef) or an existing wildcard certificate.
+#   - The `letsencrypt-production-dns` ClusterIssuer from the cert-manager
+#     chart (Cloudflare DNS-01), or an existing wildcard certificate.
 #   - DNS A/AAAA records for mail.rwx.im and the autoconfiguration names, plus
 #     a PTR record and port 25 reachability.
 #
@@ -80,7 +79,7 @@ certificate:
     - ua-auto-config.rwx.im
   issuerRef:
     kind: ClusterIssuer
-    name: letsencrypt-production
+    name: letsencrypt-production-dns
     group: cert-manager.io
   reload:
     enabled: true
