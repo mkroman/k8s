@@ -171,7 +171,7 @@ Keys not listed here fall through to the upstream chart defaults — see its
 helm-docs generated [values reference][upstream-values] for the full surface.
 All keys are validated by `values.schema.json`. `validate-helm.sh` lints and
 renders the chart with the production `values.yaml`; `values-kind.yaml` is
-applied by the kind e2e run (`hack/e2e/run-app.sh`) and is covered there, not
+applied by the Astrarium kind e2e run and is covered there, not
 by `validate-helm.sh`.
 
 [upstream-values]: https://github.com/spegel-org/spegel/blob/main/charts/spegel/README.md

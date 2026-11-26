@@ -339,10 +339,10 @@ must be verified on the target node.
 
 ## e2e / kind
 
-The kind-based e2e cluster (`hack/e2e/run-app.sh`) has no USB coordinator and
+The kind-based Astrarium e2e cluster has no USB coordinator and
 no `feature.node.kubernetes.io/zigbee-coordinator=true` node, so the chart can
 run there only with a coordinator emulator. `values-kind.yaml` (next to
-`Chart.yaml`; the runner appends it to the Application's valueFiles) wires this
+`Chart.yaml`; Astrarium appends it to the Application's valueFiles) wires this
 up. It is e2e-only and must never be enabled in production.
 
 - The emulator ([romanlum/zstack-adapter-emulator](https://github.com/romanlum/zstack-adapter-emulator))

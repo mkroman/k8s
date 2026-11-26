@@ -29,9 +29,9 @@ uses Astrarium's typed catalog adapter to import the e2e subset of
 [`apps/values.yaml`](apps/values.yaml) and
 [`hack/e2e/apps.yaml`](hack/e2e/apps.yaml); the workspace, RFDs and CI/release
 workflows live in [`astrium/`](astrium/) and
-[`.github/workflows/astrarium-*.yaml`](.github/workflows/). The legacy shell
-harness in `hack/e2e/` remains as a reference until Astrarium passes the smoke
-set twice.
+[`.github/workflows/astrarium-*.yaml`](.github/workflows/). The remaining
+`hack/e2e/` files are shared Astrarium inputs (e2e metadata, kind config and
+the headless Argo CD overlay), not a separate shell harness.
 
 [cluster-bootstrapping]: https://argo-cd.readthedocs.io/en/stable/operator-manual/cluster-bootstrapping/
 

@@ -1,8 +1,8 @@
 # kind e2e overlay
 
-This overlay adapts the mosquitto application to the kind-based Argo CD e2e
-harness (`hack/e2e/run-app.sh`). The e2e runner points the Application at
-`mosquitto/overlays/kind` when it exists.
+This overlay adapts the mosquitto application to the Astrarium kind e2e
+suite. Astrarium points the Application at `mosquitto/overlays/kind` when that
+directory exists.
 
 ## Why it exists
 

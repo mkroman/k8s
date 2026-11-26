@@ -124,18 +124,17 @@ in-cluster CA and `serverName: kubernetes`.
    ```bash
    kubectl kustomize monitoring
    kubectl kustomize monitoring/overlays/kind
-   ./hack/e2e/run-app.sh monitoring
+   astrarium run --app monitoring
    ```
 
 ## Kind e2e
 
-`hack/e2e/run-app.sh monitoring` deploys `monitoring/overlays/kind`, which
+`astrarium run --app monitoring` deploys `monitoring/overlays/kind`, which
 contains only the production-free Prometheus composition. After the Application
-is Synced and Healthy, the harness port-forwards to the `prometheus` Service and
-queries `/api/v1/targets?state=active`. The `prometheus_targets.jobs` entry in
+is Synced and Healthy, Astrarium queries `/api/v1/targets?state=active` through
+the Kubernetes service proxy. The `prometheus_targets.jobs` entry in
 `hack/e2e/apps.yaml` lists the expected jobs; every target for those jobs must
-report `up`. This check lives in the generic e2e harness, not in a
-monitoring-specific Job.
+report `up`. This check lives in Astrarium, not in a monitoring-specific Job.
 
 Kind's control-plane runs kubeadm. `hack/e2e/kind.yaml` patches the
 scheduler/controller-manager bind addresses; kind's kubeadm patch helper merges
