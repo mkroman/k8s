@@ -8,7 +8,7 @@ description: >-
 type: application
 version: 0.1.0
 # renovate: datasource=github-releases depName=stalwartlabs/stalwart
-appVersion: "1.1.1"
+appVersion: "1.2.1"
 kubeVersion: ">=1.31.0-0"
 
 home: https://stalw.art/
