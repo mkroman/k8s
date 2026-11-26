@@ -481,8 +481,10 @@ pub struct UpgradeSpec {
     /// default.
     #[serde(default = "default_true")]
     pub enabled: bool,
-    /// Values used for the initial deployment, relative to the app's `source`
-    /// and applied before the current values.
+    /// Values merged after the app's current values for the initial
+    /// deployment, relative to the app's `source`. Use this to pin the
+    /// previous image or configuration; the upgrade then applies the current
+    /// values.
     #[serde(default)]
     pub from_values: Vec<PathBuf>,
     /// A Git revision to deploy before the current working tree.

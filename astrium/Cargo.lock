@@ -181,6 +181,7 @@ name = "astrarium-core"
 version = "0.1.2"
 dependencies = [
  "axum",
+ "base64 0.22.1",
  "bollard",
  "futures",
  "gix",

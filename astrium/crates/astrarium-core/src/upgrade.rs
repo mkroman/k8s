@@ -266,9 +266,14 @@ fn configured_upgrade(app: &AppSpec) -> Result<&UpgradeSpec, UpgradeError> {
             renderer: app.renderer,
         });
     }
-    if !upgrade.from_values.is_empty() || upgrade.from_revision.is_some() {
+    if upgrade.from_revision.is_some() {
         return Err(UpgradeError::Check(
-            "`upgrade.from_values` and `upgrade.from_revision` are not implemented; remove them or use the current values".to_owned(),
+            "`upgrade.from_revision` is not implemented; use `upgrade.from_values` with the previous values".to_owned(),
+        ));
+    }
+    if upgrade.from_values.is_empty() {
+        return Err(UpgradeError::Check(
+            "the upgrade test requires at least one `upgrade.from_values` file so the initial deployment differs from the current values".to_owned(),
         ));
     }
     Ok(upgrade)
@@ -327,23 +332,39 @@ async fn perform_upgrade(
         .tempdir()
         .map_err(|source| UpgradeError::io(std::env::temp_dir(), source))?;
     let output_dir = work.path().join("charts");
-    let mut request = RenderRequest::from_manifest(manifest, app, output_dir)?;
-    request.namespace = NamespaceName::new(namespace.clone())?;
-    request.release_name = release.clone();
-    request.inline_values = disable_e2e(request.inline_values);
+    let base_request = RenderRequest::from_manifest(manifest, app, output_dir)?;
+    let mut baseline_request = base_request.clone();
+    baseline_request.namespace = NamespaceName::new(namespace.clone())?;
+    baseline_request.release_name = release.clone();
+    baseline_request.inline_values = disable_e2e(baseline_request.inline_values.clone());
+    baseline_request.values_files.extend(
+        upgrade
+            .from_values
+            .iter()
+            .map(|path| manifest.resolve_path(&app.source.join(path)))
+            .collect::<Result<Vec<_>, _>>()?,
+    );
+
+    let mut current_request = base_request;
+    current_request.namespace = NamespaceName::new(namespace.clone())?;
+    current_request.release_name = release.clone();
+    current_request.inline_values = disable_e2e(current_request.inline_values);
+
     let renderer = HelmRenderer::new(Arc::clone(&runner)).with_home(HelmHome::temporary()?);
-    let packaged = renderer.render(request).await?;
+    let baseline = renderer.render(baseline_request).await?;
+    let current = renderer.render(current_request).await?;
+    if baseline.content_hash == current.content_hash {
+        return Err(UpgradeError::Check(
+            "upgrade.from_values did not change the rendered chart or values; the test would not exercise an upgrade".to_owned(),
+        ));
+    }
 
-    let values_path = work.path().join("values.json");
-    let values = serde_json::to_vec_pretty(&packaged.values).map_err(|source| {
-        UpgradeError::io(
-            &values_path,
-            std::io::Error::new(std::io::ErrorKind::InvalidData, source),
-        )
-    })?;
-    fs::write(&values_path, values).map_err(|source| UpgradeError::io(&values_path, source))?;
+    let baseline_values_path = work.path().join("values-baseline.json");
+    let current_values_path = work.path().join("values-current.json");
+    write_values(&baseline_values_path, &baseline.values)?;
+    write_values(&current_values_path, &current.values)?;
 
-    let chart = packaged.chart_path.display().to_string();
+    let chart = current.chart_path.display().to_string();
     helm(
         runner.as_ref(),
         manifest,
@@ -360,7 +381,7 @@ async fn perform_upgrade(
             "--timeout",
             &format!("{}s", timeout.as_secs()),
             "--values",
-            &values_path.display().to_string(),
+            &baseline_values_path.display().to_string(),
         ]
         .map(str::to_owned),
     )
@@ -417,31 +438,11 @@ async fn perform_upgrade(
             "--timeout",
             &format!("{}s", timeout.as_secs()),
             "--values",
-            &values_path.display().to_string(),
+            &current_values_path.display().to_string(),
         ]
         .map(str::to_owned),
     )
     .await?;
-
-    // Helm does not restart a workload when the chart did not change. Delete
-    // the release pods so controllers recreate them and the persistence checks
-    // exercise a real pod replacement.
-    let pods = kube
-        .list(POD, Some(namespace.clone()), Some(selector.clone()))
-        .await?;
-    for pod in pods {
-        let Some(name) = pod.metadata.name.clone() else {
-            continue;
-        };
-        kube.delete(
-            ResourceKey::namespaced(POD, &namespace, name),
-            DeleteOptions {
-                grace_period: Some(0),
-                ..DeleteOptions::default()
-            },
-        )
-        .await?;
-    }
 
     let replacement =
         wait_for_replacement_pod(kube, &namespace, &selector, &pod_uid, timeout, clock).await?;
@@ -544,6 +545,16 @@ fn disable_e2e(mut values: serde_json::Value) -> serde_json::Value {
         }
     }
     values
+}
+
+fn write_values(path: &Path, values: &serde_json::Value) -> Result<(), UpgradeError> {
+    let encoded = serde_json::to_vec_pretty(values).map_err(|source| {
+        UpgradeError::io(
+            path,
+            std::io::Error::new(std::io::ErrorKind::InvalidData, source),
+        )
+    })?;
+    fs::write(path, encoded).map_err(|source| UpgradeError::io(path, source))
 }
 
 fn marker_path(data_path: &str) -> String {
@@ -800,7 +811,7 @@ name = "demo"
 namespace = "demo"
 project = "demo"
 source = "demo"
-upgrade = { container = "app", data_path = "/data", timeout_seconds = 1 }
+upgrade = { from_values = ["values-upgrade-from.yaml"], container = "app", data_path = "/data", timeout_seconds = 1 }
 "#;
 
     fn manifest() -> (tempfile::TempDir, Manifest) {
@@ -812,6 +823,11 @@ upgrade = { container = "app", data_path = "/data", timeout_seconds = 1 }
             "apiVersion: v2\nname: demo\nversion: 0.1.0\n",
         )
         .expect("chart metadata");
+        std::fs::write(
+            chart.join("values-upgrade-from.yaml"),
+            "image:\n  tag: previous\n",
+        )
+        .expect("baseline values");
         let manifest = Manifest::from_toml_str(MANIFEST, directory.path()).expect("manifest");
         (directory, manifest)
     }
@@ -1000,11 +1016,7 @@ upgrade = { container = "app", data_path = "/data", timeout_seconds = 1 }
         let (_directory, manifest) = manifest();
         let pvcs = vec![vec![pvc("data-demo-0", "pvc-1", "Bound")]; 3];
         let kube = FakeKube::new(
-            vec![
-                vec![pod("pod-1", true)],
-                vec![pod("pod-1", true)],
-                vec![pod("pod-2", true)],
-            ],
+            vec![vec![pod("pod-1", true)], vec![pod("pod-2", true)]],
             pvcs,
         )
         .with_marker("e2e-rollout");
@@ -1015,9 +1027,8 @@ upgrade = { container = "app", data_path = "/data", timeout_seconds = 1 }
         assert_eq!(outcome.pod, "demo-rollout-0");
         assert_eq!(kube.execs().len(), 2);
         assert!(
-            kube.deletes()
-                .iter()
-                .any(|key| key.name == "demo-rollout-0")
+            !kube.deletes().iter().any(|key| key.resource == POD),
+            "the normal upgrade must let the StatefulSet replace the pod"
         );
     }
 
@@ -1026,11 +1037,7 @@ upgrade = { container = "app", data_path = "/data", timeout_seconds = 1 }
         let (_directory, manifest) = manifest();
         let pvcs = vec![vec![pvc("data-demo-0", "pvc-1", "Bound")]; 3];
         let kube = FakeKube::new(
-            vec![
-                vec![pod("pod-1", true)],
-                vec![pod("pod-1", true)],
-                vec![pod("pod-2", true)],
-            ],
+            vec![vec![pod("pod-1", true)], vec![pod("pod-2", true)]],
             pvcs,
         )
         .with_marker("");
@@ -1047,11 +1054,7 @@ upgrade = { container = "app", data_path = "/data", timeout_seconds = 1 }
             vec![pvc("data-demo-0", "pvc-2", "Bound")],
         ];
         let kube = FakeKube::new(
-            vec![
-                vec![pod("pod-1", true)],
-                vec![pod("pod-1", true)],
-                vec![pod("pod-2", true)],
-            ],
+            vec![vec![pod("pod-1", true)], vec![pod("pod-2", true)]],
             pvcs,
         )
         .with_marker("e2e-rollout");

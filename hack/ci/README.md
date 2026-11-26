@@ -15,7 +15,6 @@ locally so failures can be reproduced without pushing.
 | `validate-e2e-contract.sh` | Every Helm app that exposes `e2e` has the standard probe labels, hooks, image, and restricted security context. |
 | `validate-ci-images.sh` | The kind node image, compose images, and rendered upgrade-app images exist in the prefixed registry. Uses `docker buildx imagetools inspect`. |
 | `prepare-ci-images.sh` | Pulls host-side images through the prefixed registry and retags them with their original names for kind and compose. |
-| `prepare-kind-registry-auth.sh` | Writes a plain Docker `config.json` with credentials keyed by every upstream image host for the kind nodes. |
 | `validate-dashboards.py` | Grafana dashboard JSON: datasource references, variable convention, panel IDs, and removed panel types. |
 | `install-tools.sh` | Reads `tools.txt`, downloads each pinned release, verifies its SHA-256, and installs the binary. |
 
@@ -98,7 +97,9 @@ Set `REGISTRY` to override the default registry host.
 - `.github/workflows/lint-ci.yaml` runs actionlint, shellcheck, and zizmor.
 - `.github/workflows/astrarium-e2e.yaml` runs the changed-application e2e
   tests on kind through Astrarium; see [`astrium/README.md`](../../astrium/README.md)
-  and [`hack/e2e/README.md`](../e2e/README.md).
+  and [`hack/e2e/README.md`](../e2e/README.md). The authenticated `run` job and
+  the Renovate container job are skipped for fork pull requests because
+  repository secrets are not exposed there.
 
 The workflows use official `actions/*` and `azure/*` actions, the official
 zizmor action, and the pinned `docker/login-action` used by the image build.

@@ -96,12 +96,14 @@ inspect_image() {
 
 add_upgrade_images() {
   local app="$1"
-  local enabled entry path namespace chart rendered
+  local enabled entry path namespace chart
   local -a args=()
+  local -a baseline_args=()
   local -a files=()
   local -A seen_files=()
   local -A seen_images=()
   local file image
+  local from_file rendered_current rendered_baseline
 
   if ! yq -e ".apps[\"${app}\"] | has(\"upgrade\")" "${CONFIG_FILE}" >/dev/null; then
     printf 'No upgrade image preflight for %s\n' "${app}"
@@ -139,10 +141,26 @@ add_upgrade_images() {
     args+=(-f "${file}")
   done
 
-  rendered="${TEMP_DIR}/${app}.yaml"
+  rendered_current="${TEMP_DIR}/${app}-current.yaml"
   if ! helm template "${app}" "${chart}" --namespace "${namespace}" \
-    --include-crds "${args[@]}" >"${rendered}"; then
+    --include-crds "${args[@]}" >"${rendered_current}"; then
     die "${app} could not be rendered for image validation"
+  fi
+
+  rendered_baseline="${TEMP_DIR}/${app}-baseline.yaml"
+  : >"${rendered_baseline}"
+  baseline_args=("${args[@]}")
+  while IFS= read -r from_file; do
+    [[ -n "${from_file}" ]] || continue
+    [[ -f "${chart}/${from_file}" ]] ||
+      die "${app} is missing upgrade.from_values file ${from_file}"
+    baseline_args+=(-f "${chart}/${from_file}")
+  done < <(yq -r ".apps[\"${app}\"].upgrade.from_values[]?" "${CONFIG_FILE}")
+  if ((${#baseline_args[@]} > ${#args[@]})); then
+    if ! helm template "${app}" "${chart}" --namespace "${namespace}" \
+      --include-crds "${baseline_args[@]}" >"${rendered_baseline}"; then
+      die "${app} baseline could not be rendered for image validation"
+    fi
   fi
 
   while IFS= read -r image; do
@@ -151,7 +169,10 @@ add_upgrade_images() {
     seen_images["${image}"]=1
     inspect_image "$(prefix_image "${image}")"
   done < <(
-    yq -r '.. | select(has("image")) | .image' "${rendered}" |
+    {
+      yq -r '.. | select(has("image")) | .image' "${rendered_current}"
+      yq -r '.. | select(has("image")) | .image' "${rendered_baseline}"
+    } |
       grep -v '^---$' |
       grep -v '^null$' |
       sort -u

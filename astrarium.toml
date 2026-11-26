@@ -94,11 +94,12 @@ host = "auto"
 # image names in charts and manifests stay unchanged. `fallback = false` omits
 # the upstream `server` entry, so a failed mirror never falls back to a direct
 # pull and the proxy credentials are never offered to the upstream registry.
-# ASTRARIUM_REGISTRY_AUTH_FILE points at a plain Docker config.json that is
-# mounted into every node at /var/lib/kubelet/config.json. Its auth entries are
-# keyed by the upstream image hosts (docker.io, ghcr.io, ...), because kubelet
-# selects credentials by the image reference before containerd applies the
-# mirror.
+# Astrarium generates a plain Docker config.json from
+# ASTRARIUM_REGISTRY_USER/ASTRARIUM_REGISTRY_PASSWORD and mounts it at
+# /var/lib/kubelet/config.json. Its auth entries are keyed by the upstream image
+# hosts (docker.io, ghcr.io, ...), because kubelet selects credentials by the
+# image reference before containerd applies the mirror. An explicit
+# ASTRARIUM_REGISTRY_AUTH_FILE overrides generation.
 [[registry.mirrors]]
 upstream = "docker.io"
 endpoint = "https://registry.rwx.im/v2/docker.io"

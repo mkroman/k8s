@@ -298,23 +298,26 @@ diagnostics are collected in parallel, but syncs are not reordered.
 ### Upgrade runs
 
 `astrarium upgrade --app <name>` first deploys the app and its prerequisites
-through the normal Argo CD run path. It then packages the app's Helm chart
-with the same kind values, installs it into a disposable
-`<namespace>-rollout-<run>` namespace, and runs the generic in-cluster test:
+through the normal Argo CD run path. It then packages the app's Helm chart with
+the same kind values plus the `upgrade.from_values` overlay, installs it into a
+disposable `<namespace>-rollout-<run>` namespace, upgrades to the current
+values, and runs the generic in-cluster test:
 
 1. Wait for a Ready pod and assert the restricted security profile.
 2. Snapshot the PVC names, UIDs and bind phases.
 3. Optionally write a marker below `upgrade.data_path` in the configured
    container.
-4. Run `helm upgrade`, delete the release pods so their controllers recreate
-   them, and wait for a Ready pod with a new UID.
+4. Run `helm upgrade` to the current values and wait for the StatefulSet to
+   replace the pod with a new UID.
 5. Check the marker survived and the PVC identity and bind state did not
    change.
 6. Run `helm uninstall`; unless `verify_pvc_retention` is false, the PVCs must
    still exist.
 
-The old `from_values`/`from_revision` fields remain in the manifest for a
-future chart-diff upgrade fixture, but the catalog adapter does not set them.
+`from_values` is required for the generic test: it is merged last for the
+initial deployment so the upgrade exercises a real image or configuration
+change. `from_revision` remains in the manifest shape but is rejected until a
+chart-diff fixture is implemented.
 
 ### Cleanup
 
@@ -395,10 +398,9 @@ raw content.
 
 ## Unresolved questions
 
-- **Deferred:** should the upgrade fixture also support `from_values` (a
-  second values file) or `from_revision` (the previous commit)? The current
-  test exercises pod replacement, data persistence and PVC retention with the
-  same chart; a chart-diff fixture would test the rendered manifest change.
+- **Deferred:** should `from_revision` (extracting the previous chart from Git)
+  replace or complement `from_values`? `from_values` covers the image/config
+  upgrade; a chart-diff fixture would also test manifest changes.
 - **Can be deferred:** should Astrarium register the chart repository as an
   Argo CD repository Secret so the UI shows a name and future authentication has
   a home? The direct URL works today.

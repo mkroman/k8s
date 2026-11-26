@@ -5,11 +5,14 @@
 //! gets a `hosts.toml` file that is bind-mounted into each node from the run's
 //! working directory.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::fs;
 use std::net::IpAddr;
 use std::path::{Path, PathBuf};
+
+use base64::Engine as _;
+use base64::engine::general_purpose::STANDARD;
 
 use crate::manifest::RegistryMirror;
 
@@ -24,6 +27,14 @@ pub const HOST_IP_ENV: &str = "ASTRARIUM_HOST_IP";
 /// Environment variable pointing at a plain Docker config.json whose
 /// credentials are mounted into every node for registry pulls.
 pub const AUTH_FILE_ENV: &str = "ASTRARIUM_REGISTRY_AUTH_FILE";
+
+/// Username for generating the node Docker config when no explicit auth file
+/// is configured.
+pub const AUTH_USER_ENV: &str = "ASTRARIUM_REGISTRY_USER";
+
+/// Password for generating the node Docker config when no explicit auth file
+/// is configured.
+pub const AUTH_PASSWORD_ENV: &str = "ASTRARIUM_REGISTRY_PASSWORD";
 
 /// The path kubelet reads registry credentials from in a kind node.
 const KUBELET_AUTH_FILE: &str = "/var/lib/kubelet/config.json";
@@ -232,9 +243,79 @@ pub fn prepare(
 
     if let Some(value) = env::var_os(AUTH_FILE_ENV).filter(|value| !value.is_empty()) {
         mounts.push(auth_mount(Path::new(&value))?);
+    } else {
+        let user = env::var(AUTH_USER_ENV)
+            .ok()
+            .filter(|value| !value.is_empty());
+        let password = env::var(AUTH_PASSWORD_ENV)
+            .ok()
+            .filter(|value| !value.is_empty());
+        match (user, password) {
+            (Some(user), Some(password)) => {
+                let path = directory.join("auth.json");
+                write_auth_file(&path, mirrors, &user, &password)?;
+                mounts.push(auth_mount(&path)?);
+            }
+            (None, None) => {}
+            _ => {
+                return Err(ClusterError::Registry(format!(
+                    "{AUTH_USER_ENV} and {AUTH_PASSWORD_ENV} must be set together"
+                )));
+            }
+        }
     }
 
     Ok(mounts)
+}
+
+fn auth_hosts(mirrors: &[RegistryMirror]) -> BTreeSet<String> {
+    let mut hosts = BTreeSet::new();
+    for mirror in mirrors {
+        let upstream = mirror.upstream.trim();
+        if !upstream.is_empty() {
+            hosts.insert(upstream.to_owned());
+        }
+        if upstream == "docker.io" {
+            hosts.insert("registry-1.docker.io".to_owned());
+            hosts.insert("index.docker.io".to_owned());
+        }
+        if let Some(host) = endpoint_host(&mirror.endpoint)
+            && !host.contains('{')
+        {
+            hosts.insert(host.to_owned());
+        }
+    }
+    hosts
+}
+
+fn endpoint_host(endpoint: &str) -> Option<&str> {
+    let authority = endpoint.split_once("://")?.1.split('/').next()?;
+    let authority = authority.rsplit('@').next()?;
+    let host = authority.split(':').next()?;
+    (!host.is_empty()).then_some(host)
+}
+
+fn write_auth_file(
+    path: &Path,
+    mirrors: &[RegistryMirror],
+    user: &str,
+    password: &str,
+) -> Result<(), ClusterError> {
+    let encoded = STANDARD.encode(format!("{user}:{password}"));
+    let auths: BTreeMap<String, serde_json::Value> = auth_hosts(mirrors)
+        .into_iter()
+        .map(|host| (host, serde_json::json!({ "auth": encoded.clone() })))
+        .collect();
+    let contents = serde_json::to_vec_pretty(&serde_json::json!({ "auths": auths }))
+        .map_err(|source| ClusterError::Registry(source.to_string()))?;
+    fs::write(path, contents).map_err(|source| ClusterError::io(path, source))?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt as _;
+        let permissions = fs::Permissions::from_mode(0o600);
+        fs::set_permissions(path, permissions).map_err(|source| ClusterError::io(path, source))?;
+    }
+    Ok(())
 }
 
 fn auth_mount(path: &Path) -> Result<MirrorMount, ClusterError> {
@@ -457,6 +538,46 @@ eth0\t00000000\t00000000\t0001\t0\t0\t0\t00000000\t0\t0\t0
             .expect("docker hosts.toml");
         assert!(!docker.contains("server ="));
         assert!(docker.contains("override_path = true"));
+    }
+
+    #[test]
+    fn generated_auth_file_uses_upstream_hosts() {
+        let directory = tempfile::tempdir().expect("tempdir");
+        let path = directory.path().join("auth.json");
+        let mirrors = [
+            RegistryMirror {
+                upstream: "docker.io".to_owned(),
+                endpoint: "https://registry.example.com/v2/docker.io".to_owned(),
+                override_path: true,
+                fallback: false,
+            },
+            RegistryMirror {
+                upstream: "ghcr.io".to_owned(),
+                endpoint: "https://registry.example.com/v2/ghcr.io".to_owned(),
+                override_path: true,
+                fallback: false,
+            },
+        ];
+
+        write_auth_file(&path, &mirrors, "user", "password").expect("auth file");
+        let contents: serde_json::Value =
+            serde_json::from_slice(&fs::read(&path).expect("read")).expect("json");
+        let auths = contents["auths"].as_object().expect("auths");
+        for host in [
+            "docker.io",
+            "registry-1.docker.io",
+            "index.docker.io",
+            "ghcr.io",
+            "registry.example.com",
+        ] {
+            assert!(auths.contains_key(host), "missing {host}");
+        }
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt as _;
+            let mode = fs::metadata(&path).expect("metadata").permissions().mode();
+            assert_eq!(mode & 0o777, 0o600);
+        }
     }
 
     #[test]

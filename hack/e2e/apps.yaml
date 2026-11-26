@@ -42,10 +42,11 @@
 # `defaults.upgrade` centralises the generic upgrade test settings.
 #
 # upgrade opts an app into the generic in-cluster upgrade test.
-# `astrarium upgrade` installs the same chart into `<namespace>-rollout` with
-# the same kind values, verifies the rollout, and checks PVC retention.
-# `data_path` is optional and is used for a write/read marker inside a mounted
-# data volume.
+# `astrarium upgrade` installs the chart with `from_values` (a pinned previous
+# image or configuration) into `<namespace>-rollout-<run>`, then upgrades to
+# the current values and checks pod replacement, marker persistence, and PVC
+# retention. `from_values` is required; `data_path` is optional and is used for
+# a write/read marker inside a mounted data volume.
 helm_repositories:
   - name: quickwit
     url: https://helm.quickwit.io
@@ -177,6 +178,8 @@ apps:
     timeout_seconds: 900
     upgrade:
       enabled: true
+      from_values:
+        - values-upgrade-from.yaml
       container: stalwart
       data_path: /var/lib/stalwart
     resources:

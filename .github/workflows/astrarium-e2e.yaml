@@ -186,7 +186,12 @@ jobs:
   run:
     name: App ${{ matrix.app }}
     needs: [changes, build, plan]
-    if: needs.plan.outputs.has_apps == 'true'
+    # Repository secrets are not available to fork pull requests. Run this
+    # authenticated job only for branches in this repository.
+    if: >-
+      needs.plan.outputs.has_apps == 'true' &&
+      (github.event_name != 'pull_request' ||
+       github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     permissions:
@@ -256,11 +261,6 @@ jobs:
       run: ./hack/ci/validate-ci-images.sh "${APP}"
     - name: Prepare CI images
       run: ./hack/ci/prepare-ci-images.sh
-    - name: Prepare kind registry credentials
-      env:
-        REGISTRY_USER: ${{ secrets.REGISTRY_USER }}
-        REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
-      run: ./hack/ci/prepare-kind-registry-auth.sh
     - name: Start local services
       # Each matrix job has its own runner, so the fixed compose ports do not
       # collide across apps.
@@ -290,7 +290,8 @@ jobs:
       timeout-minutes: 20
       env:
         APP: ${{ matrix.app }}
-        ASTRARIUM_REGISTRY_AUTH_FILE: ${{ github.workspace }}/.astrium/registry-auth.json
+        ASTRARIUM_REGISTRY_USER: ${{ secrets.REGISTRY_USER }}
+        ASTRARIUM_REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
       run: |
         set -euo pipefail
         astrarium run --app "${APP}" --fast-fail --keep-cluster \

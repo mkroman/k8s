@@ -30,9 +30,10 @@ Manual chaos testing of the `stalwart` chart found:
 - Rotating an external recovery-admin Secret does not restart the pod, so the
   running process keeps the old value.
 
-The existing `astrarium upgrade` test covers install, a single upgrade, pod
-replacement, a data marker, and PVC retention. It does not cover timing,
-failure recovery, or Secret rotation.
+The existing `astrarium upgrade` test covers install from a pinned previous
+image (`upgrade.from_values`), the real image upgrade, pod replacement, a data
+marker, and PVC retention. It does not cover timing, failure recovery, or
+Secret rotation.
 
 ## Scenarios
 

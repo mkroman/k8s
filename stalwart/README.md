@@ -232,9 +232,11 @@ against the registry proxy. The e2e run then deploys cert-manager and
 Prometheus Operator as prerequisites, issues a self-signed Certificate, applies
 the ServiceMonitor and PrometheusRule, and runs the PostSync probe (admin readiness, SMTP banner, SMTPS/IMAPS TCP,
 HTTPS TCP reachability). The upgrade command then runs the generic in-cluster
-upgrade test because `apps.yaml` sets `upgrade.enabled: true`; it writes a
-marker under `/var/lib/stalwart`, upgrades the chart, verifies pod replacement
-and marker survival, and checks PVC retention after uninstall.
+upgrade test because `apps.yaml` sets `upgrade.enabled: true`. It installs
+`values-upgrade-from.yaml` (`v1.1.0`), writes a marker under
+`/var/lib/stalwart`, upgrades to the current `v1.1.1` image, verifies that the
+StatefulSet replaced the pod, checks marker survival, and checks PVC retention
+after uninstall.
 
 Static checks:
 

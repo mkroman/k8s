@@ -39,29 +39,28 @@ astrium/target/release/astrarium upgrade --app stalwart
 ```
 
 Astrarium pulls workload images through the path-prefixed registry proxy
-configured in `astrarium.toml`. For local runs, create a plain Docker config
-and point `ASTRARIUM_REGISTRY_AUTH_FILE` at it:
+configured in `astrarium.toml`. For local runs, set the credentials; Astrarium
+generates a plain Docker config with the upstream host names and mounts it
+read-only at `/var/lib/kubelet/config.json` on every kind node:
 
 ```bash
-export REGISTRY_USER=...
-export REGISTRY_PASSWORD=...
-./hack/ci/prepare-kind-registry-auth.sh
-export ASTRARIUM_REGISTRY_AUTH_FILE="${PWD}/.astrium/registry-auth.json"
+export ASTRARIUM_REGISTRY_USER=...
+export ASTRARIUM_REGISTRY_PASSWORD=...
 ```
 
-The file is mounted read-only at `/var/lib/kubelet/config.json` on every kind
-node. The e2e workflow creates the same file from the `REGISTRY_USER` and
-`REGISTRY_PASSWORD` repository secrets. Host-side pulls (`kindest/node`,
-Jaeger) are pre-pulled through the proxy and retagged by
-`hack/ci/prepare-ci-images.sh`.
+`ASTRARIUM_REGISTRY_AUTH_FILE` can point at an existing plain Docker config
+instead. The e2e workflow supplies the `REGISTRY_USER` and `REGISTRY_PASSWORD`
+repository secrets. Host-side pulls (`kindest/node`, Jaeger) are pre-pulled
+through the proxy and retagged by `hack/ci/prepare-ci-images.sh`.
 
 `astrarium doctor` checks `helm`, `kustomize`, `kind` and the manifest paths.
 `plan` selects apps from a Git diff (M3) or explicitly with `--all`/`--app`.
 `run` creates a kind cluster, installs Argo CD, and deploys the selected apps.
 `upgrade` first deploys the app and its prerequisites through the same path,
-then installs the chart into a disposable `<namespace>-rollout-<run>` namespace,
-upgrades and restarts it, and verifies pod replacement, a data marker and PVC
-retention. With `--reuse-cluster --no-deploy` it tests an app that is already
+then installs the chart with `upgrade.from_values` (a pinned previous image or
+configuration) into a disposable `<namespace>-rollout-<run>` namespace. It
+upgrades to the current chart values, waits for the StatefulSet to replace the
+pod, and verifies the data marker and PVC retention. With `--reuse-cluster --no-deploy` it tests an app that is already
 running, which is how the e2e workflow exercises it after `run` has kept the
 cluster.
 

@@ -603,7 +603,7 @@ fn upgrade_spec(
     };
     Ok(UpgradeSpec {
         enabled: upgrade.enabled,
-        from_values: Vec::new(),
+        from_values: upgrade.from_values.clone(),
         from_revision: None,
         container: upgrade.container.clone(),
         data_path: upgrade.data_path.clone(),
@@ -868,6 +868,8 @@ struct CatalogUpgrade {
     #[serde(default = "default_true")]
     enabled: bool,
     #[serde(default)]
+    from_values: Vec<PathBuf>,
+    #[serde(default)]
     container: Option<String>,
     #[serde(default, alias = "dataPath")]
     data_path: Option<String>,
@@ -1042,6 +1044,10 @@ mirrors = []
             .expect("stalwart upgrade test");
         assert!(upgrade.enabled);
         assert_eq!(upgrade.container.as_deref(), Some("stalwart"));
+        assert_eq!(
+            upgrade.from_values,
+            vec![PathBuf::from("values-upgrade-from.yaml")]
+        );
         assert_eq!(upgrade.data_path.as_deref(), Some("/var/lib/stalwart"));
         assert_eq!(upgrade.timeout_seconds, 600);
         assert_eq!(upgrade.security_profile, UpgradeSecurityProfile::Restricted);
@@ -1311,6 +1317,7 @@ apps:
     fn upgrade_defaults_fill_missing_app_values() {
         let upgrade = CatalogUpgrade {
             enabled: true,
+            from_values: Vec::new(),
             container: Some("app".to_owned()),
             data_path: Some("/data".to_owned()),
             timeout_seconds: None,
@@ -1333,6 +1340,7 @@ apps:
     fn unknown_upgrade_security_profile_is_rejected() {
         let upgrade = CatalogUpgrade {
             enabled: true,
+            from_values: Vec::new(),
             container: None,
             data_path: None,
             timeout_seconds: None,
