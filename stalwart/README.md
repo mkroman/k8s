@@ -189,10 +189,10 @@ Production uses the PostgreSQL data store; `values-prod.yaml` disables the
 local data PVC. Stalwart creates its tables in `stalwart_prod` on first start.
 Use the CloudNativePG backup and restore workflow for the `postgres` cluster.
 
-The kind e2e suite keeps the embedded RocksDB store at `/var/lib/stalwart`.
-The StatefulSet uses `persistentVolumeClaimRetentionPolicy: Retain` for both
-deletion and scale-down, and `helm uninstall` leaves the PVC behind. RocksDB
-has no online backup; use one of:
+In the kind e2e suite, the StatefulSet keeps the embedded RocksDB store at
+`/var/lib/stalwart`, uses `persistentVolumeClaimRetentionPolicy: Retain` for
+both deletion and scale-down, and `helm uninstall` leaves the PVC behind.
+RocksDB has no online backup; use one of:
 
 - a Longhorn volume snapshot of the whole data directory, or
 - stop the pod and use the official offline export:
