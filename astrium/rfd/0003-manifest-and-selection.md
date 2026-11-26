@@ -1,7 +1,7 @@
 ---
 authors: ["Astrarium maintainers <maintainers@astrarium.invalid>"]
-state: prediscussion
-discussion: ""
+state: published
+discussion: "https://github.com/mkroman/k8s/pull/435"
 labels: [software, manifest]
 ---
 
