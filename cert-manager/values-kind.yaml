@@ -1,7 +1,12 @@
 # Ephemeral kind clusters do not have the production sealed-secrets key.
-# The controller, CRDs and ClusterIssuers are still fully exercised.
+# The controller, CRDs, HTTP-01 and staging ClusterIssuers are still
+# exercised; the Cloudflare DNS-01 issuer is production-only.
 sealedSecret:
   enabled: false
+
+clusterIssuer:
+  letsEncryptProductionDns:
+    enabled: false
 
 cert-manager:
   # Prometheus Operator depends on cert-manager, so its CRDs do not exist when
