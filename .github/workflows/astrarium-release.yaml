@@ -1,0 +1,209 @@
+name: Astrarium release
+
+on:
+  push:
+    tags:
+    - "astrarium-v*"
+
+permissions:
+  contents: write
+
+# Build provenance attestation is deliberately left out of the first release.
+# Add actions/attest-build-provenance with a job-scoped `id-token: write` once
+# signing is required; do not broaden this workflow's default permissions.
+
+concurrency:
+  group: astrarium-release
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_VERSION: "1.100.0"
+
+jobs:
+  verify:
+    name: Verify tag
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+    - name: Checkout
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+        fetch-depth: 1
+    - name: Check tag against workspace version
+      id: version
+      env:
+        TAG: ${{ github.ref_name }}
+      run: |
+        set -euo pipefail
+        if [[ "${TAG}" != astrarium-v* ]]; then
+          echo "::error::unexpected tag ${TAG}; expected astrarium-v<version>"
+          exit 1
+        fi
+        version="${TAG#astrarium-v}"
+        manifest_version="$(
+          cargo metadata --no-deps --format-version 1 \
+            --manifest-path astrium/Cargo.toml |
+            jq -r '.packages[] | select(.name == "astrarium") | .version'
+        )"
+        if [[ -z "${manifest_version}" || "${version}" != "${manifest_version}" ]]; then
+          echo "::error::tag ${TAG} does not match the astrarium workspace version ${manifest_version:-<unknown>}"
+          exit 1
+        fi
+        echo "version=${version}" >>"${GITHUB_OUTPUT}"
+        echo "Tag ${TAG} matches Astrarium ${version}."
+
+  build:
+    name: Build ${{ matrix.target }}
+    needs: verify
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - target: x86_64-unknown-linux-gnu
+          runner: ubuntu-24.04
+        # ubuntu-24.04-arm is available for public repositories. Drop this
+        # entry (or self-host the runner) if the repository ever moves to a
+        # private plan without arm64 runners.
+        - target: aarch64-unknown-linux-gnu
+          runner: ubuntu-24.04-arm
+    env:
+      VERSION: ${{ needs.verify.outputs.version }}
+      TARGET: ${{ matrix.target }}
+    steps:
+    - name: Checkout
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+        fetch-depth: 1
+    - name: Install Rust
+      run: |
+        set -euo pipefail
+        if ! rustup toolchain list | grep -q "^${RUST_VERSION}"; then
+          rustup toolchain install "${RUST_VERSION}" \
+            --component clippy,rustfmt --profile minimal
+        fi
+        rustup component add --toolchain "${RUST_VERSION}" clippy rustfmt
+        rustup default "${RUST_VERSION}"
+        rustc --version
+    - name: Build release binary
+      timeout-minutes: 25
+      run: |
+        set -euo pipefail
+        cargo build --locked --release \
+          --manifest-path astrium/Cargo.toml \
+          --target "${TARGET}"
+    - name: Package release
+      run: |
+        set -euo pipefail
+        binary="astrium/target/${TARGET}/release/astrarium"
+        package="astrarium-${VERSION}-${TARGET}"
+        staging="dist/${package}"
+        mkdir -p "${staging}/completions"
+        install -m 0755 "${binary}" "${staging}/astrarium"
+        cp astrium/README.md "${staging}/README.md"
+        for license in LICENSE-MIT LICENSE-APACHE; do
+          if [[ -f "${license}" ]]; then
+            cp "${license}" "${staging}/${license}"
+          elif [[ -f "astrium/${license}" ]]; then
+            cp "astrium/${license}" "${staging}/${license}"
+          fi
+        done
+        for shell in bash zsh fish; do
+          "${binary}" completions "${shell}" >"${staging}/completions/astrarium.${shell}"
+        done
+        tar -C dist -czf "dist/${package}.tar.gz" "${package}"
+        ls -lh "dist/${package}.tar.gz"
+    - name: Upload package
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: astrarium-${{ matrix.target }}
+        path: dist/*.tar.gz
+        if-no-files-found: error
+        retention-days: 1
+
+  release:
+    name: Publish release
+    needs: [verify, build]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      TAG: ${{ github.ref_name }}
+      VERSION: ${{ needs.verify.outputs.version }}
+    steps:
+    - name: Download packages
+      uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+      with:
+        pattern: astrarium-*
+        path: dist
+        merge-multiple: true
+    - name: Generate checksums
+      run: |
+        set -euo pipefail
+        cd dist
+        sha256sum -- *.tar.gz >SHA256SUMS
+        cat SHA256SUMS
+    - name: Write release notes
+      run: |
+        set -euo pipefail
+        cat >release-notes.md <<EOF
+        ## Astrarium ${VERSION}
+
+        Clockwork test orchestration for Kubernetes GitOps.
+
+        Each archive contains the \`astrarium\` binary, the README, and bash, zsh
+        and fish completions. Verify downloads with \`sha256sum -c SHA256SUMS\`,
+        then run \`./astrarium --version\`.
+
+        See \`README.md\` in the archive for usage.
+        EOF
+    - name: Create draft release
+      run: |
+        set -euo pipefail
+        if gh release view "${TAG}" >/dev/null 2>&1; then
+          echo "::error::release ${TAG} already exists; refusing to overwrite its assets"
+          exit 1
+        fi
+        gh release create "${TAG}" \
+          --verify-tag \
+          --draft \
+          --title "Astrarium ${VERSION}" \
+          --notes-file release-notes.md
+    - name: Upload assets
+      run: |
+        set -euo pipefail
+        gh release upload "${TAG}" dist/*.tar.gz dist/SHA256SUMS --clobber=false
+    - name: Publish release
+      run: |
+        set -euo pipefail
+        gh release edit "${TAG}" --draft=false
+    - name: Write summary
+      if: always()
+      env:
+        JOB_STATUS: ${{ job.status }}
+      run: |
+        set -euo pipefail
+        {
+          echo "## Astrarium release ${VERSION}"
+          echo
+          echo "Tag: \`${TAG}\`"
+          echo
+          echo "Result: **${JOB_STATUS}**."
+        } >>"${GITHUB_STEP_SUMMARY}"

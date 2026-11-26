@@ -1,0 +1,101 @@
+# Astrarium suite for this repository.
+#
+# This suite opts into the read-only YAML catalogue adapter instead of
+# duplicating the production app-of-apps definitions in TOML. `apps` points at
+# the production catalogue and `e2e` at the e2e subset:
+#   - only applications listed in `hack/e2e/apps.yaml` are included;
+#   - projects come from `apps/values.yaml`, reduced to the referenced ones;
+#   - namespaces are derived from application and project destinations, using
+#     the production labels when declared and empty specs for cluster-created
+#     namespaces such as kube-system and cnpg-system.
+#
+# The adapter is read-only and does not use the production `apps` chart for
+# deployment. Native `[[projects]]`, `[[namespaces]]`, `[[apps]]` and
+# `[[helm_repositories]]` tables remain supported for other repositories; a
+# single manifest must use one mode or the other.
+#
+# Conversion notes:
+#   - a production `syncPolicy` maps automated/prune/selfHeal/syncOptions; the
+#     e2e `retry_limit` override wins, otherwise the default is 20 attempts
+#     with a 5s backoff and a 5m maximum;
+#   - Helm apps append `values-kind.yaml` after the production value files;
+#   - an `overlays/kind` source also watches the production path;
+#   - `probe` stays false because the adapter does not inspect PostSync hooks;
+#     the run orchestrator does not use that field.
+#
+# RFDs: astrium/rfd/
+# Usage: astrarium plan
+#        astrarium plan --all
+#        astrarium run --app mosquitto
+
+[project]
+name = "k8s-home-lab"
+root = "."
+base_branch = "main"
+# A change to any of these paths selects every app. The manifest itself, the
+# kind configuration and the Argo CD install directory are also treated as
+# shared automatically.
+shared_paths = [
+  "astrarium.toml",
+  "apps/values.yaml",
+  "hack/e2e/apps.yaml",
+  "hack/e2e/kind.yaml",
+  "hack/e2e/argocd",
+  "astrium",
+  "astrium/compose.yaml",
+]
+
+[catalog]
+apps = "apps/values.yaml"
+e2e = "hack/e2e/apps.yaml"
+
+[cluster]
+provider = "kind"
+name = "astrarium"
+kind_config = "hack/e2e/kind.yaml"
+kubeconfig = ".astrium/kubeconfig"
+
+[argocd]
+install = "hack/e2e/argocd"
+namespace = "argocd"
+project = "astrarium"
+repo_name = "astrarium"
+server = "https://kubernetes.default.svc"
+
+[render]
+helm = "helm"
+kustomize = "kustomize"
+kind = "kind"
+namespace = "default"
+timeout = "10m"
+dry_run = true
+
+[telemetry]
+enabled = true
+otlp_endpoint = "http://localhost:4317"
+service_name = "astrarium"
+environment = "kind"
+
+[registry]
+enabled = true
+host = "auto"
+
+[[registry.mirrors]]
+upstream = "docker.io"
+endpoint = "http://{host}:5000"
+
+[[registry.mirrors]]
+upstream = "quay.io"
+endpoint = "http://{host}:5001"
+
+[[registry.mirrors]]
+upstream = "ghcr.io"
+endpoint = "http://{host}:5002"
+
+[[registry.mirrors]]
+upstream = "registry.k8s.io"
+endpoint = "http://{host}:5003"
+
+# The catalog adapter also imports the Helm repositories from
+# `hack/e2e/apps.yaml`. Only repository checks need them; Argo CD resolves its
+# own chart sources.

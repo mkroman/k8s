@@ -1,0 +1,41 @@
+[package]
+name = "astrarium"
+description.workspace = true
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+[[bin]]
+name = "astrarium"
+path = "src/main.rs"
+
+[dependencies]
+astrarium-core.workspace = true
+clap.workspace = true
+clap_complete.workspace = true
+miette.workspace = true
+rustls.workspace = true
+schemars.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+which.workspace = true
+
+[dev-dependencies]
+assert_cmd.workspace = true
+astrarium-test-support.workspace = true
+gix.workspace = true
+insta.workspace = true
+predicates.workspace = true
+serial_test.workspace = true
+tempfile.workspace = true
+
+[lints]
+workspace = true

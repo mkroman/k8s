@@ -1,0 +1,52 @@
+[package]
+name = "astrarium-core"
+description.workspace = true
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+[features]
+# Compiles the reusable fakes in `testing` for external test crates.
+# `astrarium-test-support` enables this feature.
+testing = []
+
+[dependencies]
+axum.workspace = true
+bollard.workspace = true
+futures.workspace = true
+gix.workspace = true
+http.workspace = true
+jiff.workspace = true
+k8s-openapi.workspace = true
+kube.workspace = true
+local-ip-address.workspace = true
+opentelemetry.workspace = true
+opentelemetry-otlp.workspace = true
+opentelemetry_sdk.workspace = true
+reqwest.workspace = true
+schemars.workspace = true
+semver.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+tempfile.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+toml.workspace = true
+tracing.workspace = true
+tracing-opentelemetry.workspace = true
+tracing-subscriber.workspace = true
+yaml_serde.workspace = true
+
+[dev-dependencies]
+insta.workspace = true
+
+[lints]
+workspace = true
