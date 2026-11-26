@@ -13,7 +13,7 @@ name: astrarium
 
 services:
   jaeger:
-    image: jaegertracing/jaeger:2.23.0
+    image: jaegertracing/jaeger:2.23.0@sha256:3823829974ccfc2485d2e48b165579091f32295022ae80ca49704e2f4834116e
     restart: unless-stopped
     ports:
     - "16686:16686"
