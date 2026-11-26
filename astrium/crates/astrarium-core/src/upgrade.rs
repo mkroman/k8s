@@ -267,6 +267,32 @@ async fn perform_upgrade(
     let timeout = Duration::from_secs(upgrade.timeout_seconds.max(1));
     let selector = format!("app.kubernetes.io/instance={release}");
 
+    // Start from a clean rollout namespace. A previous failed attempt may
+    // still own the Helm release name, and leftover PVCs would invalidate the
+    // retention check.
+    if helm(
+        runner.as_ref(),
+        manifest,
+        kubeconfig,
+        timeout,
+        [
+            "uninstall",
+            &release,
+            "--namespace",
+            &namespace,
+            "--wait",
+            "--timeout",
+            &format!("{}s", timeout.as_secs()),
+        ]
+        .map(str::to_owned),
+    )
+    .await
+    .is_err()
+    {
+        info!(release = %release, namespace = %namespace, "no previous rollout release to remove");
+    }
+    delete_namespace(kube, &namespace, timeout, clock).await?;
+
     let work = tempfile::Builder::new()
         .prefix("astrarium-upgrade-")
         .tempdir()

@@ -1308,6 +1308,47 @@ apps:
     }
 
     #[test]
+    fn upgrade_defaults_fill_missing_app_values() {
+        let upgrade = CatalogUpgrade {
+            enabled: true,
+            container: Some("app".to_owned()),
+            data_path: Some("/data".to_owned()),
+            timeout_seconds: None,
+            security_profile: None,
+            verify_pvc_retention: None,
+        };
+        let defaults = CatalogUpgradeDefaults {
+            timeout_seconds: Some(42),
+            security_profile: Some("none".to_owned()),
+            verify_pvc_retention: Some(false),
+        };
+
+        let spec = upgrade_spec("demo", &upgrade, &defaults).expect("upgrade spec");
+        assert_eq!(spec.timeout_seconds, 42);
+        assert_eq!(spec.security_profile, UpgradeSecurityProfile::None);
+        assert!(!spec.verify_pvc_retention);
+    }
+
+    #[test]
+    fn unknown_upgrade_security_profile_is_rejected() {
+        let upgrade = CatalogUpgrade {
+            enabled: true,
+            container: None,
+            data_path: None,
+            timeout_seconds: None,
+            security_profile: Some("permissive".to_owned()),
+            verify_pvc_retention: None,
+        };
+        let error = upgrade_spec("demo", &upgrade, &CatalogUpgradeDefaults::default())
+            .expect_err("unknown profile");
+        assert!(
+            matches!(error, CatalogError::InvalidUpgradeProfile { ref app, ref value }
+                if app == "demo" && value == "permissive"),
+            "{error:?}"
+        );
+    }
+
+    #[test]
     fn missing_e2e_prerequisite_is_reported() {
         let directory = tempfile::tempdir().expect("tempdir");
         write_catalogs(

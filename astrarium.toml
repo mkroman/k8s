@@ -18,7 +18,8 @@
 #   - a production `syncPolicy` maps automated/prune/selfHeal/syncOptions; the
 #     e2e `retry_limit` override wins, otherwise the default is 20 attempts
 #     with a 5s backoff and a 5m maximum;
-#   - Helm apps append `values-kind.yaml` after the production value files;
+#   - Helm apps merge `[catalog].common_values` and append `values-kind.yaml`
+#     after the production value files;
 #   - an `overlays/kind` source also watches the production path;
 #   - `probe` stays false because the adapter does not inspect PostSync hooks;
 #     the run orchestrator does not use that field.
