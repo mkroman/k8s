@@ -14,6 +14,9 @@
 #       password: <metrics password>
 #   - A Secret named `stalwart-postgres` containing the complete Stalwart
 #     `config.json`; see below and the chart README.
+#   - A Secret named `stalwart-cli` with a permanent administrator's
+#     STALWART_USER and STALWART_PASSWORD (or STALWART_TOKEN) for the
+#     certificate reload CronJob.
 #   - The `letsencrypt-production` ClusterIssuer. It uses HTTP-01 through
 #     Traefik, so mail.rwx.im needs a DNS-01 issuer (create one and override
 #     certificate.issuerRef) or an existing wildcard certificate.
@@ -81,7 +84,9 @@ certificate:
     group: cert-manager.io
   reload:
     enabled: true
-    credentialsSecret: stalwart-recovery-admin
+    # A permanent administrator, not the recovery credential. The recovery
+    # administrator Secret is removed after the first install.
+    credentialsSecret: stalwart-cli
 
 metrics:
   exporter:
