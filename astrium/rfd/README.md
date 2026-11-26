@@ -138,7 +138,7 @@ the decision rather than the document.
 | [0005](0005-cluster-registry-telemetry.md) | Cluster, registry, and telemetry | published | Bootstraps kind, the path-prefixed registry proxy, Argo CD, and OTLP traces with bounded diagnostics. |
 | [0006](0006-ci-release-and-caching.md) | CI, release, and caching | published | Defines GitHub Actions, release tags and binaries, and how e2e jobs obtain Astrarium. |
 | [0007](0007-testing-and-structure.md) | Testing and structure | published | Fixes the workspace, module, error, async, and testing rules and the migration away from `hack/e2e`. |
-| [0008](0008-chaos-testing.md) | Chaos testing for stateful upgrades | prediscussion | Plans a repeatable outage, failure-recovery, and Secret-rotation suite for stateful upgrade paths. |
+| [0008](0008-chaos-testing.md) | Chaos testing for stateful upgrades | ideation | Plans a repeatable outage, failure-recovery, and Secret-rotation suite for stateful upgrade paths. |
 
 ## Conventions
 

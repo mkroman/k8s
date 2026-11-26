@@ -194,7 +194,12 @@ pub fn prepare(
             )));
         }
         let endpoint = mirror.endpoint.replace("{host}", host);
-        let contents = hosts_toml(&upstream_server(upstream), &endpoint, mirror.override_path);
+        let contents = hosts_toml(
+            &upstream_server(upstream),
+            &endpoint,
+            mirror.override_path,
+            mirror.fallback,
+        );
 
         let directories: Vec<&str> = if upstream == "docker.io" {
             vec!["docker.io", "registry-1.docker.io"]
@@ -275,14 +280,19 @@ fn upstream_server(upstream: &str) -> String {
     }
 }
 
-fn hosts_toml(server: &str, endpoint: &str, override_path: bool) -> String {
+fn hosts_toml(server: &str, endpoint: &str, override_path: bool, fallback: bool) -> String {
+    let server_line = if fallback {
+        format!("server = \"{server}\"\n\n")
+    } else {
+        String::new()
+    };
     let override_line = if override_path {
         "\n  override_path = true"
     } else {
         ""
     };
     format!(
-        "server = \"{server}\"\n\n[host.\"{endpoint}\"]\n  capabilities = [\"pull\", \"resolve\"]{override_line}\n"
+        "{server_line}[host.\"{endpoint}\"]\n  capabilities = [\"pull\", \"resolve\"]{override_line}\n"
     )
 }
 
@@ -295,6 +305,7 @@ mod tests {
             upstream: upstream.to_owned(),
             endpoint: endpoint.to_owned(),
             override_path: false,
+            fallback: true,
         }
     }
 
@@ -416,6 +427,7 @@ eth0\t00000000\t00000000\t0001\t0\t0\t0\t00000000\t0\t0\t0
                 upstream: "docker.io".to_owned(),
                 endpoint: "https://registry.example.com/v2/docker.io".to_owned(),
                 override_path: true,
+                fallback: true,
             }],
         )
         .expect("registry prepared");
@@ -423,6 +435,27 @@ eth0\t00000000\t00000000\t0001\t0\t0\t0\t00000000\t0\t0\t0
         let docker = fs::read_to_string(directory.path().join("registry/docker.io/hosts.toml"))
             .expect("docker hosts.toml");
         assert!(docker.contains("[host.\"https://registry.example.com/v2/docker.io\"]"));
+        assert!(docker.contains("override_path = true"));
+    }
+
+    #[test]
+    fn disabling_fallback_omits_the_upstream_server() {
+        let directory = tempfile::tempdir().expect("tempdir");
+        prepare(
+            directory.path(),
+            "192.0.2.10",
+            &[RegistryMirror {
+                upstream: "docker.io".to_owned(),
+                endpoint: "https://registry.example.com/v2/docker.io".to_owned(),
+                override_path: true,
+                fallback: false,
+            }],
+        )
+        .expect("registry prepared");
+
+        let docker = fs::read_to_string(directory.path().join("registry/docker.io/hosts.toml"))
+            .expect("docker hosts.toml");
+        assert!(!docker.contains("server ="));
         assert!(docker.contains("override_path = true"));
     }
 

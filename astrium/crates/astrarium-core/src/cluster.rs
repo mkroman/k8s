@@ -715,11 +715,13 @@ mod tests {
                     upstream: "docker.io".to_owned(),
                     endpoint: "http://{host}:5000".to_owned(),
                     override_path: false,
+                    fallback: true,
                 },
                 RegistryMirror {
                     upstream: "ghcr.io".to_owned(),
                     endpoint: "http://{host}:5002".to_owned(),
                     override_path: false,
+                    fallback: true,
                 },
             ],
             work_dir: work_dir.join("work"),

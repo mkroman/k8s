@@ -135,12 +135,14 @@ endpoint:
 
 ```toml
 # <state>/certs.d/docker.io/hosts.toml
-server = "https://registry-1.docker.io"
-
 [host."https://registry.rwx.im/v2/docker.io"]
   capabilities = ["pull", "resolve"]
   override_path = true
 ```
+
+The generated file deliberately omits `server`: upstream fallback is disabled
+with `fallback = false`, so a failed mirror cannot silently pull directly from
+Docker Hub or send the proxy credentials to the upstream registry.
 
 The same pattern covers `ghcr.io`, `quay.io`, `registry.k8s.io`, `gcr.io`,
 `mirror.gcr.io`, and `public.ecr.aws`. Image names in charts and manifests stay
@@ -150,8 +152,13 @@ Registry credentials use kind's recommended node-level mechanism. A plain
 Docker `config.json` is named by `ASTRARIUM_REGISTRY_AUTH_FILE`; Astrarium adds
 an `extraMount` to every node at `/var/lib/kubelet/config.json`. The file must
 contain base64-encoded credentials in `auths`; credential helpers are not
-available inside a node. CI writes it from the `REGISTRY_USER` and
-`REGISTRY_PASSWORD` repository secrets.
+available inside a node. Its keys must be the upstream image hosts
+(`docker.io`, `registry-1.docker.io`, `index.docker.io`, `ghcr.io`, `quay.io`,
+`registry.k8s.io`, `gcr.io`, `mirror.gcr.io`, `public.ecr.aws`), because kubelet
+selects credentials by the image reference before containerd applies the
+mirror. `hack/ci/prepare-kind-registry-auth.sh` derives them from
+`astrarium.toml`; CI supplies the `REGISTRY_USER` and `REGISTRY_PASSWORD`
+repository secrets.
 
 **Host-side images bypass the node mirrors.** kind pulls `kindest/node` with
 the host Docker daemon before any node exists. The e2e workflow pulls the

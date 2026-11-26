@@ -103,7 +103,11 @@ add_upgrade_images() {
   local -A seen_images=()
   local file image
 
-  enabled="$(yq -r ".apps[\"${app}\"].upgrade.enabled // false" "${CONFIG_FILE}")"
+  if ! yq -e ".apps[\"${app}\"] | has(\"upgrade\")" "${CONFIG_FILE}" >/dev/null; then
+    printf 'No upgrade image preflight for %s\n' "${app}"
+    return 0
+  fi
+  enabled="$(yq -r ".apps[\"${app}\"].upgrade.enabled // true" "${CONFIG_FILE}")"
   if [[ "${enabled}" != "true" ]]; then
     printf 'No upgrade image preflight for %s\n' "${app}"
     return 0

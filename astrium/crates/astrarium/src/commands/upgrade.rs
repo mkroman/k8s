@@ -20,10 +20,10 @@ pub async fn run(manifest: Option<&Manifest>, args: &UpgradeArgs) -> Result<()> 
     let manifest =
         manifest.ok_or_else(|| miette::miette!("a manifest is required for `upgrade`"))?;
     let app = AppName::new(args.app.clone()).into_diagnostic()?;
-    match manifest
-        .app(app.as_str())
-        .and_then(|app| app.upgrade.as_ref())
-    {
+    let Some(app_spec) = manifest.app(app.as_str()) else {
+        return Err(miette::miette!("app {app} is not declared in the manifest"));
+    };
+    match app_spec.upgrade.as_ref() {
         None => {
             println!("App {app} has no upgrade test enabled; nothing to do.");
             return Ok(());

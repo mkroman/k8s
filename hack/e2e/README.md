@@ -24,9 +24,13 @@ and manifest image names stay unchanged.
 
 Registry credentials come from a plain Docker `config.json` named by
 `ASTRARIUM_REGISTRY_AUTH_FILE`; Astrarium mounts it at
-`/var/lib/kubelet/config.json` on every node. Host-side images are pulled
-through the same registry and retagged before kind starts. In CI the
-`REGISTRY_USER` and `REGISTRY_PASSWORD` repository secrets provide both.
+`/var/lib/kubelet/config.json` on every node. Create it with
+`hack/ci/prepare-kind-registry-auth.sh`, which keys `auths` by every upstream
+image host because kubelet chooses credentials before containerd applies the
+mirror. Mirrors use `fallback = false` so a failed mirror never falls back to
+the upstream. Host-side images are pulled through the same registry and
+retagged before kind starts. In CI the `REGISTRY_USER` and
+`REGISTRY_PASSWORD` repository secrets provide both.
 
 Run a suite with:
 
@@ -59,7 +63,7 @@ enforces those rules.
 
 An app can opt into the generic upgrade test with an `upgrade` block in
 `apps.yaml`. `astrarium upgrade --app <name>` first deploys the app and its
-prerequisites, then installs the chart into `<namespace>-rollout` with the same
+prerequisites, then installs the chart into `<namespace>-rollout-<run>` with the same
 kind values, upgrades it, restarts the workload, and verifies that the pod was
 replaced, a marker below `data_path` survived, and the PVC identities and bind
 state did not change. Unless `verify_pvc_retention` is false, the PVCs must

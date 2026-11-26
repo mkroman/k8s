@@ -300,7 +300,7 @@ diagnostics are collected in parallel, but syncs are not reordered.
 `astrarium upgrade --app <name>` first deploys the app and its prerequisites
 through the normal Argo CD run path. It then packages the app's Helm chart
 with the same kind values, installs it into a disposable
-`<namespace>-rollout` namespace, and runs the generic in-cluster test:
+`<namespace>-rollout-<run>` namespace, and runs the generic in-cluster test:
 
 1. Wait for a Ready pod and assert the restricted security profile.
 2. Snapshot the PVC names, UIDs and bind phases.

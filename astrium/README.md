@@ -45,11 +45,7 @@ and point `ASTRARIUM_REGISTRY_AUTH_FILE` at it:
 ```bash
 export REGISTRY_USER=...
 export REGISTRY_PASSWORD=...
-mkdir -p .astrium
-umask 077
-auth="$(printf '%s:%s' "${REGISTRY_USER}" "${REGISTRY_PASSWORD}" | base64 -w0)"
-printf '{"auths":{"%s":{"auth":"%s"}}}\n' "${REGISTRY}" "${auth}" \
-  >.astrium/registry-auth.json
+./hack/ci/prepare-kind-registry-auth.sh
 export ASTRARIUM_REGISTRY_AUTH_FILE="${PWD}/.astrium/registry-auth.json"
 ```
 
@@ -63,7 +59,7 @@ Jaeger) are pre-pulled through the proxy and retagged by
 `plan` selects apps from a Git diff (M3) or explicitly with `--all`/`--app`.
 `run` creates a kind cluster, installs Argo CD, and deploys the selected apps.
 `upgrade` first deploys the app and its prerequisites through the same path,
-then installs the chart into a disposable `<namespace>-rollout` namespace,
+then installs the chart into a disposable `<namespace>-rollout-<run>` namespace,
 upgrades and restarts it, and verifies pod replacement, a data marker and PVC
 retention. With `--reuse-cluster --no-deploy` it tests an app that is already
 running, which is how the e2e workflow exercises it after `run` has kept the

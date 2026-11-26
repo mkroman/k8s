@@ -407,6 +407,27 @@ fn upgrade_help_lists_cluster_flags() {
 }
 
 #[test]
+fn upgrade_unknown_app_fails_before_creating_a_cluster() {
+    let directory = tempfile::tempdir().expect("tempdir");
+    let manifest = directory.path().join("astrarium.toml");
+    std::fs::write(&manifest, demo_manifest()).expect("manifest");
+
+    binary()
+        .args(["upgrade", "--app", "missing", "--config"])
+        .arg(&manifest)
+        .env_remove("GITHUB_OUTPUT")
+        .env_remove("GITHUB_STEP_SUMMARY")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("not declared in the manifest"));
+
+    assert!(
+        !directory.path().join(".astrium").exists(),
+        "an unknown app must not prepare a cluster"
+    );
+}
+
+#[test]
 fn upgrade_without_an_upgrade_block_is_a_noop() {
     let directory = tempfile::tempdir().expect("tempdir");
     let manifest = directory.path().join("astrarium.toml");

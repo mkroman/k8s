@@ -15,6 +15,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use jiff::Timestamp;
+use sha2::{Digest as _, Sha256};
 use thiserror::Error;
 use tracing::{info, warn};
 
@@ -195,7 +196,19 @@ pub async fn upgrade_suite(
         )
         .await?
     };
-    let rollout_namespace = rollout_namespace(app)?;
+    if options.skip_run {
+        let clusters = KindCluster::new(Arc::clone(&runner))
+            .list_clusters()
+            .await?;
+        if !clusters.iter().any(|name| name == &manifest.cluster.name) {
+            return Err(UpgradeError::Check(format!(
+                "refusing to run --no-deploy against a kubeconfig that is not the kind cluster {:?}",
+                manifest.cluster.name
+            )));
+        }
+    }
+
+    let (rollout_namespace, _) = rollout_names(app, &run_id)?;
     info!(
         cluster = %run.cluster,
         app = %app.name,
@@ -253,6 +266,11 @@ fn configured_upgrade(app: &AppSpec) -> Result<&UpgradeSpec, UpgradeError> {
             renderer: app.renderer,
         });
     }
+    if !upgrade.from_values.is_empty() || upgrade.from_revision.is_some() {
+        return Err(UpgradeError::Check(
+            "`upgrade.from_values` and `upgrade.from_revision` are not implemented; remove them or use the current values".to_owned(),
+        ));
+    }
     Ok(upgrade)
 }
 
@@ -273,8 +291,8 @@ async fn perform_upgrade(
     clock: &dyn Clock,
     run_id: &str,
 ) -> Result<UpgradeOutcome, UpgradeError> {
-    let namespace = rollout_namespace(app)?.as_str().to_owned();
-    let release = format!("{}-rollout", app.name);
+    let (namespace, release) = rollout_names(app, run_id)?;
+    let namespace = namespace.as_str().to_owned();
     let timeout = Duration::from_secs(upgrade.timeout_seconds.max(1));
     let selector = format!("app.kubernetes.io/instance={release}");
 
@@ -501,13 +519,16 @@ async fn perform_upgrade(
     })
 }
 
-fn rollout_namespace(app: &AppSpec) -> Result<NamespaceName, UpgradeError> {
-    let name = format!("{}-rollout", app.namespace.as_str());
-    NamespaceName::new(name.clone()).map_err(|error| {
+fn rollout_names(app: &AppSpec, run_id: &str) -> Result<(NamespaceName, String), UpgradeError> {
+    let digest = Sha256::digest(run_id.as_bytes());
+    let suffix: String = format!("{digest:x}").chars().take(8).collect();
+    let namespace = format!("{}-rollout-{}", app.namespace.as_str(), suffix);
+    let namespace = NamespaceName::new(namespace.clone()).map_err(|error| {
         UpgradeError::Check(format!(
-            "the upgrade test cannot derive a namespace from {name:?}: {error}"
+            "the upgrade test cannot derive a namespace from {namespace:?}: {error}"
         ))
-    })
+    })?;
+    Ok((namespace, format!("{}-rollout-{}", app.name, suffix)))
 }
 
 fn disable_e2e(mut values: serde_json::Value) -> serde_json::Value {
@@ -990,7 +1011,7 @@ upgrade = { container = "app", data_path = "/data", timeout_seconds = 1 }
 
         let outcome = run_upgrade(&manifest, &kube).expect("upgrade");
 
-        assert_eq!(outcome.namespace, "demo-rollout");
+        assert!(outcome.namespace.starts_with("demo-rollout-"));
         assert_eq!(outcome.pod, "demo-rollout-0");
         assert_eq!(kube.execs().len(), 2);
         assert!(

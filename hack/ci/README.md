@@ -15,6 +15,7 @@ locally so failures can be reproduced without pushing.
 | `validate-e2e-contract.sh` | Every Helm app that exposes `e2e` has the standard probe labels, hooks, image, and restricted security context. |
 | `validate-ci-images.sh` | The kind node image, compose images, and rendered upgrade-app images exist in the prefixed registry. Uses `docker buildx imagetools inspect`. |
 | `prepare-ci-images.sh` | Pulls host-side images through the prefixed registry and retags them with their original names for kind and compose. |
+| `prepare-kind-registry-auth.sh` | Writes a plain Docker `config.json` with credentials keyed by every upstream image host for the kind nodes. |
 | `validate-dashboards.py` | Grafana dashboard JSON: datasource references, variable convention, panel IDs, and removed panel types. |
 | `install-tools.sh` | Reads `tools.txt`, downloads each pinned release, verifies its SHA-256, and installs the binary. |
 

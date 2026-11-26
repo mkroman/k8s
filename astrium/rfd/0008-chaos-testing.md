@@ -1,7 +1,7 @@
 ---
 authors: ["Astrarium maintainers <maintainers@astrarium.invalid>"]
-state: prediscussion
-discussion: ""
+state: ideation
+discussion: "https://github.com/mkroman/k8s/pull/430"
 labels: [software, testing]
 ---
 

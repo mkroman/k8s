@@ -307,6 +307,11 @@ pub struct RegistryMirror {
     /// `https://registry.example.com/v2/docker.io`.
     #[serde(default)]
     pub override_path: bool,
+    /// Fall back to the upstream registry when every mirror fails. When false,
+    /// the generated `hosts.toml` omits `server` and the proxy is
+    /// authoritative.
+    #[serde(default = "default_true")]
+    pub fallback: bool,
 }
 
 /// A Helm chart repository that must be registered for dependency builds.
@@ -1214,21 +1219,25 @@ fn default_registry_mirrors() -> Vec<RegistryMirror> {
             upstream: "docker.io".to_owned(),
             endpoint: "http://{host}:5000".to_owned(),
             override_path: false,
+            fallback: true,
         },
         RegistryMirror {
             upstream: "quay.io".to_owned(),
             endpoint: "http://{host}:5001".to_owned(),
             override_path: false,
+            fallback: true,
         },
         RegistryMirror {
             upstream: "ghcr.io".to_owned(),
             endpoint: "http://{host}:5002".to_owned(),
             override_path: false,
+            fallback: true,
         },
         RegistryMirror {
             upstream: "registry.k8s.io".to_owned(),
             endpoint: "http://{host}:5003".to_owned(),
             override_path: false,
+            fallback: true,
         },
     ]
 }

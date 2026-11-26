@@ -91,43 +91,55 @@ host = "auto"
 #   registry.rwx.im/docker.io/<repo>
 #   registry.rwx.im/ghcr.io/<repo>
 # `override_path` makes containerd use /v2/<upstream> as the API root, so
-# image names in charts and manifests stay unchanged. ASTRARIUM_REGISTRY_AUTH_FILE
-# points at a plain Docker config.json that is mounted into every node at
-# /var/lib/kubelet/config.json for registry authentication.
+# image names in charts and manifests stay unchanged. `fallback = false` omits
+# the upstream `server` entry, so a failed mirror never falls back to a direct
+# pull and the proxy credentials are never offered to the upstream registry.
+# ASTRARIUM_REGISTRY_AUTH_FILE points at a plain Docker config.json that is
+# mounted into every node at /var/lib/kubelet/config.json. Its auth entries are
+# keyed by the upstream image hosts (docker.io, ghcr.io, ...), because kubelet
+# selects credentials by the image reference before containerd applies the
+# mirror.
 [[registry.mirrors]]
 upstream = "docker.io"
 endpoint = "https://registry.rwx.im/v2/docker.io"
 override_path = true
+fallback = false
 
 [[registry.mirrors]]
 upstream = "quay.io"
 endpoint = "https://registry.rwx.im/v2/quay.io"
 override_path = true
+fallback = false
 
 [[registry.mirrors]]
 upstream = "ghcr.io"
 endpoint = "https://registry.rwx.im/v2/ghcr.io"
 override_path = true
+fallback = false
 
 [[registry.mirrors]]
 upstream = "registry.k8s.io"
 endpoint = "https://registry.rwx.im/v2/registry.k8s.io"
 override_path = true
+fallback = false
 
 [[registry.mirrors]]
 upstream = "gcr.io"
 endpoint = "https://registry.rwx.im/v2/gcr.io"
 override_path = true
+fallback = false
 
 [[registry.mirrors]]
 upstream = "mirror.gcr.io"
 endpoint = "https://registry.rwx.im/v2/mirror.gcr.io"
 override_path = true
+fallback = false
 
 [[registry.mirrors]]
 upstream = "public.ecr.aws"
 endpoint = "https://registry.rwx.im/v2/public.ecr.aws"
 override_path = true
+fallback = false
 
 # The catalog adapter also imports the Helm repositories from
 # `hack/e2e/apps.yaml`. Only repository checks need them; Argo CD resolves its

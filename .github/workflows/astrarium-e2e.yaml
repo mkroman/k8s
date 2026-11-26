@@ -188,7 +188,7 @@ jobs:
     needs: [changes, build, plan]
     if: needs.plan.outputs.has_apps == 'true'
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 60
     permissions:
       contents: read
     env:
@@ -260,17 +260,7 @@ jobs:
       env:
         REGISTRY_USER: ${{ secrets.REGISTRY_USER }}
         REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
-      run: |
-        set -euo pipefail
-        if [[ -z "${REGISTRY_USER}" || -z "${REGISTRY_PASSWORD}" ]]; then
-          echo "::error::REGISTRY_USER and REGISTRY_PASSWORD repository secrets are required"
-          exit 1
-        fi
-        mkdir -p .astrium
-        umask 077
-        auth="$(printf '%s:%s' "${REGISTRY_USER}" "${REGISTRY_PASSWORD}" | base64 -w0)"
-        printf '{"auths":{"%s":{"auth":"%s"}}}\n' "${REGISTRY}" "${auth}" \
-          >.astrium/registry-auth.json
+      run: ./hack/ci/prepare-kind-registry-auth.sh
     - name: Start local services
       # Each matrix job has its own runner, so the fixed compose ports do not
       # collide across apps.
@@ -306,7 +296,7 @@ jobs:
         astrarium run --app "${APP}" --fast-fail --keep-cluster \
           --trace-file "diagnostics/astrarium-trace.json"
     - name: Run the upgrade test
-      timeout-minutes: 15
+      timeout-minutes: 30
       env:
         APP: ${{ matrix.app }}
       run: |
@@ -337,7 +327,7 @@ jobs:
         mkdir -p diagnostics
         while IFS= read -r cluster; do
           kind export logs "diagnostics/${cluster}" --name "${cluster}" || true
-        done < <(kind get clusters | grep '^astrarium-' || true)
+        done < <(kind get clusters | grep -E '^astrarium(-|$)' || true)
     - name: Upload diagnostics
       if: failure()
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

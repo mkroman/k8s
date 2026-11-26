@@ -7,7 +7,7 @@ members = [
 resolver = "3"
 
 [workspace.package]
-version = "0.1.1"
+version = "0.1.2"
 edition = "2024"
 rust-version = "1.100"
 license = "MIT OR Apache-2.0"
@@ -19,8 +19,8 @@ keywords = ["kubernetes", "gitops", "testing", "argo-cd", "kind"]
 categories = ["development-tools::testing"]
 
 [workspace.dependencies]
-astrarium-core = { version = "0.1.1", path = "crates/astrarium-core" }
-astrarium-test-support = { version = "0.1.1", path = "crates/astrarium-test-support" }
+astrarium-core = { version = "0.1.2", path = "crates/astrarium-core" }
+astrarium-test-support = { version = "0.1.2", path = "crates/astrarium-test-support" }
 
 axum = "0.8.9"
 bollard = "0.21.1"
