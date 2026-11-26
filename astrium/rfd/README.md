@@ -131,13 +131,13 @@ the decision rather than the document.
 
 | RFD | Title | State | Summary |
 | --- | --- | --- | --- |
-| [0001](0001-rfd-process.md) | RFD process | prediscussion | Adapts Oxide's RFD process to Markdown front matter and fixes the states, review rules, and index maintenance. |
-| [0002](0002-astrarium-overview.md) | Astrarium overview | prediscussion | Names the project, states its goals and non-goals, and fixes the crate, command, and milestone shape. |
-| [0003](0003-manifest-and-selection.md) | Manifest and selection | prediscussion | Defines `astrarium.toml`, the dependency DAG, and diff-based application selection. |
-| [0004](0004-rendering-and-argocd.md) | Rendering and Argo CD | prediscussion | Packages Helm and Kustomize applications into an HTTP chart repository and creates Argo CD resources directly. |
-| [0005](0005-cluster-registry-telemetry.md) | Cluster, registry, and telemetry | prediscussion | Bootstraps kind, pull-through registry mirrors, Argo CD, and OTLP traces with bounded diagnostics. |
-| [0006](0006-ci-release-and-caching.md) | CI, release, and caching | prediscussion | Defines GitHub Actions, release tags and binaries, and how e2e jobs obtain Astrarium. |
-| [0007](0007-testing-and-structure.md) | Testing and structure | prediscussion | Fixes the workspace, module, error, async, and testing rules and the migration away from `hack/e2e`. |
+| [0001](0001-rfd-process.md) | RFD process | published | Adapts Oxide's RFD process to Markdown front matter and fixes the states, review rules, and index maintenance. |
+| [0002](0002-astrarium-overview.md) | Astrarium overview | published | Names the project, states its goals and non-goals, and fixes the crate, command, and milestone shape. |
+| [0003](0003-manifest-and-selection.md) | Manifest and selection | published | Defines `astrarium.toml`, the dependency DAG, and diff-based application selection. |
+| [0004](0004-rendering-and-argocd.md) | Rendering and Argo CD | published | Packages Helm and Kustomize applications into an HTTP chart repository and creates Argo CD resources directly. |
+| [0005](0005-cluster-registry-telemetry.md) | Cluster, registry, and telemetry | published | Bootstraps kind, pull-through registry mirrors, Argo CD, and OTLP traces with bounded diagnostics. |
+| [0006](0006-ci-release-and-caching.md) | CI, release, and caching | published | Defines GitHub Actions, release tags and binaries, and how e2e jobs obtain Astrarium. |
+| [0007](0007-testing-and-structure.md) | Testing and structure | published | Fixes the workspace, module, error, async, and testing rules and the migration away from `hack/e2e`. |
 
 ## Conventions
 
