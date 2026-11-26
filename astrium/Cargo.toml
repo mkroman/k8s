@@ -53,6 +53,7 @@ toml = { version = "1.2.3", features = ["preserve_order"] }
 tracing = "0.1.44"
 tracing-opentelemetry = { version = "0.34.0", default-features = false }
 tracing-subscriber = { version = "0.3.23", features = ["env-filter", "json", "fmt"] }
+url = "2.5.9"
 which = "8.0.6"
 yaml_serde = "0.10.7"
 

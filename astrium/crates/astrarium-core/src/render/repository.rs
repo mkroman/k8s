@@ -18,6 +18,7 @@ use axum::routing::get;
 use tokio::net::TcpListener;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, warn};
+use url::Url;
 
 use crate::BoxFuture;
 use crate::command::{CommandRunner, CommandSpec, RealCommandRunner, Tool};
@@ -185,7 +186,7 @@ impl HttpChartRepository {
                 source,
             })?;
         let host = resolve_host(self.host.as_deref())?;
-        let url = format_url(host, address.port());
+        let url = format_url(host, address.port())?;
         let shutdown = spawn_server(listener, root.clone());
         debug!(%url, directory = %root.display(), "serving Helm chart repository");
         Ok(ServedChartRepository {
@@ -224,7 +225,7 @@ impl HttpChartRepository {
                 source,
             })?;
         let host = resolve_host(self.host.as_deref())?;
-        let url = format_url(host, address.port());
+        let url = format_url(host, address.port())?;
         self.index(&root, &url).await?;
         let shutdown = spawn_server(listener, root.clone());
         debug!(%url, directory = %root.display(), "serving indexed Helm chart repository");
@@ -297,13 +298,31 @@ fn parse_host(value: &str) -> Result<IpAddr, RenderError> {
     })
 }
 
-/// Formats a repository URL. IPv6 addresses are bracketed.
-#[must_use]
-pub fn format_url(host: IpAddr, port: u16) -> String {
-    match host {
-        IpAddr::V4(address) => format!("http://{address}:{port}"),
-        IpAddr::V6(address) => format!("http://[{address}]:{port}"),
-    }
+/// Formats a repository URL.
+///
+/// # Errors
+///
+/// Returns [`RenderError::Host`] when the host or port cannot be represented
+/// in an HTTP URL.
+pub fn format_url(host: IpAddr, port: u16) -> Result<String, RenderError> {
+    let host = match host {
+        IpAddr::V4(address) => address.to_string(),
+        IpAddr::V6(address) => format!("[{address}]"),
+    };
+    let mut url = Url::parse("http://localhost").map_err(|error| RenderError::Host {
+        value: host.clone(),
+        message: error.to_string(),
+    })?;
+    url.set_host(Some(&host))
+        .map_err(|error| RenderError::Host {
+            value: host.clone(),
+            message: error.to_string(),
+        })?;
+    url.set_port(Some(port)).map_err(|()| RenderError::Host {
+        value: host,
+        message: "invalid port".to_owned(),
+    })?;
+    Ok(url.to_string().trim_end_matches('/').to_owned())
 }
 
 #[derive(Clone)]
@@ -514,11 +533,11 @@ mod tests {
     #[test]
     fn formats_ipv4_and_ipv6_urls() {
         assert_eq!(
-            format_url(IpAddr::V4(Ipv4Addr::new(192, 0, 2, 10)), 8080),
+            format_url(IpAddr::V4(Ipv4Addr::new(192, 0, 2, 10)), 8080).expect("ipv4 URL"),
             "http://192.0.2.10:8080"
         );
         assert_eq!(
-            format_url("::1".parse().expect("ipv6"), 8080),
+            format_url("::1".parse().expect("ipv6"), 8080).expect("ipv6 URL"),
             "http://[::1]:8080"
         );
     }

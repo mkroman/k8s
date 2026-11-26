@@ -13,6 +13,7 @@ use std::path::{Path, PathBuf};
 
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD;
+use url::Url;
 
 use crate::manifest::RegistryMirror;
 
@@ -198,13 +199,17 @@ pub fn prepare(
     for mirror in mirrors {
         let upstream = mirror.upstream.trim();
         validate_upstream(upstream)?;
-        if !mirror.endpoint.starts_with("http://") && !mirror.endpoint.starts_with("https://") {
+        let endpoint = mirror.endpoint.replace("{host}", host);
+        let endpoint_url = Url::parse(&endpoint).map_err(|error| {
+            ClusterError::Registry(format!(
+                "mirror endpoint {endpoint:?} for {upstream} is not a URL: {error}"
+            ))
+        })?;
+        if !matches!(endpoint_url.scheme(), "http" | "https") || endpoint_url.host_str().is_none() {
             return Err(ClusterError::Registry(format!(
-                "mirror endpoint {:?} for {upstream} must start with http:// or https://",
-                mirror.endpoint
+                "mirror endpoint {endpoint:?} for {upstream} must be an http(s) URL with a host"
             )));
         }
-        let endpoint = mirror.endpoint.replace("{host}", host);
         let contents = hosts_toml(
             &upstream_server(upstream),
             &endpoint,
@@ -279,20 +284,16 @@ fn auth_hosts(mirrors: &[RegistryMirror]) -> BTreeSet<String> {
             hosts.insert("registry-1.docker.io".to_owned());
             hosts.insert("index.docker.io".to_owned());
         }
-        if let Some(host) = endpoint_host(&mirror.endpoint)
-            && !host.contains('{')
-        {
-            hosts.insert(host.to_owned());
+        if let Some(host) = endpoint_host(&mirror.endpoint) {
+            hosts.insert(host);
         }
     }
     hosts
 }
 
-fn endpoint_host(endpoint: &str) -> Option<&str> {
-    let authority = endpoint.split_once("://")?.1.split('/').next()?;
-    let authority = authority.rsplit('@').next()?;
-    let host = authority.split(':').next()?;
-    (!host.is_empty()).then_some(host)
+fn endpoint_host(endpoint: &str) -> Option<String> {
+    let endpoint = Url::parse(endpoint).ok()?;
+    endpoint.host_str().map(str::to_owned)
 }
 
 fn write_auth_file(
@@ -352,9 +353,7 @@ fn validate_upstream(upstream: &str) -> Result<(), ClusterError> {
 }
 
 fn upstream_server(upstream: &str) -> String {
-    if upstream.starts_with("http://") || upstream.starts_with("https://") {
-        upstream.to_owned()
-    } else if upstream == "docker.io" {
+    if upstream == "docker.io" {
         "https://registry-1.docker.io".to_owned()
     } else {
         format!("https://{upstream}")

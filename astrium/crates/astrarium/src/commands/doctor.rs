@@ -9,6 +9,7 @@ use astrarium_core::command::{CommandRunner, CommandSpec, RealCommandRunner, Too
 use miette::{IntoDiagnostic, Result};
 use serde::Serialize;
 use tokio::net::TcpStream;
+use url::{Host, Url};
 
 use crate::cli::DoctorArgs;
 
@@ -275,31 +276,17 @@ async fn check_service(name: &str, endpoint: &str) -> ServiceStatus {
 }
 
 fn parse_endpoint(endpoint: &str) -> Option<(String, u16)> {
-    let (scheme, rest) = endpoint.split_once("://")?;
-    let default_port = match scheme.to_ascii_lowercase().as_str() {
-        "http" => 80,
-        "https" => 443,
-        _ => return None,
+    let url = Url::parse(endpoint).ok()?;
+    if !matches!(url.scheme(), "http" | "https") {
+        return None;
+    }
+    let port = url.port_or_known_default()?;
+    let host = match url.host()? {
+        Host::Domain(domain) => domain.to_owned(),
+        Host::Ipv4(address) => address.to_string(),
+        Host::Ipv6(address) => address.to_string(),
     };
-
-    let authority = rest.split('/').next()?;
-    let authority = authority.rsplit('@').next()?;
-    if let Some(rest) = authority.strip_prefix('[') {
-        let (host, rest) = rest.split_once(']')?;
-        let port = rest
-            .strip_prefix(':')
-            .and_then(|port| port.parse::<u16>().ok())
-            .unwrap_or(default_port);
-        return Some((host.to_owned(), port));
-    }
-
-    match authority.rsplit_once(':') {
-        Some((host, port)) if !host.contains(':') => {
-            Some((host.to_owned(), port.parse::<u16>().ok()?))
-        }
-        Some(_) => None,
-        None => Some((authority.to_owned(), default_port)),
-    }
+    Some((host, port))
 }
 
 fn print_human(report: &DoctorReport) {

@@ -913,7 +913,7 @@ impl Manifest {
         }
 
         if self.telemetry.enabled {
-            reqwest::Url::parse(&self.telemetry.otlp_endpoint).map_err(|error| {
+            url::Url::parse(&self.telemetry.otlp_endpoint).map_err(|error| {
                 ManifestError::invalid(format!(
                     "telemetry.otlp_endpoint {:?} is not a URL: {error}",
                     self.telemetry.otlp_endpoint
@@ -926,6 +926,18 @@ impl Manifest {
                 return Err(ManifestError::invalid(
                     "helm_repositories entries need a name and url",
                 ));
+            }
+            let url = url::Url::parse(&repository.url).map_err(|error| {
+                ManifestError::invalid(format!(
+                    "helm repository {:?} url {:?} is not a URL: {error}",
+                    repository.name, repository.url
+                ))
+            })?;
+            if !matches!(url.scheme(), "http" | "https" | "oci") || url.host_str().is_none() {
+                return Err(ManifestError::invalid(format!(
+                    "helm repository {:?} must be an http(s) or oci URL with a host, not {:?}",
+                    repository.name, repository.url
+                )));
             }
         }
 
@@ -1375,6 +1387,29 @@ source = "alpha"
         let source = base_manifest("").replace("[project]", "[project]\nunknown = true");
         let error = Manifest::from_toml_str(&source, dir.path()).unwrap_err();
         assert!(matches!(error, ManifestError::Parse { .. }));
+    }
+
+    #[test]
+    fn validates_helm_repository_urls() {
+        let dir = tempfile::tempdir().unwrap();
+        for (url, expected) in [
+            ("ftp://example.com/charts", "must be an http(s) or oci URL"),
+            ("oci:charts", "must be an http(s) or oci URL"),
+            ("not a url", "is not a URL"),
+        ] {
+            let source = format!(
+                "{}\n[[helm_repositories]]\nname = \"test\"\nurl = \"{url}\"\n",
+                base_manifest("")
+            );
+            let error = Manifest::from_toml_str(&source, dir.path()).unwrap_err();
+            assert!(error.to_string().contains(expected), "{url}: {error}");
+        }
+
+        let source = format!(
+            "{}\n[[helm_repositories]]\nname = \"test\"\nurl = \"oci://ghcr.io/example/charts\"\n",
+            base_manifest("")
+        );
+        Manifest::from_toml_str(&source, dir.path()).unwrap();
     }
 
     #[test]
