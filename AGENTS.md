@@ -162,7 +162,9 @@ astrarium run --app spegel --reuse-cluster --fast-fail
 - Apps can opt into the generic in-cluster upgrade test with an `upgrade`
   block in `hack/e2e/apps.yaml`. `astrarium upgrade` installs into
   `<namespace>-rollout` with Helm, then checks pod replacement, marker
-  persistence and PVC retention. Do not add a per-app shell script.
+  persistence and PVC retention. The e2e workflow runs it with
+  `--reuse-cluster --no-deploy` after `run --keep-cluster`. Do not add a
+  per-app shell script.
 
 ## Probe conventions
 

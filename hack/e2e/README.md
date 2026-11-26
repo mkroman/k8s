@@ -52,4 +52,7 @@ state did not change. Unless `verify_pvc_retention` is false, the PVCs must
 also survive `helm uninstall`.
 
 `defaults.upgrade` in `apps.yaml` supplies the timeout, security profile and
-PVC-retention defaults. An app-level `upgrade` block overrides them.
+PVC-retention defaults. An app-level `upgrade` block overrides them. In CI,
+`astrarium run --app <name> --keep-cluster` deploys the app and
+`astrarium upgrade --app <name> --reuse-cluster --no-deploy` runs only the
+in-cluster part on that cluster. Apps without an upgrade test are no-ops.

@@ -41,7 +41,9 @@ astrium/target/release/astrarium upgrade --app stalwart
 `upgrade` first deploys the app and its prerequisites through the same path,
 then installs the chart into a disposable `<namespace>-rollout` namespace,
 upgrades and restarts it, and verifies pod replacement, a data marker and PVC
-retention.
+retention. With `--reuse-cluster --no-deploy` it tests an app that is already
+running, which is how the e2e workflow exercises it after `run` has kept the
+cluster.
 
 ### Trace files
 

@@ -20,6 +20,20 @@ pub async fn run(manifest: Option<&Manifest>, args: &UpgradeArgs) -> Result<()> 
     let manifest =
         manifest.ok_or_else(|| miette::miette!("a manifest is required for `upgrade`"))?;
     let app = AppName::new(args.app.clone()).into_diagnostic()?;
+    match manifest
+        .app(app.as_str())
+        .and_then(|app| app.upgrade.as_ref())
+    {
+        None => {
+            println!("App {app} has no upgrade test enabled; nothing to do.");
+            return Ok(());
+        }
+        Some(upgrade) if !upgrade.enabled => {
+            println!("App {app} has no upgrade test enabled; nothing to do.");
+            return Ok(());
+        }
+        Some(_) => {}
+    }
     let request = SelectionRequest {
         base: None,
         head: None,
@@ -39,6 +53,7 @@ pub async fn run(manifest: Option<&Manifest>, args: &UpgradeArgs) -> Result<()> 
     let options = UpgradeOptions {
         keep_cluster: args.keep_cluster || manifest.cluster.keep,
         reuse_cluster: args.reuse_cluster || manifest.cluster.reuse,
+        skip_run: args.no_deploy,
         run_id: run_id.clone(),
     };
 

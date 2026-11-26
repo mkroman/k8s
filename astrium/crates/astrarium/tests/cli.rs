@@ -402,11 +402,12 @@ fn upgrade_help_lists_cluster_flags() {
         .success()
         .stdout(predicate::str::contains("--app"))
         .stdout(predicate::str::contains("--keep-cluster"))
-        .stdout(predicate::str::contains("--reuse-cluster"));
+        .stdout(predicate::str::contains("--reuse-cluster"))
+        .stdout(predicate::str::contains("--no-deploy"));
 }
 
 #[test]
-fn upgrade_without_an_upgrade_block_fails_before_creating_a_cluster() {
+fn upgrade_without_an_upgrade_block_is_a_noop() {
     let directory = tempfile::tempdir().expect("tempdir");
     let manifest = directory.path().join("astrarium.toml");
     std::fs::write(&manifest, demo_manifest()).expect("manifest");
@@ -417,12 +418,12 @@ fn upgrade_without_an_upgrade_block_fails_before_creating_a_cluster() {
         .env_remove("GITHUB_OUTPUT")
         .env_remove("GITHUB_STEP_SUMMARY")
         .assert()
-        .failure()
-        .stderr(predicate::str::contains("has no upgrade test"));
+        .success()
+        .stdout(predicate::str::contains("has no upgrade test"));
 
     assert!(
         !directory.path().join(".astrium").exists(),
-        "the upgrade must validate the app before preparing a cluster"
+        "a no-op upgrade must not prepare a cluster"
     );
 }
 

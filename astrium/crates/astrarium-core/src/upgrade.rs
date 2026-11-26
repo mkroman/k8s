@@ -40,6 +40,8 @@ pub struct UpgradeOptions {
     pub keep_cluster: bool,
     /// Reuse an existing cluster instead of creating one.
     pub reuse_cluster: bool,
+    /// Skip the normal suite run and assume the app is already deployed.
+    pub skip_run: bool,
     /// The unique run ID, shared with telemetry and diagnostics.
     pub run_id: String,
 }
@@ -171,19 +173,28 @@ pub async fn upgrade_suite(
 
     let reused = options.reuse_cluster || manifest.cluster.reuse;
     let run_id = options.run_id.clone();
-    let run = run_suite(
-        manifest,
-        plan,
-        RunOptions {
-            keep_cluster: true,
-            reuse_cluster: reused,
-            fast_fail: false,
-            run_id: options.run_id,
-        },
-        Arc::clone(&runner),
-        Arc::clone(&clock),
-    )
-    .await?;
+    let run = if options.skip_run {
+        RunReport {
+            cluster: manifest.cluster.name.clone(),
+            apps: Vec::new(),
+            kept_cluster: true,
+            diagnostics: None,
+        }
+    } else {
+        run_suite(
+            manifest,
+            plan,
+            RunOptions {
+                keep_cluster: true,
+                reuse_cluster: reused,
+                fast_fail: false,
+                run_id: options.run_id,
+            },
+            Arc::clone(&runner),
+            Arc::clone(&clock),
+        )
+        .await?
+    };
     let rollout_namespace = rollout_namespace(app)?;
     info!(
         cluster = %run.cluster,
@@ -208,7 +219,7 @@ pub async fn upgrade_suite(
     .await?;
     let duration = started.elapsed();
 
-    let keep_cluster = options.keep_cluster || manifest.cluster.keep || reused;
+    let keep_cluster = options.keep_cluster || manifest.cluster.keep || reused || options.skip_run;
     if !keep_cluster {
         KindCluster::new(Arc::clone(&runner))
             .delete_cluster(&manifest.cluster.name)
