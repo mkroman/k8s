@@ -2,7 +2,10 @@
 {{- if gt (int .Values.replicaCount) 1 }}
 {{- fail "replicaCount must be 1: a second Stalwart pod without shared stores and a coordinator would have independent data" }}
 {{- end }}
-{{- if and (eq $configType "RocksDb") (not .Values.persistence.enabled) }}
+{{- if and .Values.configSecret.name (not .Values.configSecret.key) }}
+{{- fail "configSecret.key is required when configSecret.name is set" }}
+{{- end }}
+{{- if and (not .Values.configSecret.name) (eq $configType "RocksDb") (not .Values.persistence.enabled) }}
 {{- fail "persistence.enabled must be true when config.@type is RocksDb" }}
 {{- end }}
 {{- if and (eq $configType "RocksDb") (not (index .Values.config "path")) }}
@@ -59,7 +62,9 @@ spec:
         {{- toYaml . | nindent 8 }}
         {{- end }}
       annotations:
+        {{- if not .Values.configSecret.name }}
         checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- end }}
         {{- if and .Values.recoveryAdmin.enabled (not .Values.recoveryAdmin.existingSecret) .Values.recoveryAdmin.password }}
         checksum/recovery-admin: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
         {{- end }}
@@ -289,8 +294,16 @@ spec:
             {{- end }}
       volumes:
         - name: config
+          {{- if .Values.configSecret.name }}
+          secret:
+            secretName: {{ .Values.configSecret.name }}
+            items:
+              - key: {{ .Values.configSecret.key }}
+                path: config.json
+          {{- else }}
           configMap:
             name: {{ include "stalwart.configMapName" . }}
+          {{- end }}
         - name: logs
           emptyDir:
             {{- with .Values.logs.sizeLimit }}

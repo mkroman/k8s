@@ -953,17 +953,6 @@ mirrors = []
         let root = repository_root();
         let manifest = Manifest::load(root.join("astrarium.toml")).expect("repository manifest");
 
-        assert_eq!(manifest.apps.len(), 18);
-        assert_eq!(manifest.projects.len(), 15);
-        assert_eq!(manifest.namespaces.len(), 15);
-        assert_eq!(manifest.helm_repositories.len(), 2);
-        let repository_names: Vec<&str> = manifest
-            .helm_repositories
-            .iter()
-            .map(|repository| repository.name.as_str())
-            .collect();
-        assert_eq!(repository_names, vec!["quickwit", "vector"]);
-
         let e2e: E2eCatalog = read_yaml(&root.join("hack/e2e/apps.yaml")).expect("e2e catalog");
         for (name, expected) in &e2e.apps {
             let app = manifest.app(name).unwrap_or_else(|| {

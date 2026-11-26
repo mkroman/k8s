@@ -6,6 +6,8 @@
 //! `astrarium-test-support`. Objects cross the boundary as
 //! [`DynamicObject`]s so a fake does not need to model every Kubernetes type.
 
+use std::time::Duration;
+
 use k8s_openapi::api::core::v1::Pod;
 use kube::api::{
     Api, DeleteParams, ListParams, LogParams, Patch, PatchParams, PropagationPolicy,
@@ -148,6 +150,9 @@ pub struct LogRequest {
     pub tail_lines: u32,
 }
 
+/// The default maximum time to wait for a command and its output streams.
+pub const DEFAULT_EXEC_TIMEOUT: Duration = Duration::from_secs(30);
+
 /// A command to execute in a running container.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ExecRequest {
@@ -159,6 +164,8 @@ pub struct ExecRequest {
     pub container: Option<String>,
     /// The command and its arguments.
     pub command: Vec<String>,
+    /// The maximum time to wait for the command to finish.
+    pub timeout: Duration,
 }
 
 /// The captured result of a container command.
@@ -759,66 +766,79 @@ impl KubeApi for KubeClient {
 
     fn exec(&self, request: ExecRequest) -> BoxFuture<'_, Result<ExecOutput, KubeError>> {
         Box::pin(async move {
-            use tokio::io::AsyncReadExt as _;
-
-            let api: Api<Pod> = Api::namespaced(self.client.clone(), &request.namespace);
-            let mut params = kube::api::AttachParams::default().stdout(true).stderr(true);
-            if let Some(container) = &request.container {
-                params = params.container(container.clone());
-            }
-            let mut process = api
-                .exec(&request.pod, request.command.clone(), &params)
+            let pod = request.pod.clone();
+            let timeout = request.timeout;
+            tokio::time::timeout(timeout, self.exec_command(request))
                 .await
-                .map_err(|source| KubeError::api(POD.kind, request.pod.clone(), source))?;
+                .map_err(|_| KubeError::Exec {
+                    pod,
+                    message: format!("command timed out after {timeout:?}"),
+                })?
+        })
+    }
+}
 
-            // Read streams to EOF before joining, then inspect the status
-            // object. A non-zero exit is reported through the status, not as
-            // a transport error.
-            let status = process.take_status();
-            let mut stdout = String::new();
-            if let Some(mut reader) = process.stdout() {
-                reader
-                    .read_to_string(&mut stdout)
-                    .await
-                    .map_err(|source| KubeError::Exec {
-                        pod: request.pod.clone(),
-                        message: source.to_string(),
-                    })?;
-            }
-            let mut stderr = String::new();
-            if let Some(mut reader) = process.stderr() {
-                reader
-                    .read_to_string(&mut stderr)
-                    .await
-                    .map_err(|source| KubeError::Exec {
-                        pod: request.pod.clone(),
-                        message: source.to_string(),
-                    })?;
-            }
-            // The remote-command protocol sends a Status object on success as
-            // well as on failure, so inspect it instead of treating every
-            // status as an error.
-            let success = match status {
-                Some(status) => match status.await {
-                    Some(status) if status.status.as_deref() == Some("Failure") => {
-                        if stderr.is_empty() {
-                            stderr = status.message.unwrap_or_default();
-                        }
-                        false
+impl KubeClient {
+    async fn exec_command(&self, request: ExecRequest) -> Result<ExecOutput, KubeError> {
+        use tokio::io::AsyncReadExt as _;
+
+        let api: Api<Pod> = Api::namespaced(self.client.clone(), &request.namespace);
+        let mut params = kube::api::AttachParams::default().stdout(true).stderr(true);
+        if let Some(container) = &request.container {
+            params = params.container(container.clone());
+        }
+        let mut process = api
+            .exec(&request.pod, request.command.clone(), &params)
+            .await
+            .map_err(|source| KubeError::api(POD.kind, request.pod.clone(), source))?;
+
+        // Read streams to EOF before joining, then inspect the status
+        // object. A non-zero exit is reported through the status, not as
+        // a transport error.
+        let status = process.take_status();
+        let mut stdout = String::new();
+        if let Some(mut reader) = process.stdout() {
+            reader
+                .read_to_string(&mut stdout)
+                .await
+                .map_err(|source| KubeError::Exec {
+                    pod: request.pod.clone(),
+                    message: source.to_string(),
+                })?;
+        }
+        let mut stderr = String::new();
+        if let Some(mut reader) = process.stderr() {
+            reader
+                .read_to_string(&mut stderr)
+                .await
+                .map_err(|source| KubeError::Exec {
+                    pod: request.pod.clone(),
+                    message: source.to_string(),
+                })?;
+        }
+        // The remote-command protocol sends a Status object on success as
+        // well as on failure, so inspect it instead of treating every
+        // status as an error.
+        let success = match status {
+            Some(status) => match status.await {
+                Some(status) if status.status.as_deref() == Some("Failure") => {
+                    if stderr.is_empty() {
+                        stderr = status.message.unwrap_or_default();
                     }
-                    _ => true,
-                },
-                None => true,
-            };
-            process.join().await.map_err(|source| KubeError::Exec {
-                pod: request.pod.clone(),
-                message: source.to_string(),
-            })?;
-            Ok(ExecOutput {
-                stdout,
-                stderr,
-                success,
-            })
+                    false
+                }
+                _ => true,
+            },
+            None => true,
+        };
+        process.join().await.map_err(|source| KubeError::Exec {
+            pod: request.pod.clone(),
+            message: source.to_string(),
+        })?;
+        Ok(ExecOutput {
+            stdout,
+            stderr,
+            success,
         })
     }
 }

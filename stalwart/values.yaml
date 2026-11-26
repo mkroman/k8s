@@ -174,6 +174,17 @@ config:
   "@type": RocksDb
   path: /var/lib/stalwart
 
+configSecret:
+  # -- Use an existing Secret containing the complete `config.json` instead of
+  #    the chart-managed ConfigMap. This lets the DataStore username and
+  #    password live in a Secret. The non-secret `config` values above are
+  #    still used for chart validation and NetworkPolicy egress rules; keep
+  #    them consistent with the Secret. The Secret is not checksummed, so
+  #    restart the StatefulSet after rotating it.
+  name: ""
+  # -- Key in the Secret that contains `config.json`.
+  key: config.json
+
 recoveryAdmin:
   # -- Enable the `STALWART_RECOVERY_ADMIN` credential. Required for the first
   #    install because the chart always renders `config.json` and the server
@@ -307,6 +318,9 @@ networkPolicy:
     allowHttp: false
     # -- Allow the configured external PostgreSQL or MySQL port.
     allowDatabase: true
+    # -- Override the database port derived from `config.port`. Set this when
+    #    `configSecret` supplies the connection settings and `config` is empty.
+    databasePort: 0
     # -- Additional raw egress rules.
     extraEgress: []
 
@@ -327,7 +341,7 @@ certificate:
   #  - mail.rwx.im
   issuerRef:
     kind: ClusterIssuer
-    name: letsencrypt-prod
+    name: letsencrypt-production
     group: cert-manager.io
   privateKey:
     rotationPolicy: Always
@@ -356,6 +370,11 @@ certificate:
         memory: 64Mi
 
 metrics:
+  exporter:
+    # -- Set to true only after the Stalwart Prometheus exporter has been
+    #    enabled in the database. The exporter-dependent alerts are otherwise
+    #    omitted because a disabled exporter reports `up == 0`.
+    enabled: false
   serviceMonitor:
     # -- Create a ServiceMonitor for the repo Prometheus. The Stalwart
     #    Prometheus exporter must also be enabled in the database.

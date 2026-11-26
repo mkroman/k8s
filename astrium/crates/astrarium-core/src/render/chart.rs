@@ -4,6 +4,7 @@ use std::collections::HashSet;
 use std::path::Path;
 
 use serde::Deserialize;
+use url::Url;
 
 use crate::manifest::HelmRepository;
 use crate::render::RenderError;
@@ -99,7 +100,9 @@ impl ChartMetadata {
             .iter()
             .filter_map(|dependency| dependency.repository.as_deref())
             .filter(|repository| {
-                repository.starts_with("http://") || repository.starts_with("https://")
+                Url::parse(repository).is_ok_and(|url| {
+                    matches!(url.scheme(), "http" | "https") && url.host_str().is_some()
+                })
             })
             .filter(|repository| seen.insert((*repository).to_owned()))
             .map(ToOwned::to_owned)

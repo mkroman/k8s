@@ -30,7 +30,6 @@ local-ip-address.workspace = true
 opentelemetry.workspace = true
 opentelemetry-otlp.workspace = true
 opentelemetry_sdk.workspace = true
-reqwest.workspace = true
 schemars.workspace = true
 semver.workspace = true
 serde.workspace = true
@@ -44,9 +43,11 @@ toml.workspace = true
 tracing.workspace = true
 tracing-opentelemetry.workspace = true
 tracing-subscriber.workspace = true
+url.workspace = true
 yaml_serde.workspace = true
 
 [dev-dependencies]
+reqwest.workspace = true
 insta.workspace = true
 
 [lints]

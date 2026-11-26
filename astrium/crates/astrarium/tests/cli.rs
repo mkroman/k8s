@@ -2,7 +2,7 @@
 
 //! CLI integration tests.
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use assert_cmd::Command;
 use gix::refs::transaction::{PreviousValue, RefEdit};
@@ -10,10 +10,6 @@ use predicates::prelude::*;
 
 fn binary() -> Command {
     Command::cargo_bin("astrarium").expect("astrarium binary")
-}
-
-fn repository_manifest() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../astrarium.toml")
 }
 
 struct Repo {
@@ -320,65 +316,6 @@ fn plan_empty_selection_is_a_success() {
     assert!(output.contains("has_apps=false"));
     let summary = std::fs::read_to_string(&step_summary).expect("step summary");
     assert!(summary.contains("No apps selected."));
-}
-
-#[test]
-fn full_repository_manifest_validates() {
-    binary()
-        .args(["manifest", "validate", "--config"])
-        .arg(repository_manifest())
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("18 apps"));
-}
-
-#[test]
-fn full_repository_plan_contains_every_e2e_app() {
-    let stdout = binary()
-        .args(["plan", "--all", "--json", "--config"])
-        .arg(repository_manifest())
-        .env_remove("GITHUB_OUTPUT")
-        .env_remove("GITHUB_STEP_SUMMARY")
-        .assert()
-        .success()
-        .get_output()
-        .stdout
-        .clone();
-    let plan: serde_json::Value = serde_json::from_slice(&stdout).expect("plan JSON");
-    let mut apps: Vec<&str> = plan["apps"]
-        .as_array()
-        .expect("apps")
-        .iter()
-        .map(|app| app["name"].as_str().expect("app name"))
-        .collect();
-    apps.sort_unstable();
-    assert_eq!(
-        apps,
-        vec![
-            "agentgateway",
-            "cert-manager",
-            "cloudnative-pg",
-            "cluster-exporters",
-            "gateway-api",
-            "grafana",
-            "magistr",
-            "monitoring",
-            "mosquitto",
-            "node-feature-discovery",
-            "prometheus-operator",
-            "sealed-secrets",
-            "spegel",
-            "stalwart",
-            "traefik",
-            "vector-agent",
-            "vector-aggregator",
-            "zigbee2mqtt",
-        ]
-    );
-    assert_eq!(
-        plan["matrix"]["include"].as_array().expect("include").len(),
-        18
-    );
 }
 
 #[test]

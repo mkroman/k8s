@@ -30,7 +30,8 @@ Management listener (ClusterIP only):
 Important:
   - Port 8080 is plain HTTP and must never be exposed by the mail LoadBalancer.
   - Ensure a public IP, matching PTR record, DNS records, and open port 25.
-  - Back up the PVC and `config.json` before minor or major upgrades.
+  - Back up the data store (PostgreSQL in production, the PVC in kind) and
+    `config.json` before minor or major upgrades.
   - The default Log tracer writes to `/var/log/stalwart`; switch to a Stdout
     tracer in the WebUI for cluster log collection.
   - The TLS certificate Secret is mounted, but Stalwart does not use it until

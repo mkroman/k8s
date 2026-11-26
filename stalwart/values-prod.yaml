@@ -12,12 +12,18 @@
 #   - A SealedSecret named `stalwart-metrics` containing:
 #       username: prometheus
 #       password: <metrics password>
-#   - The `letsencrypt-prod` ClusterIssuer (or adjust issuerRef below).
+#   - A Secret named `stalwart-postgres` containing the complete Stalwart
+#     `config.json`; see below and the chart README.
+#   - After the first install, a Secret named `stalwart-cli` with a permanent
+#     administrator's STALWART_USER and STALWART_PASSWORD (or STALWART_TOKEN)
+#     before enabling the certificate reload CronJob.
+#   - The `letsencrypt-production-dns` ClusterIssuer from the cert-manager
+#     chart (Cloudflare DNS-01), or an existing wildcard certificate.
 #   - DNS A/AAAA records for mail.rwx.im and the autoconfiguration names, plus
 #     a PTR record and port 25 reachability.
 #
-# Create the SealedSecrets before the first sync; the pod waits for the
-# recovery administrator Secret.
+# Create the config and recovery administrator Secrets before the first sync;
+# the pod waits for them.
 
 service:
   mail:
@@ -27,9 +33,24 @@ service:
     # annotations:
     #   lbipam.cilium.io/ips: 10.0.3.10
 
+# These non-secret fields drive chart validation and the NetworkPolicy
+# database egress rule. The mounted config.json comes from configSecret below;
+# keep both definitions in sync.
+config:
+  "@type": PostgreSql
+  host: postgres-rw.rwx.svc.cluster.local
+  port: 5432
+  database: stalwart_prod
+
+# The full config.json, including the database username and password, lives in
+# this Secret. See the README for the expected JSON.
+configSecret:
+  name: stalwart-postgres
+  key: config.json
+
+# PostgreSQL holds the data store; no local data PVC is needed.
 persistence:
-  storageClass: ssd-gp1x3
-  size: 50Gi
+  enabled: false
 
 resources:
   requests:
@@ -58,13 +79,19 @@ certificate:
     - ua-auto-config.rwx.im
   issuerRef:
     kind: ClusterIssuer
-    name: letsencrypt-prod
+    name: letsencrypt-production-dns
     group: cert-manager.io
   reload:
-    enabled: true
-    credentialsSecret: stalwart-recovery-admin
+    # Enable after creating the permanent administrator and the stalwart-cli
+    # Secret. The recovery administrator is removed after the first install.
+    enabled: false
+    credentialsSecret: stalwart-cli
 
 metrics:
+  exporter:
+    # Enable the exporter in Stalwart's database first, then set this to true
+    # so the exporter-dependent alerts are rendered.
+    enabled: false
   serviceMonitor:
     enabled: true
   prometheusRule:

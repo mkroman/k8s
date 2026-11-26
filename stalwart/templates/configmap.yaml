@@ -1,3 +1,4 @@
+{{- if not .Values.configSecret.name }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -10,3 +11,5 @@ data:
   # else lives in the database and is managed through the WebUI or CLI.
   config.json: |
     {{- .Values.config | toPrettyJson | nindent 4 }}
+
+{{- end }}

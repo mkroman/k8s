@@ -23,8 +23,8 @@ use crate::clock::Clock;
 use crate::cluster::{ClusterError, KindCluster};
 use crate::command::{CommandError, CommandRunner, CommandSpec, Tool};
 use crate::kube::{
-    DeleteOptions, ExecRequest, KubeApi, KubeClient, KubeError, NAMESPACE, PERSISTENT_VOLUME_CLAIM,
-    POD, ResourceKey,
+    DEFAULT_EXEC_TIMEOUT, DeleteOptions, ExecRequest, KubeApi, KubeClient, KubeError, NAMESPACE,
+    PERSISTENT_VOLUME_CLAIM, POD, ResourceKey,
 };
 use crate::manifest::{
     AppSpec, Manifest, ManifestError, RendererKind, UpgradeSecurityProfile, UpgradeSpec,
@@ -412,6 +412,7 @@ async fn perform_upgrade(
                     "-ec".to_owned(),
                     format!("printf '%s' e2e-rollout > '{marker}'"),
                 ],
+                timeout: DEFAULT_EXEC_TIMEOUT,
             })
             .await?;
         if !output.success {
@@ -460,6 +461,7 @@ async fn perform_upgrade(
                 pod: replacement_name.clone(),
                 container: Some(container.clone()),
                 command: vec!["cat".to_owned(), marker],
+                timeout: DEFAULT_EXEC_TIMEOUT,
             })
             .await?;
         if !output.success || output.stdout.trim() != "e2e-rollout" {
