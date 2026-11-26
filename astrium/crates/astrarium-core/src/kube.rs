@@ -795,8 +795,19 @@ impl KubeApi for KubeClient {
                         message: source.to_string(),
                     })?;
             }
+            // The remote-command protocol sends a Status object on success as
+            // well as on failure, so inspect it instead of treating every
+            // status as an error.
             let success = match status {
-                Some(status) => status.await.is_none(),
+                Some(status) => match status.await {
+                    Some(status) if status.status.as_deref() == Some("Failure") => {
+                        if stderr.is_empty() {
+                            stderr = status.message.unwrap_or_default();
+                        }
+                        false
+                    }
+                    _ => true,
+                },
                 None => true,
             };
             process.join().await.map_err(|source| KubeError::Exec {
