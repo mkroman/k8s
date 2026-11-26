@@ -27,7 +27,7 @@ env:
 jobs:
   verify:
     name: Verify tag
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 5
     permissions:
       contents: read
@@ -138,7 +138,7 @@ jobs:
   release:
     name: Publish release
     needs: [verify, build]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
     permissions:
       contents: write

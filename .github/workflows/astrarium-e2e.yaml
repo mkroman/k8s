@@ -41,7 +41,7 @@ defaults:
 jobs:
   changes:
     name: Detect source changes
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 5
     outputs:
       source: ${{ steps.detect.outputs.source }}
@@ -71,7 +71,7 @@ jobs:
   build:
     name: Build Astrarium
     needs: changes
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 15
     steps:
     - name: Checkout
@@ -113,7 +113,7 @@ jobs:
   plan:
     name: Plan matrix
     needs: [changes, build]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
     outputs:
       matrix: ${{ steps.plan.outputs.matrix }}
@@ -192,7 +192,7 @@ jobs:
       needs.plan.outputs.has_apps == 'true' &&
       (github.event_name != 'pull_request' ||
        github.event.pull_request.head.repo.full_name == github.repository)
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 60
     permissions:
       contents: read
