@@ -32,11 +32,16 @@ cargo build --release
 docker compose -f astrium/compose.yaml up -d
 astrium/target/release/astrarium plan --all
 astrium/target/release/astrarium run --app mosquitto
+astrium/target/release/astrarium upgrade --app stalwart
 ```
 
 `astrarium doctor` checks `helm`, `kustomize`, `kind` and the manifest paths.
 `plan` selects apps from a Git diff (M3) or explicitly with `--all`/`--app`.
 `run` creates a kind cluster, installs Argo CD, and deploys the selected apps.
+`upgrade` first deploys the app and its prerequisites through the same path,
+then installs the chart into a disposable `<namespace>-rollout` namespace,
+upgrades and restarts it, and verifies pod replacement, a data marker and PVC
+retention.
 
 ### Trace files
 
@@ -58,9 +63,10 @@ the file as an `astrarium-<app>-trace` artifact on every run.
   suite. Native `[[projects]]`, `[[namespaces]]`, `[[apps]]` and
   `[[helm_repositories]]` tables remain supported. This repository opts into
   the read-only `[catalog]` adapter, which imports its existing
-  `apps/values.yaml` and `hack/e2e/apps.yaml` before validation. Astrarium
-  creates `Namespace`, `AppProject` and `Application` objects directly; it does
-  not bootstrap the production `apps` chart.
+  `apps/values.yaml` and `hack/e2e/apps.yaml` before validation, plus a
+  `[catalog].common_values` file such as `hack/e2e/values-common.yaml`.
+  Astrarium creates `Namespace`, `AppProject` and `Application` objects
+  directly; it does not bootstrap the production `apps` chart.
 - **Only three external CLI programs.** The Rust binary invokes `helm`,
   `kustomize` and `kind`. Git access uses `gix`, Kubernetes access uses `kube`,
   HTTP uses `reqwest`, and dates/times use `jiff`. Cold-image removal and node

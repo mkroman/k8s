@@ -171,19 +171,20 @@ release notes first.
 
 ## Testing
 
-The chart is exercised by the repo's Argo CD e2e harness:
+The chart is exercised by the repo's Astrarium e2e suite:
 
 ```bash
-KEEP_CLUSTER=1 ./hack/e2e/run-app.sh stalwart
+astrarium run --app stalwart
+astrarium upgrade --app stalwart
 ```
 
 The e2e run deploys cert-manager and Prometheus Operator as prerequisites,
 issues a self-signed Certificate, applies the ServiceMonitor and PrometheusRule,
 and runs the PostSync probe (admin readiness, SMTP banner, SMTPS/IMAPS TCP,
-HTTPS TCP reachability). It then runs the generic in-cluster upgrade test because
-`apps.yaml` sets `upgrade.enabled: true`; that test writes a marker under
-`/var/lib/stalwart`, upgrades the chart, verifies pod replacement and marker
-survival, and checks PVC retention after uninstall.
+HTTPS TCP reachability). The upgrade command then runs the generic in-cluster
+upgrade test because `apps.yaml` sets `upgrade.enabled: true`; it writes a
+marker under `/var/lib/stalwart`, upgrades the chart, verifies pod replacement
+and marker survival, and checks PVC retention after uninstall.
 
 Static checks:
 

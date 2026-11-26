@@ -1,5 +1,5 @@
 # Default values are documented in values.yaml.
-# This file is used by hack/e2e/run-app.sh and the Stalwart contract tests.
+# This file is used by the Astrarium e2e suite and the Stalwart contract tests.
 replicaCount: 1
 
 service:

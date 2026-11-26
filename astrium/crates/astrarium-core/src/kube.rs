@@ -148,6 +148,30 @@ pub struct LogRequest {
     pub tail_lines: u32,
 }
 
+/// A command to execute in a running container.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ExecRequest {
+    /// The pod namespace.
+    pub namespace: String,
+    /// The pod name.
+    pub pod: String,
+    /// The container, or `None` for the pod's default container.
+    pub container: Option<String>,
+    /// The command and its arguments.
+    pub command: Vec<String>,
+}
+
+/// The captured result of a container command.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ExecOutput {
+    /// Standard output.
+    pub stdout: String,
+    /// Standard error.
+    pub stderr: String,
+    /// Whether the command exited successfully.
+    pub success: bool,
+}
+
 /// A Kubernetes object identified by API version and kind.
 ///
 /// Manifest probes declare objects this way, so the client can resolve the
@@ -302,6 +326,14 @@ pub enum KubeError {
         /// A description of the problem.
         message: String,
     },
+    /// Reading from an exec stream failed.
+    #[error("failed to read exec output for pod {pod}: {message}")]
+    Exec {
+        /// The pod name.
+        pod: String,
+        /// A description of the failure.
+        message: String,
+    },
 }
 
 impl KubeError {
@@ -396,6 +428,18 @@ pub trait KubeApi: Send + Sync {
 
     /// Fetches pod container logs.
     fn logs(&self, request: LogRequest) -> BoxFuture<'_, Result<String, KubeError>>;
+
+    /// Executes a command in a running container.
+    ///
+    /// The default implementation reports that exec is unsupported so test
+    /// fakes that do not exercise it need no extra code.
+    fn exec(&self, _request: ExecRequest) -> BoxFuture<'_, Result<ExecOutput, KubeError>> {
+        Box::pin(async {
+            Err(KubeError::Request {
+                message: "exec is not implemented by this KubeApi".to_owned(),
+            })
+        })
+    }
 }
 
 /// The production [`KubeApi`] implementation.
@@ -710,6 +754,60 @@ impl KubeApi for KubeClient {
             api.logs(&request.pod, &params)
                 .await
                 .map_err(|source| KubeError::api(POD.kind, request.pod, source))
+        })
+    }
+
+    fn exec(&self, request: ExecRequest) -> BoxFuture<'_, Result<ExecOutput, KubeError>> {
+        Box::pin(async move {
+            use tokio::io::AsyncReadExt as _;
+
+            let api: Api<Pod> = Api::namespaced(self.client.clone(), &request.namespace);
+            let mut params = kube::api::AttachParams::default().stdout(true).stderr(true);
+            if let Some(container) = &request.container {
+                params = params.container(container.clone());
+            }
+            let mut process = api
+                .exec(&request.pod, request.command.clone(), &params)
+                .await
+                .map_err(|source| KubeError::api(POD.kind, request.pod.clone(), source))?;
+
+            // Read streams to EOF before joining, then inspect the status
+            // object. A non-zero exit is reported through the status, not as
+            // a transport error.
+            let status = process.take_status();
+            let mut stdout = String::new();
+            if let Some(mut reader) = process.stdout() {
+                reader
+                    .read_to_string(&mut stdout)
+                    .await
+                    .map_err(|source| KubeError::Exec {
+                        pod: request.pod.clone(),
+                        message: source.to_string(),
+                    })?;
+            }
+            let mut stderr = String::new();
+            if let Some(mut reader) = process.stderr() {
+                reader
+                    .read_to_string(&mut stderr)
+                    .await
+                    .map_err(|source| KubeError::Exec {
+                        pod: request.pod.clone(),
+                        message: source.to_string(),
+                    })?;
+            }
+            let success = match status {
+                Some(status) => status.await.is_none(),
+                None => true,
+            };
+            process.join().await.map_err(|source| KubeError::Exec {
+                pod: request.pod.clone(),
+                message: source.to_string(),
+            })?;
+            Ok(ExecOutput {
+                stdout,
+                stderr,
+                success,
+            })
         })
     }
 }

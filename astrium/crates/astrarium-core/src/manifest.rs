@@ -458,15 +458,57 @@ pub enum RendererKind {
 }
 
 /// An optional upgrade test.
+///
+/// The generic in-cluster test installs the chart into a separate
+/// `<namespace>-rollout` namespace with Helm, upgrades it, restarts its pods
+/// and checks that a marker written below [`UpgradeSpec::data_path`] and its
+/// PersistentVolumeClaims survive.
 #[derive(Clone, Debug, Deserialize, Serialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct UpgradeSpec {
+    /// Whether the upgrade test is enabled. An `upgrade` table opts in by
+    /// default.
+    #[serde(default = "default_true")]
+    pub enabled: bool,
     /// Values used for the initial deployment, relative to the app's `source`
     /// and applied before the current values.
     #[serde(default)]
     pub from_values: Vec<PathBuf>,
     /// A Git revision to deploy before the current working tree.
     pub from_revision: Option<Revision>,
+    /// The container that owns `data_path`. Defaults to the first container.
+    pub container: Option<String>,
+    /// An absolute directory inside the container for the persistence marker.
+    /// When unset, the test does not write or read a marker.
+    pub data_path: Option<String>,
+    /// The Helm install, upgrade and rollout timeout in seconds.
+    #[serde(default = "default_upgrade_timeout")]
+    pub timeout_seconds: u64,
+    /// The pod security profile to assert.
+    #[serde(default)]
+    pub security_profile: UpgradeSecurityProfile,
+    /// Require the PersistentVolumeClaims to survive `helm uninstall`.
+    #[serde(default = "default_true")]
+    pub verify_pvc_retention: bool,
+}
+
+/// The pod security profile asserted by the upgrade test.
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, JsonSchema, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum UpgradeSecurityProfile {
+    /// The restricted profile: non-root, read-only root filesystem, no
+    /// privilege escalation, `RuntimeDefault` seccomp and all capabilities
+    /// dropped.
+    #[default]
+    Restricted,
+    /// Do not assert a pod security profile.
+    None,
+}
+
+/// The default upgrade-test timeout in seconds.
+#[must_use]
+pub const fn default_upgrade_timeout() -> u64 {
+    600
 }
 
 /// Resources that must be removed before a cold-image probe can run.
@@ -632,7 +674,12 @@ impl Manifest {
 
         let apps_path = self.resolve_path(&config.apps)?;
         let e2e_path = self.resolve_path(&config.e2e)?;
-        let suite = catalog::load(&self.project.root, &apps_path, &e2e_path)?;
+        let suite = catalog::load(
+            &self.project.root,
+            &apps_path,
+            &e2e_path,
+            config.common_values.as_deref(),
+        )?;
         self.projects = suite.projects;
         self.namespaces = suite.namespaces;
         self.apps = suite.apps;

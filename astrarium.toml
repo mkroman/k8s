@@ -39,6 +39,7 @@ shared_paths = [
   "astrarium.toml",
   "apps/values.yaml",
   "hack/e2e/apps.yaml",
+  "hack/e2e/values-common.yaml",
   "hack/e2e/kind.yaml",
   "hack/e2e/argocd",
   # Astrarium source and build inputs change the harness itself. Documentation
@@ -52,6 +53,7 @@ shared_paths = [
 [catalog]
 apps = "apps/values.yaml"
 e2e = "hack/e2e/apps.yaml"
+common_values = "hack/e2e/values-common.yaml"
 
 [cluster]
 provider = "kind"

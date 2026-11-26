@@ -297,9 +297,24 @@ diagnostics are collected in parallel, but syncs are not reordered.
 
 ### Upgrade runs
 
-`astrarium upgrade --app <name>` first deploys the values or revision in
-`[apps.upgrade]` (`from_values` or `from_revision`), waits, then applies the
-current working tree and waits again so `pre-upgrade`/`post-upgrade` hooks run.
+`astrarium upgrade --app <name>` first deploys the app and its prerequisites
+through the normal Argo CD run path. It then packages the app's Helm chart
+with the same kind values, installs it into a disposable
+`<namespace>-rollout` namespace, and runs the generic in-cluster test:
+
+1. Wait for a Ready pod and assert the restricted security profile.
+2. Snapshot the PVC names, UIDs and bind phases.
+3. Optionally write a marker below `upgrade.data_path` in the configured
+   container.
+4. Run `helm upgrade`, delete the release pods so their controllers recreate
+   them, and wait for a Ready pod with a new UID.
+5. Check the marker survived and the PVC identity and bind state did not
+   change.
+6. Run `helm uninstall`; unless `verify_pvc_retention` is false, the PVCs must
+   still exist.
+
+The old `from_values`/`from_revision` fields remain in the manifest for a
+future chart-diff upgrade fixture, but the catalog adapter does not set them.
 
 ### Cleanup
 
@@ -380,12 +395,10 @@ raw content.
 
 ## Unresolved questions
 
-- **Must answer before `published`:** is `0.1.0-astrarium.<hash>` acceptable
-  for wrapper charts? It is a valid SemVer prerelease, but a version that
-  changes on every render may surprise a future cache or comparison.
-- **Must answer before `published`:** should the upgrade fixture use
-  `from_values` (a second values file) or `from_revision` (the previous
-  commit)? Values are self-contained; a revision tests the real chart diff.
+- **Deferred:** should the upgrade fixture also support `from_values` (a
+  second values file) or `from_revision` (the previous commit)? The current
+  test exercises pod replacement, data persistence and PVC retention with the
+  same chart; a chart-diff fixture would test the rendered manifest change.
 - **Can be deferred:** should Astrarium register the chart repository as an
   Argo CD repository Secret so the UI shows a name and future authentication has
   a home? The direct URL works today.

@@ -28,6 +28,7 @@ pub mod render;
 pub mod run;
 pub mod telemetry;
 pub mod types;
+pub mod upgrade;
 
 #[cfg(any(test, feature = "testing"))]
 pub mod testing;
@@ -47,6 +48,7 @@ pub use types::{
     AppName, ChartVersion, ContentHash, HumanDuration, NamespaceName, ProjectName, Revision,
     ValueError,
 };
+pub use upgrade::{UpgradeError, UpgradeOptions, UpgradeReport};
 
 /// A boxed, sendable future used by object-safe async traits.
 pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;

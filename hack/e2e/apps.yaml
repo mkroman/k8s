@@ -37,14 +37,15 @@
 # can leave its post-delete hook resources behind; either kind of leftover can
 # keep the image in use or confuse a probe's own pod selection.
 #
-# Shared probe defaults live in values-common.yaml; run-app.sh injects them as
-# `global.e2e` into every child Application whose chart exposes an `e2e` key.
+# Shared probe defaults live in values-common.yaml; the catalog adapter merges
+# it into every app as a common values file, so charts can read `global.e2e`.
 # `defaults.upgrade` centralises the generic upgrade test settings.
 #
-# upgrade opts an app into the generic in-cluster upgrade test. run-app.sh
-# installs the same chart into `<namespace>-rollout` with the same kind value
-# files, verifies the rollout, and checks PVC retention. `data_path` is
-# optional and is used for a write/read marker inside a mounted data volume.
+# upgrade opts an app into the generic in-cluster upgrade test.
+# `astrarium upgrade` installs the same chart into `<namespace>-rollout` with
+# the same kind values, verifies the rollout, and checks PVC retention.
+# `data_path` is optional and is used for a write/read marker inside a mounted
+# data volume.
 helm_repositories:
   - name: quickwit
     url: https://helm.quickwit.io

@@ -21,7 +21,8 @@ use thiserror::Error;
 use super::{
     AppSpec, HelmOptions, HelmRepository, KustomizeOptions, NamespaceSpec, ProjectDestination,
     ProjectSpec, PrometheusTargets, RendererKind, ResourceKind, ResourceRef, StaleProbeResources,
-    SyncPolicySpec, normalize_lexically,
+    SyncPolicySpec, UpgradeSecurityProfile, UpgradeSpec, default_upgrade_timeout,
+    normalize_lexically,
 };
 use crate::types::{AppName, NamespaceName, ProjectName, ValueError};
 
@@ -33,6 +34,11 @@ pub struct CatalogConfig {
     pub apps: PathBuf,
     /// Repository-relative path to the e2e application metadata file.
     pub e2e: PathBuf,
+    /// A Helm values file shared by every imported app, merged before the
+    /// app's own value files. The e2e suite uses it for `global.e2e` probe
+    /// defaults.
+    #[serde(default)]
+    pub common_values: Option<PathBuf>,
 }
 
 /// An error while reading or converting a YAML catalogue.
@@ -131,6 +137,14 @@ pub enum CatalogError {
         /// The source path.
         path: PathBuf,
     },
+    /// An upgrade test uses an unknown security profile.
+    #[error("e2e app {app:?} upgrade.security_profile must be restricted or none (got {value:?})")]
+    InvalidUpgradeProfile {
+        /// The e2e app name.
+        app: String,
+        /// The rejected profile.
+        value: String,
+    },
     /// A catalogue value is not a valid Kubernetes name or duration.
     #[error(transparent)]
     Value(#[from] ValueError),
@@ -155,6 +169,7 @@ pub(super) fn load(
     root: &Path,
     apps_path: &Path,
     e2e_path: &Path,
+    common_values: Option<&Path>,
 ) -> Result<CatalogSuite, CatalogError> {
     let values: ValuesCatalog = read_yaml(apps_path)?;
     let e2e: E2eCatalog = read_yaml(e2e_path)?;
@@ -218,7 +233,18 @@ pub(super) fn load(
     let converted_apps = e2e
         .apps
         .iter()
-        .map(|(name, app)| app_spec(root, apps_path, name, app, &applications, &projects))
+        .map(|(name, app)| {
+            app_spec(
+                root,
+                apps_path,
+                name,
+                app,
+                &e2e.defaults.upgrade,
+                common_values,
+                &applications,
+                &projects,
+            )
+        })
         .collect::<Result<Vec<_>, _>>()?;
 
     Ok(CatalogSuite {
@@ -399,6 +425,10 @@ fn namespace_lists(
     }
 }
 
+fn default_true() -> bool {
+    true
+}
+
 fn default_namespace_blacklist() -> Vec<ResourceKind> {
     vec![
         ResourceKind {
@@ -442,11 +472,14 @@ fn namespace_spec(
     })
 }
 
+#[allow(clippy::too_many_arguments)]
 fn app_spec(
     root: &Path,
     apps_path: &Path,
     name: &str,
     e2e: &E2eApp,
+    upgrade_defaults: &CatalogUpgradeDefaults,
+    common_values: Option<&Path>,
     applications: &Indexed<CatalogApplication>,
     projects: &Indexed<CatalogProject>,
 ) -> Result<AppSpec, CatalogError> {
@@ -510,7 +543,7 @@ fn app_spec(
         watch,
         renderer,
         values,
-        common_values: None,
+        common_values: common_values.map(Path::to_path_buf),
         inline_values: BTreeMap::new(),
         requires: e2e
             .requires
@@ -518,7 +551,11 @@ fn app_spec(
             .map(|required| AppName::new(required.clone()))
             .collect::<Result<_, _>>()?,
         probe: false,
-        upgrade: None,
+        upgrade: e2e
+            .upgrade
+            .as_ref()
+            .map(|upgrade| upgrade_spec(name, upgrade, upgrade_defaults))
+            .transpose()?,
         requires_fresh_image: e2e.requires_fresh_image,
         requires_containerd_config: e2e.requires_containerd_config,
         stale_probe_resources: e2e
@@ -541,6 +578,44 @@ fn app_spec(
         annotations: application.annotations.clone(),
         helm: HelmOptions::default(),
         kustomize: KustomizeOptions::default(),
+    })
+}
+
+fn upgrade_spec(
+    app: &str,
+    upgrade: &CatalogUpgrade,
+    defaults: &CatalogUpgradeDefaults,
+) -> Result<UpgradeSpec, CatalogError> {
+    let security_profile = upgrade
+        .security_profile
+        .as_deref()
+        .or(defaults.security_profile.as_deref())
+        .unwrap_or("restricted");
+    let security_profile = match security_profile {
+        "restricted" => UpgradeSecurityProfile::Restricted,
+        "none" => UpgradeSecurityProfile::None,
+        other => {
+            return Err(CatalogError::InvalidUpgradeProfile {
+                app: app.to_owned(),
+                value: other.to_owned(),
+            });
+        }
+    };
+    Ok(UpgradeSpec {
+        enabled: upgrade.enabled,
+        from_values: Vec::new(),
+        from_revision: None,
+        container: upgrade.container.clone(),
+        data_path: upgrade.data_path.clone(),
+        timeout_seconds: upgrade
+            .timeout_seconds
+            .or(defaults.timeout_seconds)
+            .unwrap_or_else(default_upgrade_timeout),
+        security_profile,
+        verify_pvc_retention: upgrade
+            .verify_pvc_retention
+            .or(defaults.verify_pvc_retention)
+            .unwrap_or(true),
     })
 }
 
@@ -739,7 +814,25 @@ struct CatalogAutomated {
 struct E2eCatalog {
     #[serde(default)]
     helm_repositories: Vec<CatalogHelmRepository>,
+    #[serde(default)]
+    defaults: E2eDefaults,
     apps: BTreeMap<String, E2eApp>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct E2eDefaults {
+    #[serde(default)]
+    upgrade: CatalogUpgradeDefaults,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct CatalogUpgradeDefaults {
+    #[serde(default, alias = "timeoutSeconds")]
+    timeout_seconds: Option<u64>,
+    #[serde(default, alias = "securityProfile")]
+    security_profile: Option<String>,
+    #[serde(default, alias = "verifyPvcRetention")]
+    verify_pvc_retention: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -766,6 +859,24 @@ struct E2eApp {
     stale_probe_resources: Option<CatalogStaleProbeResources>,
     #[serde(default)]
     retry_limit: Option<u32>,
+    #[serde(default)]
+    upgrade: Option<CatalogUpgrade>,
+}
+
+#[derive(Debug, Deserialize)]
+struct CatalogUpgrade {
+    #[serde(default = "default_true")]
+    enabled: bool,
+    #[serde(default)]
+    container: Option<String>,
+    #[serde(default, alias = "dataPath")]
+    data_path: Option<String>,
+    #[serde(default, alias = "timeoutSeconds")]
+    timeout_seconds: Option<u64>,
+    #[serde(default, alias = "securityProfile")]
+    security_profile: Option<String>,
+    #[serde(default, alias = "verifyPvcRetention")]
+    verify_pvc_retention: Option<bool>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -840,9 +951,9 @@ mirrors = []
         let root = repository_root();
         let manifest = Manifest::load(root.join("astrarium.toml")).expect("repository manifest");
 
-        assert_eq!(manifest.apps.len(), 17);
-        assert_eq!(manifest.projects.len(), 14);
-        assert_eq!(manifest.namespaces.len(), 14);
+        assert_eq!(manifest.apps.len(), 18);
+        assert_eq!(manifest.projects.len(), 15);
+        assert_eq!(manifest.namespaces.len(), 15);
         assert_eq!(manifest.helm_repositories.len(), 2);
         let repository_names: Vec<&str> = manifest
             .helm_repositories
@@ -918,6 +1029,30 @@ mirrors = []
             20
         );
         assert!(!manifest.app("grafana").expect("grafana").probe);
+
+        assert_eq!(
+            manifest.app("stalwart").expect("stalwart").common_values,
+            Some(PathBuf::from("hack/e2e/values-common.yaml"))
+        );
+        let upgrade = manifest
+            .app("stalwart")
+            .expect("stalwart")
+            .upgrade
+            .as_ref()
+            .expect("stalwart upgrade test");
+        assert!(upgrade.enabled);
+        assert_eq!(upgrade.container.as_deref(), Some("stalwart"));
+        assert_eq!(upgrade.data_path.as_deref(), Some("/var/lib/stalwart"));
+        assert_eq!(upgrade.timeout_seconds, 600);
+        assert_eq!(upgrade.security_profile, UpgradeSecurityProfile::Restricted);
+        assert!(upgrade.verify_pvc_retention);
+        assert!(
+            manifest
+                .app("mosquitto")
+                .expect("mosquitto")
+                .upgrade
+                .is_none()
+        );
     }
 
     #[test]

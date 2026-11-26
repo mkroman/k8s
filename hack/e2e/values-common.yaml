@@ -1,7 +1,7 @@
-# Shared defaults for the Argo CD e2e harness.
+# Shared defaults for the Astrarium e2e suite.
 #
-# run-app.sh injects this as `global.e2e` into every child Application whose
-# chart exposes an `e2e` key. Charts use:
+# The catalog adapter merges this file into every imported app, so Helm charts
+# can read `global.e2e`. Charts use:
 #   .Values.e2e.probeImage | default .Values.global.e2e.probeImage
 # so an app-specific value in values-kind.yaml still wins.
 global:
