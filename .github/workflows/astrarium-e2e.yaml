@@ -4,9 +4,8 @@ name: Astrarium e2e
 # dispatch runs the whole suite or one app. The workflow downloads the pinned
 # release from `.github/astrarium-version`.
 #
-# Follow-ups:
-# - build Astrarium from source when `astrium/**` changes and reuse the release
-#   binary otherwise;
+# Source changes build Astrarium once and share the binary through an artifact;
+# app changes use the pinned release. Follow-ups:
 # - pass previous-run results with `--previous-results` and grant `actions:
 #   read` for that lookup;
 # - gate the full suite on an `e2e/full` label, with the smoke set as default.
@@ -40,8 +39,80 @@ defaults:
     shell: bash
 
 jobs:
+  changes:
+    name: Detect source changes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      source: ${{ steps.detect.outputs.source }}
+    steps:
+    - name: Checkout
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        fetch-depth: 0
+        persist-credentials: false
+    - name: Detect Astrarium source changes
+      id: detect
+      env:
+        EVENT_NAME: ${{ github.event_name }}
+        BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+      run: |
+        set -euo pipefail
+        source=false
+        if [[ "${EVENT_NAME}" != "workflow_dispatch" &&
+          -n "${BASE_SHA}" && ! "${BASE_SHA}" =~ ^0+$ ]]; then
+          if git diff --name-only "${BASE_SHA}" HEAD |
+            grep -qE '^(astrarium\.toml$|astrium/(crates/|Cargo\.toml$|Cargo\.lock$|rust-toolchain\.toml$|rustfmt\.toml$))'; then
+            source=true
+          fi
+        fi
+        echo "source=${source}" >>"${GITHUB_OUTPUT}"
+
+  build:
+    name: Build Astrarium
+    needs: changes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+    - name: Checkout
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+    - name: Install Rust
+      if: needs.changes.outputs.source == 'true'
+      run: |
+        set -euo pipefail
+        if ! rustup toolchain list | grep -q '^1.100.0'; then
+          rustup toolchain install 1.100.0 --profile minimal
+        fi
+        rustup default 1.100.0
+    - name: Cache Cargo and target
+      if: needs.changes.outputs.source == 'true'
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          astrium/target
+        key: ${{ runner.os }}-astrarium-e2e-${{ hashFiles('astrium/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-astrarium-e2e-
+    - name: Build release binary
+      if: needs.changes.outputs.source == 'true'
+      timeout-minutes: 12
+      run: cargo build --locked --release --manifest-path astrium/Cargo.toml
+    - name: Upload binary
+      if: needs.changes.outputs.source == 'true'
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: astrarium-linux
+        path: astrium/target/release/astrarium
+        if-no-files-found: error
+        retention-days: 1
+
   plan:
     name: Plan matrix
+    needs: [changes, build]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     outputs:
@@ -58,7 +129,21 @@ jobs:
       run: |
         set -euo pipefail
         echo "version=$(tr -d '[:space:]' < .github/astrarium-version)" >>"${GITHUB_OUTPUT}"
-    - name: Set up Astrarium
+    - name: Download built Astrarium
+      if: needs.changes.outputs.source == 'true'
+      uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+      with:
+        name: astrarium-linux
+        path: ${{ runner.temp }}/astrarium-bin
+    - name: Install built Astrarium
+      if: needs.changes.outputs.source == 'true'
+      run: |
+        set -euo pipefail
+        mkdir -p "${HOME}/.local/bin"
+        install -m 0755 "${RUNNER_TEMP}/astrarium-bin/astrarium" "${HOME}/.local/bin/astrarium"
+        echo "${HOME}/.local/bin" >>"${GITHUB_PATH}"
+    - name: Set up released Astrarium
+      if: needs.changes.outputs.source != 'true'
       uses: ./.github/actions/setup-astrarium # zizmor: ignore[self-repository]
       with:
         version: ${{ steps.version.outputs.version }}
@@ -100,7 +185,7 @@ jobs:
 
   run:
     name: App ${{ matrix.app }}
-    needs: plan
+    needs: [changes, build, plan]
     if: needs.plan.outputs.has_apps == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -121,7 +206,21 @@ jobs:
       run: |
         set -euo pipefail
         echo "version=$(tr -d '[:space:]' < .github/astrarium-version)" >>"${GITHUB_OUTPUT}"
-    - name: Set up Astrarium
+    - name: Download built Astrarium
+      if: needs.changes.outputs.source == 'true'
+      uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+      with:
+        name: astrarium-linux
+        path: ${{ runner.temp }}/astrarium-bin
+    - name: Install built Astrarium
+      if: needs.changes.outputs.source == 'true'
+      run: |
+        set -euo pipefail
+        mkdir -p "${HOME}/.local/bin"
+        install -m 0755 "${RUNNER_TEMP}/astrarium-bin/astrarium" "${HOME}/.local/bin/astrarium"
+        echo "${HOME}/.local/bin" >>"${GITHUB_PATH}"
+    - name: Set up released Astrarium
+      if: needs.changes.outputs.source != 'true'
       uses: ./.github/actions/setup-astrarium # zizmor: ignore[self-repository]
       with:
         version: ${{ steps.version.outputs.version }}
