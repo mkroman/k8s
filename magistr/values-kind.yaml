@@ -1,4 +1,4 @@
-# E2E-only overrides for the kind-based test cluster (hack/e2e/run-app.sh).
+# E2E-only overrides for the Astrarium kind test cluster.
 #
 # The runner appends this file after values-prod.yaml. Overrides exist only to
 # make the chart deployable and healthy on kind, which has:

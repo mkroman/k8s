@@ -1,4 +1,4 @@
-# E2E-only overrides for the kind-based test cluster (hack/e2e/run-app.sh).
+# E2E-only overrides for the Astrarium kind test cluster.
 #
 # The runner appends this file to the Application's helm valueFiles because it
 # sits next to Chart.yaml. Every override below exists only to make

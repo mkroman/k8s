@@ -2,7 +2,8 @@
 
 GitOps app-of-apps for a home-lab Kubernetes cluster managed by Argo CD.
 Deeper docs: `hack/ci/README.md` (CI scripts, tool manifest),
-`hack/e2e/README.md` (kind e2e harness), `spegel/README.md` (containerd).
+`astrium/README.md` (Astrarium e2e runner), `hack/e2e/README.md` (shared e2e
+inputs), `spegel/README.md` (containerd).
 
 ## How it is wired
 
@@ -76,8 +77,8 @@ Deeper docs: `hack/ci/README.md` (CI scripts, tool manifest),
   `astrarium-vX.Y.Z`; release binaries are uploaded to GitHub Releases and
   cached via a local composite action. No new third-party Actions; pin runner
   images and action SHAs.
-- Migration: keep `hack/e2e` as a reference until Astrarium passes the smoke
-  set twice. Do not add new shell e2e scripts; extend Astrarium instead.
+- Do not add new shell e2e scripts; extend Astrarium instead. `hack/e2e`
+  contains only shared inputs (catalogue, kind config and Argo CD overlay).
 - Agent workflow: define shared interfaces first, then parallelize by module
   in separate worktrees. The manager reviews each change for API consistency,
   idiom, security, and tests before merging.
@@ -108,7 +109,7 @@ Repository checks:
 ./hack/ci/validate-app-of-apps.sh           # root app keeps SSA + server-side diff
 ./hack/ci/validate-dashboards.py            # grafana/dashboards/*.json; datasources must use $datasource
 python3 hack/ci/test-vector-config.py       # vector/quickwit; needs helm repos from hack/e2e/apps.yaml, vector, PyYAML
-shellcheck hack/ci/*.sh hack/e2e/*.sh
+shellcheck hack/ci/*.sh
 git diff --check
 ```
 
@@ -126,34 +127,33 @@ git diff --check
 
 ## E2E (kind + Argo CD)
 
-The shell harness below is the legacy reference implementation. New e2e work
-goes into Astrarium (`astrium/`, `astrarium.toml`) until the shell harness is
-removed after Astrarium passes the smoke set twice.
+Astrarium is the only e2e runner. `astrarium.toml` uses the typed `[catalog]`
+adapter; `hack/e2e/apps.yaml` supplies the e2e metadata, `hack/e2e/kind.yaml`
+the cluster layout, and `hack/e2e/argocd` the headless Argo CD overlay.
 
-`hack/e2e/run-app.sh APP` runs one entry from `hack/e2e/apps.yaml`. It needs
-docker, kind, kubectl, argocd, yq and jq.
+```bash
+astrarium plan --all
+astrarium run --app mosquitto
+astrarium run --all --keep-cluster
+astrarium run --app spegel --reuse-cluster --fast-fail
+```
 
-- It deploys the committed HEAD from a local git daemon and refuses to run if
-  the app's paths are dirty. Commit before testing.
-- Iterate locally with `KEEP_CLUSTER=1` on the first run, then
-  `REUSE_CLUSTER=1`. The cluster is named `e2e-<app>`; tear it down with
-  `kind delete cluster --name e2e-<app>`.
-- For faster local failures, set `E2E_RETRY_LIMIT=1 E2E_RETRY_MAX_DURATION=30s
-  E2E_TIMEOUT_SECONDS=300 E2E_REFRESH_TIMEOUT_SECONDS=60`. Never lower the CI
-  defaults (20, 5m, 600, 120). An app's `retry_limit` or `timeout_seconds` in
-  `apps.yaml` overrides these.
+- Iterate locally with `--keep-cluster` on the first run, then
+  `--reuse-cluster`. The cluster name comes from `[cluster].name`; Astrarium
+  only deletes clusters named `astrarium` or prefixed with `astrarium-`.
+- `--trace-file diagnostics/astrarium-trace.json` writes OTLP JSON that Jaeger
+  UI can open through Search → Upload.
 - Kind overrides are picked up automatically: `<chart>/values-kind.yaml` for
   Helm, `<app>/overlays/kind/` for Kustomize. CI only runs apps whose path,
-  Application values or `apps.yaml` entry changed. Preview the selection
-  with `./hack/e2e/list-changed.sh origin/main HEAD`.
+  Application values, catalog entry or shared Astrarium input changed.
+  Preview the selection with `astrarium plan --base origin/main`.
 - Kind cannot decrypt production SealedSecrets. Disable them or replace them
   in the kind values/overlay.
 - Helm cannot clear base values: `{}` merges and `null` is dropped. Design
   values so that empty means "feature off" (for example
   `zigbee2mqtt` `coordinator.devicePath`).
-- Before syncing, the runner does a server-side dry-run with strict
-  validation. It catches errors static checks miss, such as a hand-written
-  Job `spec.selector`. Never set `spec.selector` on probe Jobs.
+- Astrarium relies on Argo CD sync plus diagnostics. Static chart validation
+  still happens in `hack/ci/validate-helm.sh`.
 
 ## Probe conventions
 
@@ -164,6 +164,8 @@ docker, kind, kubectl, argocd, yq and jq.
   `grafana/templates/e2e/`, `spegel/templates/e2e/checks.yaml`.
 - Probe RBAC must be normal resources, not hooks. Argo CD's hook cleanup for
   passive resources does not follow Helm's per-hook lifecycle.
+- Never set `spec.selector` on probe Jobs; the server-side validation in CI
+  catches hand-written selectors.
 - Scripts run under BusyBox `/bin/sh`:
   - Use `set -euo pipefail`.
   - Parse API JSON in a whitespace-tolerant way (the output may be indented).

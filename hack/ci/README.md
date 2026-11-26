@@ -84,8 +84,9 @@ Run from anywhere in the repository:
 - `.github/workflows/validate-dashboards.yaml` runs the dashboard check when
   files under `grafana/dashboards/` or the validator change.
 - `.github/workflows/lint-ci.yaml` runs actionlint, shellcheck, and zizmor.
-- `.github/workflows/e2e-apps.yaml` runs the changed-application e2e tests on
-  kind; see [`hack/e2e/README.md`](../e2e/README.md).
+- `.github/workflows/astrarium-e2e.yaml` runs the changed-application e2e
+  tests on kind through Astrarium; see [`astrium/README.md`](../../astrium/README.md)
+  and [`hack/e2e/README.md`](../e2e/README.md).
 
 The workflows use only official `actions/*` and `azure/*` actions, plus the
 official zizmor action. The CLI tools are installed from their upstream

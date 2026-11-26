@@ -101,10 +101,9 @@ cargo build --locked --release
 ./target/release/astrarium doctor
 ```
 
-The Astrarium CI and release workflows are in place. The e2e workflow is
-manual until the first release is published, because it downloads a pinned
-release binary. The legacy shell harness remains available until Astrarium has
-passed the smoke set twice.
+The Astrarium CI, release and e2e workflows are in place. The e2e workflow
+builds the tool for source changes and downloads the pinned release for app-only
+changes. The legacy shell harness has been removed.
 
 ## CI and releases
 
@@ -117,9 +116,10 @@ passed the smoke set twice.
   `aarch64-unknown-linux-gnu`, with bash/zsh/fish completions and
   `SHA256SUMS`.
 - `.github/workflows/astrarium-e2e.yaml` runs on app and harness changes. It
-  uses the pinned release binary, lets the plan job select apps from the diff,
-  and fans out one job per selected app. A manual dispatch runs the whole suite
-  or one named app.
+  builds the tool once when `astrium/**` or `astrarium.toml` changes, otherwise
+  uses the pinned release. The plan job selects apps from the diff and fans out
+  one job per selected app. A manual dispatch runs the whole suite or one named
+  app.
 - `.github/actions/setup-astrarium/action.yml` downloads and verifies a
   released binary, and caches `~/.local/bin/astrarium` by version, OS and
   architecture. `.github/astrarium-version` pins the e2e version; bump it after

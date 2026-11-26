@@ -40,8 +40,9 @@ Three requirements shape the design:
 
 A pull request that touches the tool runs `astrarium-ci.yaml`: fmt, clippy,
 test, doc, and a release build on `ubuntu-24.04`. A pull request that touches an
-application also runs `e2e-apps.yaml`; its plan job emits a matrix, and each
-matrix entry runs `astrarium run --app <name>`.
+application also runs `astrarium-e2e.yaml`; its plan job emits a matrix, and
+each matrix entry runs `astrarium run --app <name>`. Source changes build the
+tool once in a build job and share the binary as an artifact.
 
 A release is cut by pushing a tag:
 
@@ -74,7 +75,7 @@ a pull request, so the change is reviewed and revertible.
 | --- | --- | --- |
 | `.github/workflows/astrarium-ci.yaml` | PR/push paths `astrium/**`, `astrarium.toml`, `.github/workflows/astrarium-*.yaml`, `.github/actions/setup-astrarium/**` | fmt, clippy, test, doc, release build |
 | `.github/workflows/astrarium-release.yaml` | push tag `astrarium-v*` | build binaries, checksums, GitHub Release |
-| `.github/workflows/e2e-apps.yaml` | PR/push, nightly schedule, `workflow_dispatch` | plan and run app matrix |
+| `.github/workflows/astrarium-e2e.yaml` | PR/push, `workflow_dispatch` | build source when needed, plan and run app matrix |
 
 The release and e2e workflows are separate so a failed release cannot cancel an
 e2e run and a tag push cannot be cancelled by a branch push.
@@ -367,8 +368,8 @@ v0.1.0" ambiguous.
 - [cargo-dist](https://opensource.axo.dev/cargo-dist/) is prior art for
   multi-target Rust release packaging; Astrarium borrows the tarball and
   checksum layout without the tool.
-- The repository's existing `e2e-apps.yaml` contributes the matrix shape, the
-  `has_apps` guard, and the `workflow_dispatch` app input.
+- The former `e2e-apps.yaml` contributed the matrix shape, the `has_apps`
+  guard, and the `workflow_dispatch` app input.
 - [Sigstore](https://www.sigstore.dev/) and GitHub artifact attestations are
   prior art for provenance; only the first-party attestation is in scope.
 

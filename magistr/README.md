@@ -133,7 +133,7 @@ the same CPU/memory envelope, `info` logging, the `postgres` Secret, Traefik
 IngressRoutes for `magistr.dk` and `www.magistr.dk`, and a cert-manager
 Certificate stored in `magistr.dk-tls`.
 
-`values-kind.yaml` is for `hack/e2e/run-app.sh` only. It disables ingress,
+`values-kind.yaml` is for the Astrarium kind suite only. It disables ingress,
 the PDB and the NetworkPolicy, and enables the disposable PostgreSQL fixture
 and the HTTP probe.
 
@@ -210,13 +210,13 @@ The application has no dedicated health, readiness, or metrics endpoint.
 ## E2E
 
 The chart is registered in `apps/values.yaml` as `magistr` and in
-`hack/e2e/apps.yaml`. On kind, the runner appends `values-kind.yaml` to
+`hack/e2e/apps.yaml`. Astrarium appends `values-kind.yaml` to
 `values-prod.yaml`, starts the PostgreSQL fixture, and waits for the PostSync
 probe to receive HTTP 200 from `/` through the Service.
 
 ```bash
-KEEP_CLUSTER=1 ./hack/e2e/run-app.sh magistr
-REUSE_CLUSTER=1 ./hack/e2e/run-app.sh magistr
+astrarium run --app magistr --keep-cluster
+astrarium run --app magistr --reuse-cluster
 ```
 
 The application image is `linux/amd64` only; the e2e cluster must run amd64
