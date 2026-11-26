@@ -121,9 +121,24 @@ Enable the exporter in Stalwart with a file-based password:
 
 The chart mounts `stalwart-metrics` at `/etc/stalwart/metrics`. The
 `ServiceMonitor` scrapes the admin Service on `8080` at
-`/metrics/prometheus` with basic auth. The `PrometheusRule` alerts on a down
-target and an outbound-queue backlog. The `monitoring` namespace is allowed to
+`/metrics/prometheus` with basic auth. The `monitoring` namespace is allowed to
 reach the management port by the NetworkPolicy.
+
+The `PrometheusRule` alerts on:
+
+- a down target and an outbound-queue backlog;
+- a pod that is not Ready for two minutes;
+- container restarts;
+- `ImagePullBackOff`/`ErrImagePull`;
+- data PVC usage above `metrics.prometheusRule.pvcUsageThreshold`;
+- a cert-manager certificate expiring within
+  `metrics.prometheusRule.certificateExpiryDays`;
+- a failed TLS reload CronJob.
+
+The pod and PVC alerts need kube-state-metrics and kubelet metrics; the
+certificate alerts need the cert-manager metrics endpoint. They are only
+rendered when `metrics.serviceMonitor.enabled` and
+`metrics.prometheusRule.enabled` are true.
 
 ## Storage and backup
 
@@ -150,8 +165,12 @@ instead of the volumeClaimTemplate.
 
 The default Stalwart installation creates a `Log` tracer writing daily files to
 `/var/log/stalwart`. The chart mounts a writable `emptyDir` there so the
-read-only root filesystem works. For cluster log collection, switch the tracer
-to `Stdout` in the WebUI; `kubectl logs` then shows the events.
+read-only root filesystem works.
+
+`emptyDir` is not retained. Logs written there disappear when the pod is
+replaced, which is exactly when upgrade and crash diagnostics matter. Switch the
+tracer to `Stdout` in the WebUI and collect the container logs through the
+cluster logging stack. Keep the `Log` tracer only for short-lived debugging.
 
 ## Memory
 
@@ -207,9 +226,11 @@ astrarium run --app stalwart
 astrarium upgrade --app stalwart
 ```
 
-The e2e run deploys cert-manager and Prometheus Operator as prerequisites,
-issues a self-signed Certificate, applies the ServiceMonitor and PrometheusRule,
-and runs the PostSync probe (admin readiness, SMTP banner, SMTPS/IMAPS TCP,
+Before creating the cluster, the e2e workflow renders the chart and checks every
+image, including the probe image, with `docker buildx imagetools inspect`
+against the registry proxy. The e2e run then deploys cert-manager and
+Prometheus Operator as prerequisites, issues a self-signed Certificate, applies
+the ServiceMonitor and PrometheusRule, and runs the PostSync probe (admin readiness, SMTP banner, SMTPS/IMAPS TCP,
 HTTPS TCP reachability). The upgrade command then runs the generic in-cluster
 upgrade test because `apps.yaml` sets `upgrade.enabled: true`; it writes a
 marker under `/var/lib/stalwart`, upgrades the chart, verifies pod replacement

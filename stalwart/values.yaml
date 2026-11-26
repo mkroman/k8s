@@ -374,6 +374,10 @@ metrics:
     enabled: false
     additionalLabels: {}
     queueBacklogThreshold: 100
+    # -- Alert when the data PVC is used above this fraction.
+    pvcUsageThreshold: 0.8
+    # -- Alert when the TLS certificate expires within this many days.
+    certificateExpiryDays: 14
   auth:
     # -- Existing Secret with the metrics basic-auth credentials. The same
     #    Secret is mounted at `/etc/stalwart/metrics` for Stalwart's Metrics
