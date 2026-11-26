@@ -14,16 +14,16 @@
 #       password: <metrics password>
 #   - A Secret named `stalwart-postgres` containing the complete Stalwart
 #     `config.json`; see below and the chart README.
-#   - A Secret named `stalwart-cli` with a permanent administrator's
-#     STALWART_USER and STALWART_PASSWORD (or STALWART_TOKEN) for the
-#     certificate reload CronJob.
+#   - After the first install, a Secret named `stalwart-cli` with a permanent
+#     administrator's STALWART_USER and STALWART_PASSWORD (or STALWART_TOKEN)
+#     before enabling the certificate reload CronJob.
 #   - The `letsencrypt-production-dns` ClusterIssuer from the cert-manager
 #     chart (Cloudflare DNS-01), or an existing wildcard certificate.
 #   - DNS A/AAAA records for mail.rwx.im and the autoconfiguration names, plus
 #     a PTR record and port 25 reachability.
 #
-# Create these Secrets before the first sync; the pod waits for the config and
-# recovery administrator Secrets.
+# Create the config and recovery administrator Secrets before the first sync;
+# the pod waits for them.
 
 service:
   mail:
@@ -82,9 +82,9 @@ certificate:
     name: letsencrypt-production-dns
     group: cert-manager.io
   reload:
-    enabled: true
-    # A permanent administrator, not the recovery credential. The recovery
-    # administrator Secret is removed after the first install.
+    # Enable after creating the permanent administrator and the stalwart-cli
+    # Secret. The recovery administrator is removed after the first install.
+    enabled: false
     credentialsSecret: stalwart-cli
 
 metrics:

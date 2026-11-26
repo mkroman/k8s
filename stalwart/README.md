@@ -74,9 +74,9 @@ This means:
 - A SealedSecret `stalwart-metrics`:
   - `username`: `prometheus`
   - `password`: `<metrics password>`
-- A Secret `stalwart-cli` with a permanent administrator's `STALWART_USER`
-  and `STALWART_PASSWORD`, or `STALWART_TOKEN`, for the certificate reload
-  CronJob.
+- After the first install, a Secret `stalwart-cli` with a permanent
+  administrator's `STALWART_USER` and `STALWART_PASSWORD`, or
+  `STALWART_TOKEN`, before enabling the certificate reload CronJob.
 
 The recovery administrator is a full-access master credential. Create a
 permanent administrator, then set `recoveryAdmin.enabled: false` and upgrade.
@@ -90,8 +90,9 @@ kubectl -n stalwart port-forward svc/stalwart-admin 8080:8080
 
 Sign in with the recovery administrator, create a permanent administrator,
 configure the default hostname/domain and listeners, then store the permanent
-administrator's credentials in `stalwart-cli` and remove the recovery
-administrator from the values.
+administrator's credentials in `stalwart-cli`, set
+`certificate.reload.enabled: true`, and remove the recovery administrator from
+the values.
 
 Port 8080 is plain HTTP and is only exposed by the ClusterIP admin Service. It
 must never be added to the mail LoadBalancer.
@@ -124,9 +125,11 @@ object once, pointing at the files:
 The optional `certificate.reload` CronJob calls
 `Action/ReloadTlsCertificates` every six hours so cert-manager renewals take
 effect without a pod restart. It reads `STALWART_USER` and `STALWART_PASSWORD`,
-or `STALWART_TOKEN`, from `certificate.reload.credentialsSecret`. Production
-uses the permanent administrator in `stalwart-cli`, not the recovery
-administrator, because the recovery Secret is removed after setup.
+or `STALWART_TOKEN`, from `certificate.reload.credentialsSecret`. It is
+disabled in `values-prod.yaml` until `stalwart-cli` exists, because the
+CronJob is created with the release and would otherwise fail on its first run.
+Use the permanent administrator there, not the recovery credential that is
+removed after setup.
 
 `values-prod.yaml` references the repo's `letsencrypt-production-dns`
 ClusterIssuer. It uses Cloudflare DNS-01, so it works for the mail
