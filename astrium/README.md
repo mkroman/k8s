@@ -29,11 +29,35 @@ cargo build --release
 ./target/release/astrarium doctor
 
 # From the repository root.
+export REGISTRY=registry.rwx.im
+docker login "${REGISTRY}"
+./hack/ci/prepare-ci-images.sh
 docker compose -f astrium/compose.yaml up -d
 astrium/target/release/astrarium plan --all
 astrium/target/release/astrarium run --app mosquitto
 astrium/target/release/astrarium upgrade --app stalwart
 ```
+
+Astrarium pulls workload images through the path-prefixed registry proxy
+configured in `astrarium.toml`. For local runs, create a plain Docker config
+and point `ASTRARIUM_REGISTRY_AUTH_FILE` at it:
+
+```bash
+export REGISTRY_USER=...
+export REGISTRY_PASSWORD=...
+mkdir -p .astrium
+umask 077
+auth="$(printf '%s:%s' "${REGISTRY_USER}" "${REGISTRY_PASSWORD}" | base64 -w0)"
+printf '{"auths":{"%s":{"auth":"%s"}}}\n' "${REGISTRY}" "${auth}" \
+  >.astrium/registry-auth.json
+export ASTRARIUM_REGISTRY_AUTH_FILE="${PWD}/.astrium/registry-auth.json"
+```
+
+The file is mounted read-only at `/var/lib/kubelet/config.json` on every kind
+node. The e2e workflow creates the same file from the `REGISTRY_USER` and
+`REGISTRY_PASSWORD` repository secrets. Host-side pulls (`kindest/node`,
+Jaeger) are pre-pulled through the proxy and retagged by
+`hack/ci/prepare-ci-images.sh`.
 
 `astrarium doctor` checks `helm`, `kustomize`, `kind` and the manifest paths.
 `plan` selects apps from a Git diff (M3) or explicitly with `--all`/`--app`.
@@ -79,8 +103,8 @@ the file as an `astrarium-<app>-trace` artifact on every run.
   wrapped in a tiny Helm chart so hooks and sync waves behave like Helm.
 - **One trace per run.** OpenTelemetry spans follow the CI/CD semantic
   conventions (`cicd.pipeline.*`) with `astrarium.*` custom attributes and
-  low-cardinality span names. Jaeger and registry pull-through caches live in
-  `compose.yaml`.
+  low-cardinality span names. Jaeger lives in `compose.yaml`; kind nodes pull
+  workload images through the registry proxy configured in `astrarium.toml`.
 - **Boring, explicit Rust.** Rust 2024, `foo.rs` + `foo/` module layout (never
   `foo/mod.rs`), domain modules, newtypes for semantic strings, `thiserror` in
   libraries, `miette` at the CLI boundary, and no `unwrap`/`expect` in
@@ -91,7 +115,7 @@ the file as an `astrarium-<app>-trace` artifact on every run.
 ```
 Cargo.toml                  workspace, resolver = 3
 rust-toolchain.toml          Rust 1.100.0
-compose.yaml                 Jaeger + registry mirrors
+compose.yaml                 Jaeger
 rfd/                         Request for Discussion documents
 crates/astrarium/            CLI, telemetry bootstrap, miette diagnostics
 crates/astrarium-core/       manifest, selection, render, cluster, Argo, kube
@@ -126,8 +150,10 @@ changes. The legacy shell harness has been removed.
 - `.github/workflows/astrarium-e2e.yaml` runs on app and harness changes. It
   builds the tool once when `astrium/**` or `astrarium.toml` changes, otherwise
   uses the pinned release. The plan job selects apps from the diff and fans out
-  one job per selected app. A manual dispatch runs the whole suite or one named
-  app.
+  one job per selected app. Each job logs in with `docker/login-action`, runs
+  `hack/ci/validate-ci-images.sh` before creating a cluster, pre-pulls the
+  host-side images through the registry proxy, and uploads the trace and
+  diagnostics. A manual dispatch runs the whole suite or one named app.
 - `.github/actions/setup-astrarium/action.yml` downloads and verifies a
   released binary, and caches `~/.local/bin/astrarium` by version, OS and
   architecture. `.github/astrarium-version` pins the e2e version; bump it after

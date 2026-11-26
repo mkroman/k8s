@@ -299,8 +299,14 @@ pub struct RegistryConfig {
 pub struct RegistryMirror {
     /// The upstream registry host, for example `docker.io`.
     pub upstream: String,
-    /// The mirror endpoint. `{host}` is replaced with the resolved host address.
+    /// The mirror endpoint. `{host}`, when present, is replaced with the
+    /// resolved host address.
     pub endpoint: String,
+    /// Treat the endpoint path as the registry API root instead of appending
+    /// `/v2`. Use this for a path-prefixed proxy such as
+    /// `https://registry.example.com/v2/docker.io`.
+    #[serde(default)]
+    pub override_path: bool,
 }
 
 /// A Helm chart repository that must be registered for dependency builds.
@@ -896,12 +902,6 @@ impl Manifest {
                         "registry mirror upstream must not be empty",
                     ));
                 }
-                if !mirror.endpoint.contains("{host}") {
-                    return Err(ManifestError::invalid(format!(
-                        "registry mirror for {} must contain {{host}} in its endpoint",
-                        mirror.upstream
-                    )));
-                }
             }
         }
 
@@ -1213,18 +1213,22 @@ fn default_registry_mirrors() -> Vec<RegistryMirror> {
         RegistryMirror {
             upstream: "docker.io".to_owned(),
             endpoint: "http://{host}:5000".to_owned(),
+            override_path: false,
         },
         RegistryMirror {
             upstream: "quay.io".to_owned(),
             endpoint: "http://{host}:5001".to_owned(),
+            override_path: false,
         },
         RegistryMirror {
             upstream: "ghcr.io".to_owned(),
             endpoint: "http://{host}:5002".to_owned(),
+            override_path: false,
         },
         RegistryMirror {
             upstream: "registry.k8s.io".to_owned(),
             endpoint: "http://{host}:5003".to_owned(),
+            override_path: false,
         },
     ]
 }

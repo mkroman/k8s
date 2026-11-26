@@ -6,6 +6,7 @@
 //! working directory.
 
 use std::collections::BTreeMap;
+use std::env;
 use std::fs;
 use std::net::IpAddr;
 use std::path::{Path, PathBuf};
@@ -19,6 +20,13 @@ pub const CERTIFICATE_DIRECTORY: &str = "/etc/containerd/certs.d";
 
 /// Environment variable that overrides the host address reachable from kind.
 pub const HOST_IP_ENV: &str = "ASTRARIUM_HOST_IP";
+
+/// Environment variable pointing at a plain Docker config.json whose
+/// credentials are mounted into every node for registry pulls.
+pub const AUTH_FILE_ENV: &str = "ASTRARIUM_REGISTRY_AUTH_FILE";
+
+/// The path kubelet reads registry credentials from in a kind node.
+const KUBELET_AUTH_FILE: &str = "/var/lib/kubelet/config.json";
 
 /// A generated `hosts.toml` file and its bind-mount destination.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -186,7 +194,7 @@ pub fn prepare(
             )));
         }
         let endpoint = mirror.endpoint.replace("{host}", host);
-        let contents = hosts_toml(&upstream_server(upstream), &endpoint);
+        let contents = hosts_toml(&upstream_server(upstream), &endpoint, mirror.override_path);
 
         let directories: Vec<&str> = if upstream == "docker.io" {
             vec!["docker.io", "registry-1.docker.io"]
@@ -209,13 +217,33 @@ pub fn prepare(
         }
     }
 
-    Ok(files
+    let mut mounts: Vec<MirrorMount> = files
         .into_iter()
         .map(|(name, (host_path, _))| MirrorMount {
             host_path,
             container_path: format!("{CERTIFICATE_DIRECTORY}/{name}/hosts.toml"),
         })
-        .collect())
+        .collect();
+
+    if let Some(value) = env::var_os(AUTH_FILE_ENV).filter(|value| !value.is_empty()) {
+        mounts.push(auth_mount(Path::new(&value))?);
+    }
+
+    Ok(mounts)
+}
+
+fn auth_mount(path: &Path) -> Result<MirrorMount, ClusterError> {
+    let host_path = fs::canonicalize(path).map_err(|source| ClusterError::io(path, source))?;
+    if !host_path.is_file() {
+        return Err(ClusterError::Registry(format!(
+            "registry auth file {} is not a regular file",
+            host_path.display()
+        )));
+    }
+    Ok(MirrorMount {
+        host_path,
+        container_path: KUBELET_AUTH_FILE.to_owned(),
+    })
 }
 
 fn validate_upstream(upstream: &str) -> Result<(), ClusterError> {
@@ -247,9 +275,14 @@ fn upstream_server(upstream: &str) -> String {
     }
 }
 
-fn hosts_toml(server: &str, endpoint: &str) -> String {
+fn hosts_toml(server: &str, endpoint: &str, override_path: bool) -> String {
+    let override_line = if override_path {
+        "\n  override_path = true"
+    } else {
+        ""
+    };
     format!(
-        "server = \"{server}\"\n\n[host.\"{endpoint}\"]\n  capabilities = [\"pull\", \"resolve\"]\n"
+        "server = \"{server}\"\n\n[host.\"{endpoint}\"]\n  capabilities = [\"pull\", \"resolve\"]{override_line}\n"
     )
 }
 
@@ -261,6 +294,7 @@ mod tests {
         RegistryMirror {
             upstream: upstream.to_owned(),
             endpoint: endpoint.to_owned(),
+            override_path: false,
         }
     }
 
@@ -370,6 +404,40 @@ eth0\t00000000\t00000000\t0001\t0\t0\t0\t00000000\t0\t0\t0
         )
         .expect("hub alias hosts.toml");
         assert_eq!(hub_alias, docker);
+    }
+
+    #[test]
+    fn path_prefix_mirrors_can_override_the_api_root() {
+        let directory = tempfile::tempdir().expect("tempdir");
+        prepare(
+            directory.path(),
+            "192.0.2.10",
+            &[RegistryMirror {
+                upstream: "docker.io".to_owned(),
+                endpoint: "https://registry.example.com/v2/docker.io".to_owned(),
+                override_path: true,
+            }],
+        )
+        .expect("registry prepared");
+
+        let docker = fs::read_to_string(directory.path().join("registry/docker.io/hosts.toml"))
+            .expect("docker hosts.toml");
+        assert!(docker.contains("[host.\"https://registry.example.com/v2/docker.io\"]"));
+        assert!(docker.contains("override_path = true"));
+    }
+
+    #[test]
+    fn auth_file_mounts_at_the_kubelet_config_path() {
+        let directory = tempfile::tempdir().expect("tempdir");
+        let auth = directory.path().join("config.json");
+        fs::write(&auth, "{\"auths\":{}}").expect("auth file");
+
+        let mount = auth_mount(&auth).expect("auth mount");
+        assert_eq!(mount.container_path, "/var/lib/kubelet/config.json");
+        assert_eq!(
+            mount.host_path,
+            auth.canonicalize().expect("canonical auth")
+        );
     }
 
     #[test]

@@ -106,6 +106,8 @@ Repository checks:
 ./hack/ci/validate-helm.sh                  # every chart (CI)
 ./hack/ci/validate-chart-cases.sh           # data-driven render/negative chart cases
 ./hack/ci/validate-e2e-contract.sh          # shared Argo CD e2e probe contract
+./hack/ci/validate-ci-images.sh stalwart    # registry image preflight (needs registry login)
+./hack/ci/prepare-ci-images.sh              # pre-pull host images through the registry
 ./hack/ci/validate-kustomize.sh             # every kustomization.yaml
 ./hack/ci/validate-app-of-apps.sh           # root app keeps SSA + server-side diff
 ./hack/ci/validate-dashboards.py            # grafana/dashboards/*.json; datasources must use $datasource
@@ -142,6 +144,13 @@ astrarium run --app spegel --reuse-cluster --fast-fail
 - Iterate locally with `--keep-cluster` on the first run, then
   `--reuse-cluster`. The cluster name comes from `[cluster].name`; Astrarium
   only deletes clusters named `astrarium` or prefixed with `astrarium-`.
+- Container pulls use `registry.rwx.im` through path-prefixed containerd
+  mirrors. `astrarium.toml` sets `override_path = true` and
+  `ASTRARIUM_REGISTRY_AUTH_FILE` points at a plain Docker `config.json` that
+  Astrarium mounts at `/var/lib/kubelet/config.json` on every node. CI creates
+  that file from the `REGISTRY_USER` and `REGISTRY_PASSWORD` secrets. Host-side
+  images are pre-pulled and retagged by `hack/ci/prepare-ci-images.sh`; do not
+  prefix image names in charts or manifests.
 - `--trace-file diagnostics/astrarium-trace.json` writes OTLP JSON that Jaeger
   UI can open through Search → Upload.
 - Kind overrides are picked up automatically: `<chart>/values-kind.yaml` for
@@ -210,6 +219,11 @@ astrarium run --app spegel --reuse-cluster --fast-fail
 
 ## Cluster / containerd
 
+- Image pulls go through `registry.rwx.im`. The mirrors in `astrarium.toml`
+  store repositories as `registry.rwx.im/<upstream>/<repo>` and require
+  `override_path = true`; containerd otherwise appends `/v2` to the mirror
+  path. Node authentication is the plain Docker config mounted at
+  `/var/lib/kubelet/config.json`, not an imagePullSecret.
 - This repo has no Ansible or Kubespray playbooks. Document the node
   settings an app needs in that chart's README.
 - The production cluster runs containerd 2.3. `discard_unpacked_layers` must

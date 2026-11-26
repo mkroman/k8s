@@ -14,6 +14,20 @@ to it, not a separate harness:
 - `argocd/` is the headless Argo CD Kustomize overlay. Astrarium renders and
   applies it before creating child Applications.
 
+## Registry
+
+Astrarium writes containerd `hosts.toml` files for `docker.io`, `ghcr.io`,
+`quay.io`, `registry.k8s.io`, `gcr.io`, `mirror.gcr.io`, and `public.ecr.aws`.
+Each mirror endpoint is a path-prefixed registry root such as
+`https://registry.rwx.im/v2/docker.io`, with `override_path = true`, so chart
+and manifest image names stay unchanged.
+
+Registry credentials come from a plain Docker `config.json` named by
+`ASTRARIUM_REGISTRY_AUTH_FILE`; Astrarium mounts it at
+`/var/lib/kubelet/config.json` on every node. Host-side images are pulled
+through the same registry and retagged before kind starts. In CI the
+`REGISTRY_USER` and `REGISTRY_PASSWORD` repository secrets provide both.
+
 Run a suite with:
 
 ```bash

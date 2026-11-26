@@ -87,21 +87,47 @@ environment = "kind"
 enabled = true
 host = "auto"
 
+# The registry proxy stores each upstream below its registry host:
+#   registry.rwx.im/docker.io/<repo>
+#   registry.rwx.im/ghcr.io/<repo>
+# `override_path` makes containerd use /v2/<upstream> as the API root, so
+# image names in charts and manifests stay unchanged. ASTRARIUM_REGISTRY_AUTH_FILE
+# points at a plain Docker config.json that is mounted into every node at
+# /var/lib/kubelet/config.json for registry authentication.
 [[registry.mirrors]]
 upstream = "docker.io"
-endpoint = "http://{host}:5000"
+endpoint = "https://registry.rwx.im/v2/docker.io"
+override_path = true
 
 [[registry.mirrors]]
 upstream = "quay.io"
-endpoint = "http://{host}:5001"
+endpoint = "https://registry.rwx.im/v2/quay.io"
+override_path = true
 
 [[registry.mirrors]]
 upstream = "ghcr.io"
-endpoint = "http://{host}:5002"
+endpoint = "https://registry.rwx.im/v2/ghcr.io"
+override_path = true
 
 [[registry.mirrors]]
 upstream = "registry.k8s.io"
-endpoint = "http://{host}:5003"
+endpoint = "https://registry.rwx.im/v2/registry.k8s.io"
+override_path = true
+
+[[registry.mirrors]]
+upstream = "gcr.io"
+endpoint = "https://registry.rwx.im/v2/gcr.io"
+override_path = true
+
+[[registry.mirrors]]
+upstream = "mirror.gcr.io"
+endpoint = "https://registry.rwx.im/v2/mirror.gcr.io"
+override_path = true
+
+[[registry.mirrors]]
+upstream = "public.ecr.aws"
+endpoint = "https://registry.rwx.im/v2/public.ecr.aws"
+override_path = true
 
 # The catalog adapter also imports the Helm repositories from
 # `hack/e2e/apps.yaml`. Only repository checks need them; Argo CD resolves its

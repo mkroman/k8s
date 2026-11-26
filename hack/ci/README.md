@@ -13,6 +13,8 @@ locally so failures can be reproduced without pushing.
 | `validate-helm.sh` | Every chart builds its dependencies, lints, and renders; kubeconform validates the result. |
 | `validate-chart-cases.sh` | Data-driven render and negative-render cases under `chart-cases/`. |
 | `validate-e2e-contract.sh` | Every Helm app that exposes `e2e` has the standard probe labels, hooks, image, and restricted security context. |
+| `validate-ci-images.sh` | The kind node image, compose images, and rendered upgrade-app images exist in the prefixed registry. Uses `docker buildx imagetools inspect`. |
+| `prepare-ci-images.sh` | Pulls host-side images through the prefixed registry and retags them with their original names for kind and compose. |
 | `validate-dashboards.py` | Grafana dashboard JSON: datasource references, variable convention, panel IDs, and removed panel types. |
 | `install-tools.sh` | Reads `tools.txt`, downloads each pinned release, verifies its SHA-256, and installs the binary. |
 
@@ -80,7 +82,12 @@ Run from anywhere in the repository:
 ./hack/ci/validate-helm.sh spegel    # one chart, useful while iterating
 ./hack/ci/validate-chart-cases.sh    # declarative chart render/negative cases
 ./hack/ci/validate-e2e-contract.sh   # shared Argo CD e2e probe contract
+./hack/ci/validate-ci-images.sh stalwart
+./hack/ci/prepare-ci-images.sh
 ```
+
+The image checks require `docker`, `yq`, and a prior login to the registry.
+Set `REGISTRY` to override the default registry host.
 
 ## Workflows
 
@@ -92,10 +99,12 @@ Run from anywhere in the repository:
   tests on kind through Astrarium; see [`astrium/README.md`](../../astrium/README.md)
   and [`hack/e2e/README.md`](../e2e/README.md).
 
-The workflows use only official `actions/*` and `azure/*` actions, plus the
-official zizmor action. The CLI tools are installed from their upstream
-release archives by `install-tools.sh`; no third-party tool actions, Go
-builds, or container images are used.
+The workflows use official `actions/*` and `azure/*` actions, the official
+zizmor action, and the pinned `docker/login-action` used by the image build.
+The e2e job pulls its host images through the configured registry proxy;
+kind nodes pull workload images through the containerd mirror configuration.
+The CLI tools are installed from their upstream release archives by
+`install-tools.sh`.
 
 All actions are pinned to commit SHAs. Workflows use read-only `contents`
 permissions, `persist-credentials: false`, per-workflow concurrency, and

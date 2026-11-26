@@ -191,6 +191,8 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: read
+    env:
+      REGISTRY: registry.rwx.im
     strategy:
       fail-fast: false
       max-parallel: 4
@@ -240,8 +242,35 @@ jobs:
         tar -xzf "${tmp}/${archive}" -C "${tmp}"
         install -m 0755 "${tmp}/linux-amd64/helm" "${HOME}/.local/bin/helm"
         helm version --short
-    - name: Install kind and kustomize
-      run: ./hack/ci/install-tools.sh "${HOME}/.local/bin" kind kustomize
+    - name: Install kind, kustomize and yq
+      run: ./hack/ci/install-tools.sh "${HOME}/.local/bin" kind kustomize yq
+    - name: Log in to the registry
+      uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ secrets.REGISTRY_USER }}
+        password: ${{ secrets.REGISTRY_PASSWORD }}
+    - name: Validate CI images
+      env:
+        APP: ${{ matrix.app }}
+      run: ./hack/ci/validate-ci-images.sh "${APP}"
+    - name: Prepare CI images
+      run: ./hack/ci/prepare-ci-images.sh
+    - name: Prepare kind registry credentials
+      env:
+        REGISTRY_USER: ${{ secrets.REGISTRY_USER }}
+        REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+      run: |
+        set -euo pipefail
+        if [[ -z "${REGISTRY_USER}" || -z "${REGISTRY_PASSWORD}" ]]; then
+          echo "::error::REGISTRY_USER and REGISTRY_PASSWORD repository secrets are required"
+          exit 1
+        fi
+        mkdir -p .astrium
+        umask 077
+        auth="$(printf '%s:%s' "${REGISTRY_USER}" "${REGISTRY_PASSWORD}" | base64 -w0)"
+        printf '{"auths":{"%s":{"auth":"%s"}}}\n' "${REGISTRY}" "${auth}" \
+          >.astrium/registry-auth.json
     - name: Start local services
       # Each matrix job has its own runner, so the fixed compose ports do not
       # collide across apps.
@@ -271,6 +300,7 @@ jobs:
       timeout-minutes: 20
       env:
         APP: ${{ matrix.app }}
+        ASTRARIUM_REGISTRY_AUTH_FILE: ${{ github.workspace }}/.astrium/registry-auth.json
       run: |
         set -euo pipefail
         astrarium run --app "${APP}" --fast-fail --keep-cluster \

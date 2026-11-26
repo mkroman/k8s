@@ -10,12 +10,11 @@ labels: [software, observability, testing]
 ## Summary
 
 Astrarium creates a three-node kind cluster, mounts containerd `hosts.toml`
-files that point image pulls at local pull-through mirrors, installs a minimal
-Argo CD from a Kustomize overlay, and exports one OTLP trace per run to Jaeger.
-The supporting services are defined in `astrium/compose.yaml`: Jaeger v2 with
-in-memory storage, and four `registry:3` caches for `docker.io`, `quay.io`,
-`ghcr.io`, and `registry.k8s.io`. The binary talks to Docker through its API,
-not the `docker` CLI, and invokes only `helm`, `kustomize`, and `kind`.
+files that point image pulls at the path-prefixed `registry.rwx.im` proxy,
+installs a minimal Argo CD from a Kustomize overlay, and exports one OTLP trace
+per run to Jaeger. `astrium/compose.yaml` provides Jaeger v2 with in-memory
+storage. The binary talks to Docker through its API, not the `docker` CLI, and
+invokes only `helm`, `kustomize`, and `kind`.
 
 ## Motivation
 
@@ -46,8 +45,8 @@ astrarium doctor
 
 `doctor` checks that `helm`, `kustomize`, and `kind` are on `PATH`, that the
 Docker API and Jaeger's OTLP port answer, and that each mirror responds. It
-prints the resolved host address and the `hosts.toml` content it will mount, so
-a networking problem is visible before the cluster exists.
+prints the resolved mirror endpoints, so a networking problem is visible
+before the cluster exists.
 
 Then run an application:
 
@@ -121,63 +120,47 @@ per run, so the user's current context is not changed.
 
 ### Registry mirrors
 
-`compose.yaml` runs one cache per upstream. Each cache is a `registry:3`
-container with a filesystem-backed named volume:
+Workload images pull through `registry.rwx.im`, which stores repositories
+under an upstream prefix:
 
-```yaml
-services:
-  jaeger:
-    image: jaegertracing/jaeger:2.23.0
-    ports: ["16686:16686", "4317:4317", "4318:4318"]
-  mirror-docker:
-    image: registry:3.1.2
-    ports: ["5000:5000"]
-    environment:
-      REGISTRY_PROXY_REMOTEURL: https://registry-1.docker.io
-    volumes: ["mirror-docker:/var/lib/registry"]
+```text
+registry.rwx.im/docker.io/library/busybox
+registry.rwx.im/ghcr.io/example/app
 ```
 
-The other three services repeat the pattern on ports 5001–5003 for
-`https://quay.io`, `https://ghcr.io`, and `https://registry.k8s.io`. All bind
-`0.0.0.0`; a mirror bound to `127.0.0.1` is unreachable from a kind node. The
-volumes are cache, not state: deleting one only costs a re-pull.
-
-For each upstream, Astrarium writes a `hosts.toml` directory:
+Containerd mirrors normally append `/v2` to the mirror endpoint and preserve
+the repository path. That cannot address a prefixed repository directly, so
+each mirror sets `override_path = true` and uses the proxy's API root as the
+endpoint:
 
 ```toml
 # <state>/certs.d/docker.io/hosts.toml
 server = "https://registry-1.docker.io"
-[host."http://192.168.1.10:5000"]
+
+[host."https://registry.rwx.im/v2/docker.io"]
   capabilities = ["pull", "resolve"]
+  override_path = true
 ```
 
-Docker Hub needs two directories, `docker.io` and `registry-1.docker.io`, with
-the same mirror host, because containerd may look up either name. The other
-upstreams use their canonical host as both the directory and `server`.
+The same pattern covers `ghcr.io`, `quay.io`, `registry.k8s.io`, `gcr.io`,
+`mirror.gcr.io`, and `public.ecr.aws`. Image names in charts and manifests stay
+unchanged; only the mirror endpoint carries the prefix.
 
-The mirror host is resolved in this order:
+Registry credentials use kind's recommended node-level mechanism. A plain
+Docker `config.json` is named by `ASTRARIUM_REGISTRY_AUTH_FILE`; Astrarium adds
+an `extraMount` to every node at `/var/lib/kubelet/config.json`. The file must
+contain base64-encoded credentials in `auths`; credential helpers are not
+available inside a node. CI writes it from the `REGISTRY_USER` and
+`REGISTRY_PASSWORD` repository secrets.
 
-1. `registry.host`, if set to an address;
-2. `ASTRARIUM_HOST_IP`;
-3. the default-route address from `local-ip-address`;
-4. the gateway address of the kind Docker network.
+**Host-side images bypass the node mirrors.** kind pulls `kindest/node` with
+the host Docker daemon before any node exists. The e2e workflow pulls the
+prefixed `kindest/node` and Jaeger images through the registry, retags them
+with their original names, and then starts kind and compose. The image names
+in `kind.yaml` and `compose.yaml` remain unchanged.
 
-The last fallback exists because a host with several interfaces can choose an
-address that kind cannot route to. Astrarium inspects the `kind` network through
-the Docker API (`bollard`) and uses its gateway; it does not invoke `docker
-network inspect`. The resolved address is logged and appears as
-`astrarium.cluster.host_ip` on the cluster span.
-
-If a mirror is configured but unreachable, Astrarium warns and falls back to
-direct pulls for that upstream, unless `registry.fallback = "fail"`. A direct
-pull is slower and less deterministic, but a mirror outage should not make
-every e2e app fail with the same error.
-
-**Node images bypass the node mirrors.** kind pulls `kindest/node` with the host
-Docker daemon before any node exists. The host daemon needs its own
-`registry-mirrors` configuration or a pre-pulled image. Astrarium cannot fix
-this from inside the cluster; `doctor` prints a warning and the exact image
-reference. CI images are pinned by digest (RFD 0006), so a pre-pull is enough.
+`astrarium doctor` still checks each configured mirror endpoint over TCP. It
+does not exercise registry authentication; the first image pull does.
 
 ### Argo CD installation
 
@@ -338,16 +321,17 @@ because the repo server logs one JSON line per rendered manifest.
 
 - The tool needs Docker, a compose stack, and a host address reachable from
   containers: heavier than the shell harness, which only needs Docker and kind.
-- The chart server and registry mirrors bind to all interfaces. The chart
-  server lives for one run; the mirrors are long-lived and unauthenticated.
+- The chart server binds to all interfaces and lives for one run.
+- Workload pulls depend on the external registry proxy and its availability.
+  The mirror configuration and credentials are part of the suite.
 - Jaeger v2 with in-memory storage loses traces when the container restarts.
   That is acceptable for a test tool but not for trend analysis.
 - The CI/CD semantic conventions are still stabilizing. Attribute names may
   change, and Astrarium would either pin an old convention or rename attributes
   in a breaking change.
-- The registry mirror is another cache to invalidate, and node images bypass
-  the node mirrors: the first `kindest/node` pull on a clean host is still an
-  upstream Docker Hub pull.
+- The registry mirror is another cache to invalidate. Node images bypass the
+  node mirrors, so CI pre-pulls them through the proxy and retags them before
+  kind starts.
 
 ## Rationale and alternatives
 
@@ -356,10 +340,12 @@ cluster provider, it supports containerd patches and extra mounts, and the
 repository's config encodes real requirements (Spegel, kubeadm bind addresses,
 three nodes). A remote cluster is not disposable.
 
-**Pull-through caches instead of an in-cluster registry.** An in-cluster
-registry would need a node before the node can pull, which is circular. A host
-cache is reachable from the first node and needs no Kubernetes resources; four
-caches keep the keys and failure domains separate.
+**A path-prefixed hosted proxy instead of local caches.** An in-cluster
+registry would need a node before the node can pull, which is circular. Local
+caches keep the failure domain local, but duplicate the same proxy per
+upstream and still need credential handling. The hosted proxy gives one
+consistent source for CI and developers; `override_path = true` lets containerd
+address the prefixed repositories without rewriting image names.
 
 **Hardcode the host IP instead of `local-ip-address`.** A hardcoded address is
 wrong on every machine except the author's. The crate's default-route address
@@ -384,8 +370,12 @@ is not the primary path.
 - [kind's configuration documentation](https://kind.sigs.k8s.io/docs/user/configuration/)
   defines `containerdConfigPatches` and `extraMounts`, including the silent
   version-selector behaviour.
-- [distribution/distribution](https://github.com/distribution/distribution) is
-  the `registry:3` pull-through cache used by the compose stack.
+- [kind private registries](https://kind.sigs.k8s.io/docs/user/private-registries/)
+  documents mounting a plain Docker `config.json` at
+  `/var/lib/kubelet/config.json`.
+- [containerd hosts.toml](https://containerd.io/docs/2.3/hosts/) defines
+  `override_path`; the [kind-registry-mirror action](https://github.com/RocketPadPlatforms/github-actions/pull/22)
+  uses the same `<mirror>/v2/<registry>` + `override_path = true` pattern.
 - [Jaeger v2](https://www.jaegertracing.io/docs/2.0/) is an OTel Collector
   distribution; the all-in-one image accepts OTLP on 4317/4318 and serves the UI
   on 16686.
@@ -401,9 +391,6 @@ is not the primary path.
 - **Must answer before `published`:** does "Docker or Podman" include Podman?
   `bollard` speaks the Docker API; Podman's compatibility socket may work, but
   kind and compose are untested with it.
-- **Can be deferred:** should a mirror failure warn and fall back to direct
-  pulls, or fail? The proposal is a warning, so an upstream outage does not mask
-  the application under test.
 - **Can be deferred:** which version of the CI/CD semantic conventions is
   pinned? The names here are the current release-candidate set; a constant in
   the telemetry module should record the choice.
@@ -415,5 +402,4 @@ is not the primary path.
   configured per environment.
 - Trace links from the run span to the GitHub Actions run and from each task
   span to the Argo CD Application URL.
-- Parallel kind clusters for independent applications, with a per-cluster
-  registry port range and a shared trace.
+- Parallel kind clusters for independent applications with a shared trace.

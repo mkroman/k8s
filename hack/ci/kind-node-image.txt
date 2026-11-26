@@ -1,0 +1,4 @@
+# kind's default node image for the pinned kind release (v0.33.0). CI pulls the
+# prefixed copy through registry.rwx.im and retags it, so kind keeps using its
+# normal image reference.
+kindest/node:v1.37.0
