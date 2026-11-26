@@ -129,8 +129,8 @@ To cut a release, update the workspace version, commit, then push a matching
 tag:
 
 ```bash
-git tag astrarium-v0.1.0
-git push origin astrarium-v0.1.0
+git tag astrarium-v0.1.1
+git push origin astrarium-v0.1.1
 ```
 
 ## License
