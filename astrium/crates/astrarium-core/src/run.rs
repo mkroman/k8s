@@ -27,9 +27,12 @@ use crate::cluster::{ClusterError, ClusterOptions, ClusterProvider, KindCluster}
 use crate::command::CommandRunner;
 use crate::diagnostics::{AppRequest, DiagnosticsCollector, DiagnosticsError, DiagnosticsRequest};
 use crate::kube::{
-    APPLICATION as APPLICATION_RESOURCE, ApplyOptions, DAEMON_SET, DEPLOYMENT, DeleteOptions, JOB,
-    KubeApi, KubeClient, KubeError, NAMESPACE, POD, ResourceKey, ResourceType, STATEFUL_SET,
+    APPLICATION as APPLICATION_RESOURCE, ApplyOptions, CUSTOM_RESOURCE_DEFINITION, DAEMON_SET,
+    DEPLOYMENT, DeleteOptions, JOB, KubeApi, KubeClient, KubeError, NAMESPACE, POD, ResourceKey,
+    ResourceType, STATEFUL_SET,
 };
+use kube::core::DynamicObject;
+
 use crate::manifest::{AppSpec, Manifest};
 use crate::plan::Plan;
 use crate::probe::{ProbeError, ProbeOutcome, check_app};
@@ -256,22 +259,37 @@ pub async fn run_suite(
     };
     info!(url = %served.url, "serving the local chart repository");
 
-    let apply_result = apply_suite(manifest, plan, &kube, &served.url, &rendered).await;
-    if let Err(error) = apply_result {
+    if let Err(error) = apply_namespaces_and_projects(manifest, plan, &kube, &served.url).await {
         served.shutdown();
-        warn!(%error, "applying Argo CD resources failed; keeping the cluster");
+        warn!(%error, "applying Argo CD namespaces and projects failed; keeping the cluster");
         return Err(error);
     }
 
+    let rendered_by_name: BTreeMap<&str, &RenderedApp> = rendered
+        .iter()
+        .map(|rendered| (rendered.app.as_str(), rendered))
+        .collect();
     let mut results = Vec::with_capacity(plan.apps.len());
     for planned in &plan.apps {
         let app = manifest
             .app(planned.name.as_str())
             .ok_or_else(|| RunError::MissingApp(planned.name.to_string()))?;
-        let rendered = rendered
-            .iter()
-            .find(|rendered| rendered.app == planned.name)
-            .ok_or_else(|| RunError::MissingChart(planned.name.clone()))?;
+        let rendered = rendered_by_name
+            .get(app.name.as_str())
+            .ok_or_else(|| RunError::MissingChart(app.name.clone()))?;
+        let chart = PublishedChart::from_rendered(rendered, &served.url);
+        let resource = application_for_manifest(
+            manifest,
+            app,
+            &chart,
+            manifest.argocd.namespace.as_str(),
+            &manifest.argocd.server,
+        )?;
+        if let Err(error) = apply_application(&kube, &resource, ApplyOptions::default()).await {
+            served.shutdown();
+            warn!(cluster = %handle.name, kubeconfig = %handle.kubeconfig.display(), %error, "applying the Application failed; keeping the cluster");
+            return Err(error.into());
+        }
         let timeout = app
             .timeout_seconds
             .map_or_else(|| manifest.render.timeout.get(), Duration::from_secs);
@@ -293,6 +311,15 @@ pub async fn run_suite(
         )
         .instrument(span.clone())
         .await;
+        let wait = match wait {
+            Ok(()) => {
+                // A dependency's CRDs may become Established just after its
+                // Application reports Healthy. Wait before applying a dependent
+                // that may need those CRDs.
+                wait_for_cluster_crds(&kube, clock.as_ref()).await
+            }
+            Err(message) => Err(message),
+        };
 
         if let Err(message) = wait {
             record_task_error(&span, ErrorType::Argocd);
@@ -544,12 +571,11 @@ async fn render_apps(
     Ok(rendered)
 }
 
-async fn apply_suite(
+async fn apply_namespaces_and_projects(
     manifest: &Manifest,
     plan: &Plan,
     kube: &dyn KubeApi,
     repository_url: &str,
-    rendered: &[RenderedApp],
 ) -> Result<(), RunError> {
     let argocd_namespace = manifest.argocd.namespace.as_str();
     let mut namespaces = BTreeSet::new();
@@ -590,27 +616,6 @@ async fn apply_suite(
         apply_app_project(kube, &resource, ApplyOptions::default()).await?;
     }
 
-    let rendered_by_name: BTreeMap<&str, &RenderedApp> = rendered
-        .iter()
-        .map(|rendered| (rendered.app.as_str(), rendered))
-        .collect();
-    for planned in &plan.apps {
-        let app = manifest
-            .app(planned.name.as_str())
-            .ok_or_else(|| RunError::MissingApp(planned.name.to_string()))?;
-        let rendered = rendered_by_name
-            .get(app.name.as_str())
-            .ok_or_else(|| RunError::MissingChart(app.name.clone()))?;
-        let chart = PublishedChart::from_rendered(rendered, repository_url);
-        let resource = application_for_manifest(
-            manifest,
-            app,
-            &chart,
-            argocd_namespace,
-            &manifest.argocd.server,
-        )?;
-        apply_application(kube, &resource, ApplyOptions::default()).await?;
-    }
     Ok(())
 }
 
@@ -753,6 +758,43 @@ async fn fatal_pod(kube: &dyn KubeApi, app: &AppSpec) -> Result<Option<String>, 
     Ok(None)
 }
 
+async fn wait_for_cluster_crds(kube: &dyn KubeApi, clock: &dyn Clock) -> Result<(), String> {
+    let deadline = deadline_after(clock, Duration::from_secs(60));
+    loop {
+        let crds = kube
+            .list(CUSTOM_RESOURCE_DEFINITION, None, None)
+            .await
+            .map_err(|error| error.to_string())?;
+        let pending: Vec<String> = crds
+            .iter()
+            .filter(|crd| !crd_established(crd))
+            .filter_map(|crd| crd.metadata.name.clone())
+            .collect();
+        if pending.is_empty() {
+            return Ok(());
+        }
+        if clock.now() >= deadline {
+            return Err(format!(
+                "CustomResourceDefinitions did not become Established: {}",
+                pending.join(", ")
+            ));
+        }
+        clock.sleep(Duration::from_millis(250)).await;
+    }
+}
+
+fn crd_established(crd: &DynamicObject) -> bool {
+    crd.data
+        .pointer("/status/conditions")
+        .and_then(serde_json::Value::as_array)
+        .is_some_and(|conditions| {
+            conditions.iter().any(|condition| {
+                condition.get("type").and_then(serde_json::Value::as_str) == Some("Established")
+                    && condition.get("status").and_then(serde_json::Value::as_str) == Some("True")
+            })
+        })
+}
+
 async fn wait_for_probe(
     kube: &dyn KubeApi,
     app: &AppSpec,
@@ -816,11 +858,7 @@ async fn collect_diagnostics(
         request = request.with_app(app_request);
     }
 
-    let directory = manifest
-        .project
-        .root
-        .join(".astrium/diagnostics")
-        .join(run_id);
+    let directory = manifest.project.root.join("diagnostics").join(run_id);
     let collector = DiagnosticsCollector::new(kube, manifest.argocd.namespace.as_str());
     let report = collector.collect(request).await;
     match report.write(&directory) {
@@ -851,6 +889,26 @@ mod tests {
 
     use super::*;
     use crate::kube::{LogRequest, ObjectReference, ProxyRequest};
+
+    #[test]
+    fn crd_established_requires_the_true_condition() {
+        let established: DynamicObject = serde_json::from_value(serde_json::json!({
+            "apiVersion": "apiextensions.k8s.io/v1",
+            "kind": "CustomResourceDefinition",
+            "metadata": {"name": "widgets.example.com"},
+            "status": {"conditions": [{"type": "Established", "status": "True"}]}
+        }))
+        .expect("crd");
+        let pending: DynamicObject = serde_json::from_value(serde_json::json!({
+            "apiVersion": "apiextensions.k8s.io/v1",
+            "kind": "CustomResourceDefinition",
+            "metadata": {"name": "widgets.example.com"},
+            "status": {"conditions": [{"type": "Established", "status": "False"}]}
+        }))
+        .expect("crd");
+        assert!(crd_established(&established));
+        assert!(!crd_established(&pending));
+    }
 
     #[test]
     fn run_error_keeps_app_name() {
