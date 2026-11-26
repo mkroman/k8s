@@ -12,12 +12,15 @@
   (gt (int .Values.service.mail.ports.imap) 0)
   (gt (int .Values.service.mail.ports.pop3) 0)
   (gt (int .Values.service.mail.ports.http) 0)
+  (gt (len .Values.service.mail.extraPorts) 0)
 }}
-{{- $dbPort := 0 }}
+{{- $dbPort := int (.Values.networkPolicy.egress.databasePort | default 0) }}
+{{- if eq $dbPort 0 }}
 {{- if eq $configType "PostgreSql" }}
 {{- $dbPort = index .Values.config "port" | default 5432 | int }}
 {{- else if eq $configType "MySql" }}
 {{- $dbPort = index .Values.config "port" | default 3306 | int }}
+{{- end }}
 {{- end }}
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -78,6 +81,10 @@ spec:
         {{- if gt (int .Values.service.mail.ports.http) 0 }}
         - protocol: TCP
           port: 80
+        {{- end }}
+        {{- range .Values.service.mail.extraPorts }}
+        - protocol: {{ .protocol | default "TCP" }}
+          port: {{ .targetPort | default .port }}
         {{- end }}
     {{- end }}
     # Management listener: same namespace plus explicit namespaces/CIDRs.

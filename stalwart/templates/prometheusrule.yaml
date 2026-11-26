@@ -1,4 +1,4 @@
-{{- if and .Values.metrics.serviceMonitor.enabled .Values.metrics.prometheusRule.enabled }}
+{{- if .Values.metrics.prometheusRule.enabled }}
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:
@@ -13,6 +13,7 @@ spec:
   groups:
     - name: stalwart
       rules:
+        {{- if .Values.metrics.exporter.enabled }}
         - alert: StalwartDown
           expr: up{job="{{ .Release.Name }}"} == 0
           for: 5m
@@ -31,6 +32,7 @@ spec:
           annotations:
             summary: "Stalwart outbound queue backlog is above {{ .Values.metrics.prometheusRule.queueBacklogThreshold }}"
             description: "Messages are accumulating in the Stalwart outbound queue. Check delivery errors, DNS, port 25, and relay configuration."
+        {{- end }}
         - alert: StalwartPodNotReady
           expr: kube_pod_status_ready{namespace="{{ .Release.Namespace }}",pod=~"{{ include "stalwart.fullname" . }}-[0-9]+",condition="true"} == 0
           for: 2m

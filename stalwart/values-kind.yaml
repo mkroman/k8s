@@ -2,11 +2,20 @@
 # This file is used by the Astrarium e2e suite and the Stalwart contract tests.
 replicaCount: 1
 
+# The kind suite uses the local RocksDB data store and its PVC; production
+# overrides this with the PostgreSQL config Secret.
+config:
+  "@type": RocksDb
+  path: /var/lib/stalwart
+configSecret:
+  name: ""
+
 service:
   mail:
     type: ClusterIP
 
 persistence:
+  enabled: true
   storageClass: standard
   size: 1Gi
 

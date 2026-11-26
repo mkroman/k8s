@@ -5,7 +5,8 @@ Deploys the [Stalwart](https://stalw.art/) mail and collaboration server
 
 The chart follows Stalwart's official Kubernetes reference but hardens it:
 
-- StatefulSet with a stable pod hostname and a per-pod RocksDB volume
+- StatefulSet with a stable pod hostname; RocksDB in kind and PostgreSQL in
+  production
 - restricted Pod Security, read-only root filesystem, and seccomp
   `RuntimeDefault`
 - AppArmor is opt-in. Set `podSecurityContext.appArmorProfile.type` and
@@ -22,17 +23,17 @@ The chart follows Stalwart's official Kubernetes reference but hardens it:
 ## Important: configuration lives in the database
 
 Stalwart stores almost all configuration in its data store. The chart renders
-only `/etc/stalwart/config.json` (the DataStore connection). Domains,
-listeners, TLS Certificate objects, DKIM, DNS management, accounts, tracers and
-the Prometheus exporter are configured through the WebUI, `stalwart-cli`, or a
-declarative plan.
+only `/etc/stalwart/config.json` (the DataStore connection), from a ConfigMap
+or a Secret. Domains, listeners, TLS Certificate objects, DKIM, DNS management,
+accounts, tracers and the Prometheus exporter are configured through the
+WebUI, `stalwart-cli`, or a declarative plan.
 
 This means:
 
 - Changing `values.yaml` does not create domains or mailboxes.
 - A backup of the data store includes the configuration.
 - The first install needs a recovery administrator because the chart always
-  renders `config.json` and the server never enters bootstrap mode.
+  provides `config.json` and the server never enters bootstrap mode.
 
 ## Prerequisites
 
@@ -42,8 +43,30 @@ This means:
   (`autoconfig`, `autodiscover`, `mta-sts`, `ua-auto-config`).
 - Outbound HTTPS 443 (WebUI bundle, spam rules, ASN data, ACME, DNS providers)
   and DNS 53.
-- cert-manager and the `letsencrypt-prod` ClusterIssuer.
-- The `ssd-gp1x3` StorageClass (kind overrides this to `standard`).
+- cert-manager and the `letsencrypt-production` ClusterIssuer.
+- A PostgreSQL database and role. Production uses
+  `postgres-rw.rwx.svc.cluster.local` and database `stalwart_prod`; the role
+  needs `CREATE` on the schema (Stalwart creates its own tables).
+- A Secret `stalwart-postgres` in the `stalwart` namespace with a `config.json`
+  key containing the complete DataStore configuration. The username and
+  password are read from this Secret; no credentials are rendered from
+  `values-prod.yaml`:
+  ```json
+  {
+    "@type": "PostgreSql",
+    "host": "postgres-rw.rwx.svc.cluster.local",
+    "port": 5432,
+    "database": "stalwart_prod",
+    "authUsername": "<database role>",
+    "authSecret": {"@type": "Value", "secret": "<database password>"}
+  }
+  ```
+  The non-secret `config` block in `values-prod.yaml` is only used for chart
+  validation and the NetworkPolicy database egress rule; keep it consistent
+  with the Secret. Seal the Secret with the repository's
+  `op2secret | kubeseal` workflow, or create it directly for a disposable
+  cluster. Rotating it requires `kubectl rollout restart statefulset/stalwart`
+  because an external Secret is not checksummed by Helm.
 - A SealedSecret `stalwart-recovery-admin` before the first production sync:
   - `STALWART_RECOVERY_ADMIN`: `admin:<password>`
   - `STALWART_USER`: `admin`
@@ -68,6 +91,11 @@ administrator from the values.
 
 Port 8080 is plain HTTP and is only exposed by the ClusterIP admin Service. It
 must never be added to the mail LoadBalancer.
+
+Additional Service ports belong in `service.mail.extraPorts`; the chart adds
+their target ports to the mail NetworkPolicy automatically. Use numeric
+targets (or the named container ports from the StatefulSet) so the policy and
+Service agree.
 
 ## TLS with cert-manager
 
@@ -94,13 +122,11 @@ The optional `certificate.reload` CronJob calls
 effect without a pod restart. It needs a Secret with `STALWART_USER` and
 `STALWART_PASSWORD`, or `STALWART_TOKEN`.
 
-`values-prod.yaml` references a ClusterIssuer named `letsencrypt-prod`. The
-repo's cert-manager chart currently ships `letsencrypt-production` (HTTP-01
-through Traefik); either create `letsencrypt-prod` with a DNS-01/Cloudflare
-solver, or change `certificate.issuerRef.name` to the issuer you actually use.
-If the issuer uses HTTP-01 through Traefik, a dedicated mail LoadBalancer IP
-will not receive the challenge; use a DNS-01 issuer or an existing wildcard
-certificate.
+`values-prod.yaml` references the repo's `letsencrypt-production`
+ClusterIssuer. It uses HTTP-01 through Traefik, so a dedicated mail
+LoadBalancer IP will not receive the challenge. Create a DNS-01 ClusterIssuer
+(the cert-manager chart ships a Cloudflare API token Secret) and override
+`certificate.issuerRef.name`, or use an existing wildcard certificate.
 
 ## Prometheus
 
@@ -124,9 +150,14 @@ The chart mounts `stalwart-metrics` at `/etc/stalwart/metrics`. The
 `/metrics/prometheus` with basic auth. The `monitoring` namespace is allowed to
 reach the management port by the NetworkPolicy.
 
+Configure the exporter before enabling `metrics.exporter.enabled`. The
+ServiceMonitor can be created earlier; without the exporter the scrape returns
+404 and `up` is zero.
+
 The `PrometheusRule` alerts on:
 
-- a down target and an outbound-queue backlog;
+- a down target and an outbound-queue backlog (only when
+  `metrics.exporter.enabled` is true);
 - a pod that is not Ready for two minutes;
 - container restarts;
 - `ImagePullBackOff`/`ErrImagePull`;
@@ -136,17 +167,21 @@ The `PrometheusRule` alerts on:
 - a failed TLS reload CronJob.
 
 The pod and PVC alerts need kube-state-metrics and kubelet metrics; the
-certificate alerts need the cert-manager metrics endpoint. They are only
-rendered when `metrics.serviceMonitor.enabled` and
-`metrics.prometheusRule.enabled` are true.
+certificate alerts need the cert-manager metrics endpoint. The PrometheusRule
+is rendered when `metrics.prometheusRule.enabled` is true and does not require
+the ServiceMonitor. `StalwartDown` and `StalwartQueueBacklog` are also gated on
+`metrics.exporter.enabled` so an unconfigured exporter does not page.
 
 ## Storage and backup
 
-The data directory is `/var/lib/stalwart` on a `ssd-gp1x3` PVC. The StatefulSet
-uses `persistentVolumeClaimRetentionPolicy: Retain` for both deletion and
-scale-down, and `helm uninstall` leaves the PVC behind.
+Production uses the PostgreSQL data store; `values-prod.yaml` disables the
+local data PVC. Stalwart creates its tables in `stalwart_prod` on first start.
+Use the CloudNativePG backup and restore workflow for the `postgres` cluster.
 
-RocksDB has no online backup. Use one of:
+The kind e2e suite keeps the embedded RocksDB store at `/var/lib/stalwart`.
+The StatefulSet uses `persistentVolumeClaimRetentionPolicy: Retain` for both
+deletion and scale-down, and `helm uninstall` leaves the PVC behind. RocksDB
+has no online backup; use one of:
 
 - a Longhorn volume snapshot of the whole data directory, or
 - stop the pod and use the official offline export:

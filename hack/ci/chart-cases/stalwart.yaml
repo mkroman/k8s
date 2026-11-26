@@ -9,6 +9,13 @@ mustFail:
     match: "persistence.enabled must be true"
   - name: multiple-replicas
     args: ["--set", "replicaCount=2"]
+  - name: config-secret-without-key
+    args:
+      - "--set"
+      - "configSecret.name=stalwart-postgres"
+      - "--set"
+      - "configSecret.key="
+    match: "configSecret.key is required"
   - name: recovery-admin-without-secret
     args: ["--set", "recoveryAdmin.enabled=true"]
     match: "recoveryAdmin.enabled requires"
