@@ -169,6 +169,35 @@ before every minor or major upgrade. The StatefulSet replaces one pod at a
 time and reuses the PVC. A major release may change the data format; read its
 release notes first.
 
+Stalwart is a single-replica stateful service, so a pod-template change is a
+short but real outage. A same-values `helm upgrade` does not restart the pod
+and causes no outage. The chart adds checksum annotations for the ConfigMap and
+for a chart-managed recovery-admin Secret, so those changes do restart the pod.
+An external `recoveryAdmin.existingSecret` cannot be checksummed at render
+time; after rotating it, restart the StatefulSet explicitly:
+
+```bash
+kubectl rollout restart statefulset/stalwart
+```
+
+A failed image pull leaves the StatefulSet pod in `ImagePullBackOff`.
+`helm rollback` (including `--atomic`/`--rollback-on-failure`) restores the
+StatefulSet revision, but the StatefulSet controller does not replace a pod
+that never became Ready. Delete the stuck pod after the rollback so it is
+recreated from the restored revision:
+
+```bash
+helm rollback stalwart <revision> --wait
+kubectl delete pod stalwart-0
+kubectl rollout status statefulset/stalwart
+```
+
+Avoid `kubectl delete pod --force` for routine operations. If the old
+container is still releasing the RocksDB LOCK, the replacement pod can fail
+once with `Failed to open database: ... Resource temporarily unavailable` and
+then recover on restart. Use a graceful delete and allow the configured
+`terminationGracePeriodSeconds` and `preStop` drain to finish.
+
 ## Testing
 
 The chart is exercised by the repo's Astrarium e2e suite:
@@ -198,6 +227,30 @@ Static checks:
 without persistence, multiple replicas, a recovery administrator without a
 Secret, a certificate without DNS names, and a ServiceMonitor without the admin
 Service.
+
+### Chaos test results
+
+A disposable single-node kind cluster was exercised with a continuous
+in-cluster SMTP and management probe. The app was installed without
+cert-manager or Prometheus Operator, so these numbers isolate the StatefulSet
+and storage path.
+
+| Scenario | SMTP gap | Admin gap | Result |
+| --- | ---: | ---: | --- |
+| Same-values `helm upgrade` | 0 s | 0 s | No pod restart |
+| ConfigMap checksum change | 8.7 s | 7.6 s | Pod replaced, marker intact |
+| Chart-managed recovery-admin Secret change | 8.7 s | 7.6 s | New environment value, marker intact |
+| Graceful pod delete | 9.7 s | 7.5 s | Pod replaced, marker intact |
+| Forced pod delete | 26.5 s | 26.5 s | One RocksDB LOCK startup failure, then recovery |
+| Forced pod delete during a rollout | 26.4 s | 27.5 s | Helm succeeded after an automatic restart |
+| Bad image upgrade, then manual rollback | 410 s | 411 s | Rollback required deleting the stuck pod |
+| Bad image upgrade with `--atomic` | 403 s | 402 s | Auto-rollback also required deleting the stuck pod |
+
+The PVC UID and a data marker were unchanged in every scenario, and a JMAP
+mailbox created before the final rollouts survived. The bad-image cases are
+deliberately destructive: they measure recovery behaviour, not a normal
+upgrade. The normal 8–10 s gap is the cost of a single replica; clients should
+retry idempotent reads and connections.
 
 ## Known limitations
 
